@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BollyLook</title>
+<style>
+  :root {
+    --bg: #fbf8f4; --surface: #ffffff; --text: #1d1a17; --muted: #6b645c;
+    --border: #e7e0d7; --accent: #c2185b; --accent-text: #ffffff; --chip: #f4ece3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #151312; --surface: #1f1c1a; --text: #f3eee8; --muted: #a39b92;
+            --border: #34302c; --accent: #f06292; --accent-text: #1a0a10; --chip: #2a2623; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1040px; margin: 0 auto; padding: 24px 16px 64px; }
+  header h1 { margin: 0; font-size: 28px; letter-spacing: -0.02em; }
+  header p { margin: 4px 0 24px; color: var(--muted); }
+  h2 { font-size: 18px; margin: 32px 0 12px; }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  form { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); align-items: end; }
+  label { display: grid; gap: 4px; font-size: 14px; color: var(--muted); }
+  input { font: inherit; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px;
+          background: var(--bg); color: var(--text); width: 100%; }
+  button, .btn { font: inherit; font-weight: 600; padding: 9px 14px; border-radius: 8px; border: 0;
+                 background: var(--accent); color: var(--accent-text); cursor: pointer; text-decoration: none;
+                 display: inline-block; }
+  button:disabled { opacity: .6; cursor: wait; }
+  .btn.ghost { background: var(--chip); color: var(--text); font-weight: 500; }
+  .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+  .scene { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+           cursor: pointer; text-align: left; padding: 0; color: inherit; font-weight: 400; }
+  .scene img { width: 100%; aspect-ratio: 16/10; object-fit: cover; display: block; }
+  .scene div { padding: 8px 10px; font-size: 14px; }
+  .muted { color: var(--muted); }
+  .result { display: grid; gap: 16px; grid-template-columns: minmax(0, 320px) minmax(0, 1fr); }
+  .result > img { width: 100%; border-radius: 12px; }
+  @media (max-width: 720px) { .result { grid-template-columns: 1fr; } }
+  .garment { border-top: 1px solid var(--border); padding: 12px 0; }
+  .garment:first-child { border-top: 0; padding-top: 0; }
+  .garment h3 { margin: 0 0 2px; font-size: 16px; }
+  .chip { display: inline-block; background: var(--chip); border-radius: 999px; padding: 1px 8px;
+          font-size: 12px; margin-right: 4px; }
+  .links { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; align-items: center; }
+  .links span { font-size: 13px; color: var(--muted); min-width: 92px; }
+  .links .btn { font-size: 13px; padding: 5px 10px; }
+  .error { color: #d32f2f; }
+  footer { margin-top: 48px; font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>BollyLook</h1>
+    <p>Saw an outfit in a film or song? Find it, or a dupe, on Myntra, AJIO and Amazon.</p>
+  </header>
+
+  <section class="panel">
+    <form id="upload">
+      <label>Screenshot of the scene
+        <input type="file" name="image" accept="image/jpeg,image/png,image/webp" required>
+      </label>
+      <label>Film (optional)<input name="movie" maxlength="200" placeholder="e.g. Kabhi Khushi Kabhie Gham"></label>
+      <label>Song or scene (optional)<input name="scene" maxlength="200" placeholder="e.g. Suraj Hua Maddham"></label>
+      <button type="submit">Find the look</button>
+    </form>
+    <p id="status" class="muted" role="status"></p>
+  </section>
+
+  <section id="result" hidden></section>
+
+  <h2>Trending scenes</h2>
+  <input id="search" type="search" placeholder="Search films or songs" aria-label="Search scenes">
+  <div id="scenes" class="grid" style="margin-top:12px"></div>
+
+  <footer>BollyLook earns a commission when you buy through links on this page, at no extra cost to you.</footer>
+</main>
+
+<script>
+const $ = (sel) => document.querySelector(sel);
+
+function el(tag, attrs = {}, ...children) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "onclick") node.onclick = v; else node.setAttribute(k, v);
+  }
+  for (const c of children) node.append(c);
+  return node;
+}
+
+async function api(path, options) {
+  const res = await fetch(path, options);
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail = typeof body.detail === "string" ? body.detail : "Something went wrong";
+    throw new Error(detail);
+  }
+  return body;
+}
+
+function renderLook(look, imageSrc) {
+  const linksRow = (g, kind, label) => el("div", { class: "links" }, el("span", {}, label),
+    ...g.links.filter((l) => l.kind === kind).map((l) =>
+      el("a", { class: kind === "exact" ? "btn" : "btn ghost", href: l.url, target: "_blank",
+                rel: "nofollow sponsored noopener", title: l.query }, l.store_name)));
+
+  const garments = look.garments.length
+    ? look.garments.map((g) => el("div", { class: "garment" },
+        el("h3", {}, g.name),
+        el("div", {}, el("span", { class: "chip" }, g.category.replaceAll("_", " ")),
+                       el("span", { class: "chip" }, g.worn_by),
+                       ...(g.confidence === "low" ? [el("span", { class: "chip" }, "hard to see")] : [])),
+        el("p", { class: "muted", style: "margin:6px 0 0" }, `${g.colors.join(", ")} · ${g.pattern} · ${g.details}`),
+        linksRow(g, "exact", "Closest match"),
+        linksRow(g, "dupe", "Budget dupe")))
+    : [el("p", { class: "muted" }, "No shoppable outfit found in this image.")];
+
+  const title = [look.context.movie, look.context.scene].filter(Boolean).join(" — ");
+  const result = $("#result");
+  result.replaceChildren(
+    el("h2", {}, title || "Your look"),
+    el("div", { class: "result" },
+      imageSrc ? el("img", { src: imageSrc, alt: "Scene" }) : el("div"),
+      el("div", { class: "panel" }, el("p", { style: "margin-top:0" }, look.summary), ...garments)));
+  result.hidden = false;
+  history.replaceState(null, "", `#look=${look.id}`);
+  result.scrollIntoView({ behavior: "smooth" });
+}
+
+$("#upload").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const form = e.currentTarget;
+  const button = form.querySelector("button");
+  const file = form.image.files[0];
+  button.disabled = true;
+  $("#status").textContent = "Reading the outfits… this takes a few seconds for a new scene.";
+  $("#status").className = "muted";
+  try {
+    const look = await api("/api/looks", { method: "POST", body: new FormData(form) });
+    $("#status").textContent = look.cached ? "Found it — someone looked this scene up before." : "";
+    renderLook(look, URL.createObjectURL(file));
+  } catch (err) {
+    $("#status").textContent = err.message;
+    $("#status").className = "error";
+  } finally {
+    button.disabled = false;
+  }
+});
+
+async function openScene(id) {
+  const scene = await api(`/api/scenes/${encodeURIComponent(id)}`);
+  renderLook(scene.look, scene.image_url);
+}
+
+async function loadScenes(q = "") {
+  const scenes = await api(`/api/scenes${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+  $("#scenes").replaceChildren(...(scenes.length ? scenes.map((s) =>
+    el("button", { class: "scene", onclick: () => openScene(s.id) },
+      el("img", { src: s.image_url, alt: "", loading: "lazy" }),
+      el("div", {}, el("strong", {}, s.movie), s.year ? ` (${s.year})` : "",
+        el("br"), el("span", { class: "muted" }, s.scene || "")))) :
+    [el("p", { class: "muted" }, q ? "No scenes match that search." : "No scenes in the catalog yet.")]));
+}
+
+let searchTimer;
+$("#search").addEventListener("input", (e) => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => loadScenes(e.target.value.trim()), 250);
+});
+
+loadScenes().catch(() => {});
+const shared = location.hash.match(/^#look=([\w-]+)$/);
+if (shared) api(`/api/looks/${shared[1]}`).then((look) => renderLook(look)).catch(() => {});
+</script>
+</body>
+</html>
