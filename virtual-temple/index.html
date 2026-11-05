@@ -143,8 +143,8 @@
   <div class="chipbar tl"><button class="pill" id="hutLeave"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>Leave hut</button></div>
   <div class="chipbar tr"><button class="icon-btn" id="hutView" aria-label="Change view"><svg viewBox="0 0 24 24"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><circle cx="12" cy="12" r="3"/></svg></button></div>
   <aside id="hutPanel" aria-labelledby="hutTitle">
-    <p class="eyebrow" lang="sa">ध्यान कुटीर · Dhyana Kutir</p>
-    <h2 id="hutTitle">Meditation hut</h2>
+    <div class="hut-head"><span class="mark" id="hutMark"></span><div><p class="eyebrow" lang="sa">ध्यान कुटीर · Dhyana Kutir</p>
+    <h2 id="hutTitle">Meditation hut</h2></div></div>
     <p class="sub">Sit, breathe and settle. Choose a practice; your devotee practises with you, guided by voice, breath tones and the light.</p>
     <div class="tabs" role="tablist" aria-label="Practice type">
       <button role="tab" id="tabBreathe" aria-selected="true" aria-controls="listBreathe">Breathe</button>
@@ -170,7 +170,7 @@
   </aside>
   <div id="sessionUI" hidden>
     <div class="stop"><b id="sTitle">Box breathing</b><span id="sTime">5:00</span><div class="sbar"><i id="sBar"></i></div></div>
-    <div id="orb" aria-hidden="true"><div class="halo"></div><div class="core"></div><div class="otext"><b id="oPhase">Settle in</b><span id="oCount"></span></div></div>
+    <div id="orb" aria-hidden="true"><div class="medi-wrap" id="mediWrap"></div><div class="otext"><b id="oPhase">Settle in</b><span id="oCount"></span></div></div>
     <p id="sCaption" aria-live="polite"></p>
     <div class="sctl">
       <button class="btn" id="sPause"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5v14M15 5v14"/></svg><span>Pause</span></button>
@@ -179,8 +179,8 @@
     </div>
   </div>
   <div id="doneCard" class="sheet" hidden>
-    <p class="eyebrow">Practice complete</p>
-    <h2 id="doneTitle">Well done</h2>
+    <div class="hut-head"><span class="mark big" id="doneMark"></span><div><p class="eyebrow">Practice complete</p>
+    <h2 id="doneTitle">Well done</h2></div></div>
     <p class="sub" id="doneSub"></p>
     <div class="row"><button class="btn primary" id="doneAgain">Practise again</button><button class="btn" id="doneMore">Choose another</button><button class="btn ghost" id="doneLeave">Leave hut</button></div>
   </div>

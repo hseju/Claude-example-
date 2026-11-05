@@ -274,16 +274,21 @@ body.reduced #soundPop .np i { animation: none; }
 #sessionUI .stop span { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .sbar { height: 3px; border-radius: 2px; background: rgba(255,255,255,.12); margin-top: 6px; overflow: hidden; }
 .sbar i { display: block; height: 100%; width: 0; background: var(--gold); transition: width .5s linear; }
-#orb { --f: 0.5; position: fixed; left: 50%; top: 31%; width: min(46vmin, 260px); height: min(46vmin, 260px); transform: translate(-50%, -50%); pointer-events: none; display: grid; place-items: center; }
-#orb .halo { position: absolute; inset: -18%; border-radius: 50%; background: radial-gradient(circle, rgba(255,196,110,.34) 0%, rgba(255,160,70,.12) 45%, rgba(255,140,40,0) 70%); opacity: calc(0.35 + var(--f) * 0.65); transform: scale(calc(0.7 + var(--f) * 0.35)); }
-#orb .core { position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle at 50% 42%, rgba(255,236,196,.55), rgba(240,170,80,.28) 55%, rgba(226,181,85,.12) 72%); border: 1.5px solid rgba(255,214,150,.7); box-shadow: 0 0 40px rgba(255,170,80,.35), inset 0 0 30px rgba(255,220,160,.25); transform: scale(calc(0.5 + var(--f) * 0.5)); }
-#orb .otext { position: relative; text-align: center; text-shadow: 0 1px 8px rgba(40,15,5,.9), 0 0 2px rgba(40,15,5,.8); }
-#orb .otext b { display: block; font-family: var(--display); font-weight: 400; font-size: clamp(20px, 4.4vmin, 28px); letter-spacing: .02em; }
-#orb .otext span { display: block; font-size: clamp(26px, 6vmin, 40px); font-variant-numeric: tabular-nums; color: #fff3dc; min-height: 1.2em; }
-#orb.calm .otext span { font-size: 14px; color: var(--muted); }
-#orb.calm { top: 22%; width: min(30vmin, 160px); height: min(30vmin, 160px); }
-#orb.calm .otext b { font-size: clamp(16px, 3vmin, 20px); }
-body.reduced #orb .core, body.reduced #orb .halo { transform: none; }
+/* the meditator: a silhouette in lotus pose whose aura, light and chakras follow the breath */
+#orb { position: fixed; left: 50%; top: 45%; width: min(68vmin, 430px); transform: translate(-50%, -50%); pointer-events: none; display: flex; flex-direction: column; align-items: center; }
+#orb .medi-wrap { width: 100%; aspect-ratio: 1; }
+#orb .medi { width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 0 18px rgba(255,170,80,.25)); }
+#orb .otext { margin-top: -6%; text-align: center; text-shadow: 0 1px 8px rgba(40,15,5,.95), 0 0 2px rgba(40,15,5,.8); }
+#orb .otext b { display: block; font-family: var(--display); font-weight: 400; font-size: clamp(20px, 4.2vmin, 28px); letter-spacing: .02em; }
+#orb .otext span { display: block; font-size: clamp(24px, 5.4vmin, 36px); font-variant-numeric: tabular-nums; color: #fff3dc; min-height: 1.2em; line-height: 1.1; }
+#orb.calm .otext span { font-size: 15px; color: var(--muted); }
+#sessionUI::before { content: ''; position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse 70% 62% at 50% 42%, rgba(14,6,3,.82), rgba(14,6,3,.62) 45%, rgba(14,6,3,.3) 80%, rgba(14,6,3,.2)); transition: opacity 1s; }
+#sessionUI.noorb::before { opacity: 0; }
+.hut-head { display: flex; align-items: center; gap: 12px; }
+.hut-head .mark { flex: none; width: 54px; height: 54px; border-radius: 50%; overflow: hidden; background: radial-gradient(circle, #4a2412, #24100a); border: 1px solid rgba(226,181,85,.45); }
+.hut-head .mark svg { width: 100%; height: 100%; }
+.hut-head .mark.big { width: 76px; height: 76px; border: 0; background: none; overflow: visible; }
+.wlabel .ico .medi-mark { width: 30px; height: 30px; stroke: none; fill: initial; }
 #sCaption { position: fixed; left: 50%; bottom: calc(max(16px, env(safe-area-inset-bottom)) + 70px); transform: translateX(-50%); width: min(620px, calc(100vw - 32px)); margin: 0; text-align: center; font-size: clamp(16px, 2.4vmin, 19px); line-height: 1.45; text-shadow: 0 1px 10px rgba(20,8,4,.95), 0 0 3px rgba(20,8,4,.9); transition: opacity .6s; pointer-events: none; }
 #sCaption.dim { opacity: 0; }
 #sessionUI .sctl { position: fixed; left: 50%; bottom: max(14px, env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; gap: 10px; align-items: center; }
@@ -292,7 +297,7 @@ body.reduced #orb .core, body.reduced #orb .halo { transform: none; }
 #doneCard { z-index: 21; }
 @media (max-width: 720px) {
   #hutPanel { top: auto; left: 8px; right: 8px; width: auto; bottom: max(8px, env(safe-area-inset-bottom)); max-height: 60vh; border-radius: 18px 18px 14px 14px; }
-  #orb { top: 36%; }
+  #orb { top: 45%; width: min(86vw, 360px); }
   #sessionUI .stop { top: calc(max(12px, env(safe-area-inset-top)) + 54px); min-width: 0; width: calc(100vw - 120px); padding: 6px 12px 8px; }
   #sCaption { bottom: calc(max(14px, env(safe-area-inset-bottom)) + 66px); }
 }

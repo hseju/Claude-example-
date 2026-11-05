@@ -9,6 +9,7 @@ import { PostFX } from './postfx.js';
 import { setAnisotropy } from './textures.js';
 import { HUT } from './hut.js';
 import { BREATHWORK, MEDITATIONS, TIMER, Guide, Session, PracticeLog } from './practice.js';
+import { meditatorSVG, MeditatorVisual } from './meditator.js';
 
 const $ = (id) => document.getElementById(id);
 const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
@@ -364,7 +365,7 @@ function buildLabels() {
     const el = document.createElement('div'); el.className = 'wlabel'; el.innerHTML = `<i class="ico">${ICONS[T.icon]}</i><div><b>${T.short}</b><em>Temple</em><span></span></div>`;
     el.addEventListener('click', () => goTo(T.id)); root.appendChild(el); labelEls[T.id] = el;
   }
-  { const el = document.createElement('div'); el.className = 'wlabel'; el.innerHTML = `<i class="ico">${ICONS.lotus}</i><div><b>Meditation</b><em>hut</em><span>Breathwork · guided meditation</span></div>`;
+  { const el = document.createElement('div'); el.className = 'wlabel'; el.innerHTML = `<i class="ico">${meditatorSVG('lbl', { full: false })}</i><div><b>Meditation</b><em>hut</em><span>Breathwork · guided meditation</span></div>`;
     el.addEventListener('click', () => goTo('hut')); root.appendChild(el); labelEls.hut = el; }
   labelEls.me = document.createElement('div'); labelEls.me.className = 'nlabel me'; root.appendChild(labelEls.me);
   labelEls.sims = [];
@@ -713,7 +714,7 @@ function startSession(kind, id) {
   audio.setSessionMix({ music: bg === 'music' ? 'meditation' : null, musicLevel: 0.28, ambience: bg === 'silence' ? 0.1 : bg === 'music' ? 0.45 : 0.8 });
   if (recorded) { hutState.rec = new Audio(recorded); hutState.rec.play().catch(() => {}); }
   $('hutPanel').hidden = true; $('doneCard').hidden = true; $('sessionUI').hidden = false;
-  $('sTitle').textContent = def.name; $('orb').classList.toggle('calm', kind !== 'breath'); $('orb').hidden = def.view === 'flame';
+  $('sTitle').textContent = def.name; $('orb').classList.toggle('calm', kind !== 'breath'); $('orb').hidden = def.view === 'flame'; $('sessionUI').classList.toggle('noorb', def.view === 'flame');
   $('sPause').querySelector('span').textContent = 'Pause'; $('sCaption').textContent = ''; $('sCaption').classList.add('dim');
   if (def.view) { hutState.view = def.view; }
   requestWake();
@@ -757,8 +758,10 @@ function releaseWake() { try { hutState.wake?.release(); } catch (e) {} hutState
 const fmt = (sec) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
 function updateSessionUI() {
   const S = hutState.session, u = hutState.ui; if (!S) return;
-  const st = S.state, orb = $('orb');
-  orb.style.setProperty('--f', (settings.reducedMotion ? 0.75 : st.fill).toFixed(3));
+  const st = S.state;
+  if (!hutState.visual) hutState.visual = new MeditatorVisual($('mediWrap'), { reducedMotion: settings.reducedMotion });
+  hutState.visual.reduced = settings.reducedMotion;
+  hutState.visual.update(hutState.paused ? 0.5 : st.fill, app.time, { hold: st.phase === 'hold' });
   const label = S.kind === 'breath' ? (hutState.paused ? 'Paused' : st.label) : (hutState.paused ? 'Paused' : hutState.def.tag);
   const count = S.kind === 'breath' ? (st.left ? String(st.left) : '') : fmt(S.remaining);
   if (u.label !== label) { u.label = label; $('oPhase').textContent = label; }
@@ -767,6 +770,8 @@ function updateSessionUI() {
   if (u.left !== left) { u.left = left; $('sTime').textContent = left; $('sBar').style.width = (100 * S.elapsed / S.total).toFixed(1) + '%'; }
 }
 function bindHut() {
+  $('mediWrap').innerHTML = meditatorSVG('sess'); $('hutMark').innerHTML = meditatorSVG('hm', { full: false });
+  $('doneMark').innerHTML = meditatorSVG('dm'); new MeditatorVisual($('doneMark'), { reducedMotion: true }).update(1, 0);
   $('hutLeave').onclick = leaveHut;
   $('tabBreathe').onclick = () => selectHutTab('breathe'); $('tabMeditate').onclick = () => selectHutTab('meditate'); $('tabSit').onclick = () => selectHutTab('sit');
   $('voiceMode').querySelectorAll('button').forEach(b => b.onclick = () => { settings.guideMode = b.dataset.v; persist(); renderHutPanel(); });
