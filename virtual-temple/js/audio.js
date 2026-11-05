@@ -457,6 +457,7 @@ export class TempleAudio {
     let manifest;
     try { const r = await fetch(url, { cache: 'no-cache' }); if (!r.ok) return; manifest = await r.json(); } catch (e) { return; }
     for (const [key, file] of Object.entries(manifest)) {
+      if (!file || key.startsWith('_')) continue;
       try { const r = await fetch(file); const data = await r.arrayBuffer(); this.library[key] = await this.ctx.decodeAudioData(data); } catch (e) { console.warn('Audio file could not be loaded:', file); }
     }
     this._applyLibrary(); this.applyZone(this.zone, 1);

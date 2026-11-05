@@ -4,6 +4,7 @@ import { brass, gold, clay, darkStone, pillarGeometry, HangingBell, diyaGeometry
 import { FlameField, fountainJets, windify } from './fx.js';
 import { Avatar, randomConfig } from './avatar.js';
 import { Scenery } from './scenery.js';
+import { Flora } from './flora.js';
 
 export const TEMPLES = {
   ganesha: { id: 'ganesha', name: 'Ganesha Temple', short: 'Ganesha', pos: new THREE.Vector3(-31, 0, 0), rot: Math.PI / 2, entrance: new THREE.Vector3(-19.5, 0, 0), stone: '#f1e4cf', accent: '#b8442a', icon: 'modak', flag: '#e8731c', blurb: 'Remover of obstacles. Flower offerings and aarti.' },
@@ -72,6 +73,7 @@ export class World {
     this.pointPool = [];
     for (let i = 0; i < (this.quality.level === 'low' ? 2 : 4); i++) { const l = new THREE.PointLight('#ffae5a', 0, 7, 1.6); S.add(l); this.pointPool.push(l); }
 
+    this.flora = new Flora(this.scene, this.quality, this.windTime);
     this._ground();
     this._wall();
     this._gateway();
@@ -85,6 +87,9 @@ export class World {
     this._peacock(new THREE.Vector3(-21, 0, -10), 0.9);
     this._rangolis();
     this._gardens();
+    this._urlis();
+    this._grassPoints();
+    this.flora.build((p) => this._diya(p, 0.38));
     this._pathDiyas();
     this._bunting();
     this.scenery = new Scenery(this.scene, this.quality, this.water, this.bedSpots || []);
@@ -199,13 +204,31 @@ export class World {
     const bud = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 10), new THREE.MeshStandardMaterial({ color: '#e9a7b0', roughness: 0.6 })); bud.scale.y = 1.5; bud.position.y = 2.0; S.add(bud);
     const jets = fountainJets(this.quality.level === 'low' ? 220 : 520, new THREE.Vector3(0, 2.1, 0), { height: 0.9, radius: 2.1 });
     S.add(jets); this.updaters.push((dt, t) => { jets.material.uniforms.uTime.value = t; });
+    { const c = document.createElement('canvas'); c.width = 128; c.height = 16; const x = c.getContext('2d');
+      x.fillStyle = 'rgba(220,240,245,0.55)'; x.fillRect(0, 0, 128, 16); for (let i = 0; i < 40; i++) { x.fillStyle = `rgba(255,255,255,${0.4 + Math.random() * 0.6})`; x.fillRect(Math.random() * 128, Math.random() * 16, 10 + Math.random() * 30, 1 + Math.random() * 2); }
+      const st = new THREE.CanvasTexture(c); st.wrapS = st.wrapT = THREE.RepeatWrapping; st.colorSpace = THREE.SRGBColorSpace;
+      const sm = new THREE.MeshBasicMaterial({ map: st, transparent: true, opacity: 0.8, depthWrite: false, color: '#eef9fb' });
+      const rm = new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.5, depthWrite: false });
+      const ripples = [];
+      for (let i = 0; i < 8; i++) {
+        const a = i / 8 * Math.PI * 2 + Math.PI / 8, c0 = new THREE.Vector3(Math.cos(a) * 0.92, 1.8, Math.sin(a) * 0.92), c2 = new THREE.Vector3(Math.cos(a) * 2.05, 0.5, Math.sin(a) * 2.05);
+        const curve = new THREE.QuadraticBezierCurve3(c0, new THREE.Vector3(Math.cos(a) * 1.7, 2.05, Math.sin(a) * 1.7), c2);
+        S.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 16, 0.03, 6), sm));
+        for (let k = 0; k < 2; k++) { const r = new THREE.Mesh(new THREE.RingGeometry(0.06, 0.1, 24), rm.clone()); r.rotation.x = -Math.PI / 2; r.position.set(c2.x, 0.51, c2.z); S.add(r); ripples.push({ r, ph: k * 0.6 + i * 0.13 }); }
+      }
+      const jet = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.05, 0.75, 8, 1, true), sm); jet.position.y = 2.6; S.add(jet);
+      // stone lotus petals crowning the upper bowl
+      const petal = new THREE.SphereGeometry(0.2, 10, 8); petal.scale(0.55, 1, 0.22); petal.translate(0, 0.18, 0);
+      for (let i = 0; i < 14; i++) { const a = i / 14 * Math.PI * 2, pm = new THREE.Mesh(petal, stone); pm.position.set(Math.cos(a) * 0.98, 1.72, Math.sin(a) * 0.98); pm.rotation.set(0, -a + Math.PI / 2, 0); pm.rotateX(0.55); S.add(pm); }
+      this.updaters.push((dt, t) => { st.offset.x = (st.offset.x - dt * 1.6) % 1; for (const p of ripples) { const k = ((t * 0.8 + p.ph) % 1.2) / 1.2; p.r.scale.setScalar(1 + k * 4); p.r.material.opacity = 0.5 * (1 - k); } });
+    }
     this.colliders.circles.push({ x: 0, z: 0, r: 3.0 });
     // small lotus ponds on the diagonals
     for (const [sx, sz] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) {
       const x = sx * 4.6, z = sz * 4.6;
       const rim = new THREE.Mesh(new THREE.TorusGeometry(1.6, 0.16, 8, 32), stone); rim.rotation.x = Math.PI / 2; rim.position.set(x, 0.2, z); rim.castShadow = true; S.add(rim);
       const wtr = new THREE.Mesh(new THREE.CircleGeometry(1.6, 28), this.water); wtr.rotation.x = -Math.PI / 2; wtr.position.set(x, 0.14, z); S.add(wtr);
-      this._lotuses(x, z, 1.2, 5, 0.16);
+      this._lotuses(x, z, 1.25, 4, 0.14);
       this.colliders.circles.push({ x, z, r: 1.85 });
     }
     // plaza rim diyas
@@ -213,14 +236,26 @@ export class World {
   }
   _nearAxis(a) { const d = (x) => Math.abs(Math.atan2(Math.sin(a - x), Math.cos(a - x))); return [0, Math.PI / 2, Math.PI, -Math.PI / 2].some(x => d(x) < 0.2); }
 
-  _lotuses(cx, cz, r, n, y) {
-    const padM = new THREE.MeshStandardMaterial({ color: '#4f7b3a', roughness: 0.6, side: THREE.DoubleSide });
-    const pads = new THREE.InstancedMesh(new THREE.CircleGeometry(0.32, 14, 0.3, Math.PI * 1.85), padM, n * 2);
-    const flowers = new THREE.InstancedMesh(new THREE.ConeGeometry(0.16, 0.22, 8, 1, true), new THREE.MeshStandardMaterial({ color: '#f0b6c2', roughness: 0.55, side: THREE.DoubleSide, emissive: '#3a1a1e' }), n);
-    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
-    for (let i = 0; i < n * 2; i++) { const a = Math.random() * 6.28, rr = Math.sqrt(Math.random()) * r; e.set(-Math.PI / 2, 0, Math.random() * 6); q.setFromEuler(e); m.compose(new THREE.Vector3(cx + Math.cos(a) * rr, y + 0.01, cz + Math.sin(a) * rr), q, new THREE.Vector3(1, 1, 1).multiplyScalar(0.7 + Math.random() * 0.6)); pads.setMatrixAt(i, m);
-      if (i < n) { e.set(Math.PI, 0, 0); q.setFromEuler(e); m.compose(new THREE.Vector3(cx + Math.cos(a) * rr, y + 0.12, cz + Math.sin(a) * rr), q, new THREE.Vector3(1, 1, 1)); flowers.setMatrixAt(i, m); } }
-    this.scene.add(pads, flowers);
+  _lotuses(cx, cz, r, n, y, rect) { this.flora.addLotusPond(cx, cz, r, y, n, rect); }
+
+  _urlis() {
+    // brass urli bowls of water with floating flowers and diyas, set around the fountain
+    for (const [x, z] of [[2.9, 7.0], [-2.9, 7.0], [2.9, -7.0], [-2.9, -7.0]]) { this.flora.addUrli(x, z); this.colliders.circles.push({ x, z, r: 0.95 }); }
+  }
+
+  _grassPoints() {
+    const n = this.quality.level === 'low' ? 0 : this.quality.level === 'medium' ? 2200 : 4000, pts = [];
+    const blocked = (x, z) => {
+      if (Math.hypot(x, z) < 13.2) return true;
+      if (Math.abs(x) < 3.8 && z > 11 && z < 41) return true;
+      if (Math.abs(z) < 3.2 && Math.abs(x) > 11 && Math.abs(x) < 23) return true;
+      if (Math.abs(x) < 3.2 && z < -11 && z > -23) return true;
+      for (const b of this.colliders.boxes) if (x > b.minX - 0.3 && x < b.maxX + 0.3 && z > b.minZ - 0.3 && z < b.maxZ + 0.3) return true;
+      for (const c of this.colliders.circles) if (Math.hypot(x - c.x, z - c.z) < c.r + 0.2) return true;
+      return false;
+    };
+    for (let i = 0; pts.length < n && i < n * 4; i++) { const x = (Math.random() * 2 - 1) * 45, z = -45 + Math.random() * 84; if (!blocked(x, z)) pts.push([x, z]); }
+    this.flora.addGrass(pts);
   }
 
   _ponds() {
@@ -233,7 +268,7 @@ export class World {
       }
       const step = new THREE.Mesh(new THREE.BoxGeometry(w - 0.4, 0.1, d - 0.4), new THREE.MeshStandardMaterial({ color: '#7c6a4f', roughness: 0.9 })); step.position.set(x, 0.05, z); this.scene.add(step);
       const wtr = new THREE.Mesh(new THREE.PlaneGeometry(w - 0.5, d - 0.5), this.water); wtr.rotation.x = -Math.PI / 2; wtr.position.set(x, 0.3, z); this.scene.add(wtr);
-      this._lotuses(x, z, 2.4, 9, 0.3);
+      this._lotuses(x, z, 2.4, 10, 0.3, [w - 1.2, d - 1.2]);
       this.colliders.boxes.push({ minX: x - w / 2 - 0.3, maxX: x + w / 2 + 0.3, minZ: z - d / 2 - 0.3, maxZ: z + d / 2 + 0.3 });
       for (let k = 0; k < 5; k++) this._diya(new THREE.Vector3(x - sx * (w / 2 + 0.05), 0.46, z - d / 2 + 1 + k * 2.2));
     }
@@ -448,71 +483,30 @@ export class World {
       for (const c of this.colliders.circles) if (Math.hypot(x - c.x, z - c.z) < c.r + r + 0.8) return false;
       return true;
     };
-    // trees: trunk + foliage clusters, all instanced
-    const trunkGeo = new THREE.CylinderGeometry(0.22, 0.38, 3.2, 8); trunkGeo.translate(0, 1.6, 0);
-    const trunkM = new THREE.MeshStandardMaterial({ color: '#5e4632', roughness: 0.95 });
-    const leafGeo = new THREE.IcosahedronGeometry(1, 2);
-    { const pos = leafGeo.attributes.position, v = new THREE.Vector3(), cols = [];
-      for (let i = 0; i < pos.count; i++) { v.fromBufferAttribute(pos, i); const n = 1 + Math.sin(v.x * 5.1 + v.y * 3.3) * 0.08 + Math.sin(v.z * 6.7 - v.y * 4.1) * 0.07; v.multiplyScalar(n); pos.setXYZ(i, v.x, v.y, v.z);
-        const b = 0.72 + Math.random() * 0.4 + v.y * 0.12; cols.push(b, b, b); }
-      leafGeo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3)); leafGeo.computeVertexNormals(); }
-    const leafM = windify(new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.85, vertexColors: true, flatShading: true }), { amp: 0.06, freq: 1.3, axis: 'x', weightBy: 'height' }, this.windTime);
-    const conGeo = new THREE.ConeGeometry(1.1, 5.5, 9); conGeo.translate(0, 2.75, 0);
+    // trees: a mix of species, with the Krishna side given over to flowering trees
     const N = this.quality.level === 'low' ? 34 : 54, spots = [];
     let tries = 0;
-    while (spots.length < N && tries++ < 4000) { const x = (Math.random() * 2 - 1) * 44, z = -44 + Math.random() * 82; if (keepClear(x, z, 1.6) && spots.every(s => Math.hypot(s[0] - x, s[1] - z) > 4.2)) spots.push([x, z, Math.random() < 0.18 ? 'ashoka' : 'canopy']); }
-    // outside the walls for depth
-    for (let i = 0; i < 60; i++) { const a = Math.random() * Math.PI * 2, r = 54 + Math.random() * 40; const x = Math.cos(a) * r, z = Math.sin(a) * r; if (Math.abs(x) < 8 && z > 40) continue; spots.push([x, z, Math.random() < 0.35 ? 'ashoka' : 'canopy', true]); }
-    const canopies = spots.filter(s => s[2] === 'canopy'), ashokas = spots.filter(s => s[2] === 'ashoka');
-    const trunks = new THREE.InstancedMesh(trunkGeo, trunkM, canopies.length + ashokas.length);
-    const leaves = new THREE.InstancedMesh(leafGeo, leafM, canopies.length * 6);
-    const cones = new THREE.InstancedMesh(conGeo, new THREE.MeshStandardMaterial({ color: '#2f5226', roughness: 0.85 }), ashokas.length);
-    trunks.castShadow = leaves.castShadow = cones.castShadow = true; leaves.receiveShadow = true;
-    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), col = new THREE.Color(), greens = ['#4f7a34', '#5d8a3b', '#3f6a2c', '#6b8f3e', '#476f30'];
-    const blossoms = [['#d94f8f', '#e978ad', '#c23a7a'], ['#a46ad0', '#c08ae0', '#8d55bd'], ['#f29ab8', '#f7b8cc', '#e7779f'], ['#f2b631', '#f6c84a', '#e89a1c']];
-    let ti = 0, li = 0, ci = 0;
-    for (const [x, z, type, outside] of spots) {
-      const s = 0.8 + Math.random() * 0.6;
-      m.compose(new THREE.Vector3(x, 0, z), q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.random() * 6), new THREE.Vector3(s, s * (type === 'ashoka' ? 0.5 : 1), s)); trunks.setMatrixAt(ti++, m);
-      if (!outside) this.colliders.circles.push({ x, z, r: 0.5 * s + 0.15 });
-      const bl = !outside && Math.random() < 0.5 ? blossoms[Math.floor(Math.random() * blossoms.length)] : null;
-      if (type === 'canopy') for (let k = 0; k < 6; k++) {
-        const a = k / 6 * Math.PI * 2 + Math.random(), rr = k === 0 ? 0 : 1.3 * s;
-        const p = new THREE.Vector3(x + Math.cos(a) * rr, 3.4 * s + (k === 0 ? 1.0 * s : Math.random() * 0.8 * s), z + Math.sin(a) * rr);
-        const sc = (1.5 + Math.random() * 0.7) * s;
-        m.compose(p, q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.random() * 6), new THREE.Vector3(sc, sc * 0.8, sc)); leaves.setMatrixAt(li, m);
-        leaves.setColorAt(li++, col.set(bl && (k === 0 || Math.random() < 0.6) ? bl[Math.floor(Math.random() * 3)] : greens[Math.floor(Math.random() * greens.length)]));
-      } else { m.compose(new THREE.Vector3(x, 1.0 * s, z), q.identity(), new THREE.Vector3(s, s * 1.1, s)); cones.setMatrixAt(ci++, m); }
+    while (spots.length < N && tries++ < 4000) {
+      const x = (Math.random() * 2 - 1) * 44, z = -44 + Math.random() * 82;
+      if (!keepClear(x, z, 1.6) || !spots.every(s => Math.hypot(s[0] - x, s[1] - z) > 4.6)) continue;
+      const nearWall = Math.abs(x) > 38 || z < -38 || z > 33, krishnaSide = x > 14;
+      const r = Math.random();
+      const kind = nearWall && r < 0.45 ? 'palm' : krishnaSide ? (r < 0.4 ? 'gulmohar' : r < 0.75 ? 'bougainvillea' : r < 0.9 ? 'jacaranda' : 'neem')
+        : (r < 0.38 ? 'neem' : r < 0.55 ? 'ashoka' : r < 0.7 ? 'gulmohar' : r < 0.85 ? 'bougainvillea' : r < 0.93 ? 'jacaranda' : 'palm');
+      spots.push([x, z, kind]);
     }
-    S.add(trunks, leaves, cones);
-    // flower beds (marigold, hibiscus, jasmine); the Krishna side is a flower garden
+    for (const [x, z, kind] of spots) { const s = 0.85 + Math.random() * 0.35; this.flora.addTree(kind, x, z, s); this.colliders.circles.push({ x, z, r: kind === 'palm' ? 0.4 : 0.45 * s + 0.15 }); }
+    // outside the walls: palms and shade trees for depth
+    for (let i = 0; i < 70; i++) { const a = Math.random() * Math.PI * 2, r = 54 + Math.random() * 36; const x = Math.cos(a) * r, z = Math.sin(a) * r; if (Math.abs(x) < 8 && z > 40) continue; this.flora.addTree(Math.random() < 0.4 ? 'palm' : Math.random() < 0.7 ? 'neem' : 'ashoka', x, z, 0.9 + Math.random() * 0.4); }
+    // raised flower beds (marigold, hibiscus, jasmine); bougainvillea hedges line the approach
     const bedSpots = []; tries = 0;
     const krishnaBias = () => (Math.random() < 0.45 ? [18 + Math.random() * 26, (Math.random() * 2 - 1) * 30] : [(Math.random() * 2 - 1) * 44, -44 + Math.random() * 82]);
-    while (bedSpots.length < (this.quality.level === 'low' ? 30 : 60) && tries++ < 6000) { const [x, z] = krishnaBias(); if (keepClear(x, z, 1.2) && bedSpots.every(s => Math.hypot(s[0] - x, s[1] - z) > 3.0) && spots.every(s => Math.hypot(s[0] - x, s[1] - z) > 2.4)) bedSpots.push([x, z]); }
-    // also hedges lining the approach path
-    for (let z = 14; z < 37; z += 2.4) for (const sx of [-1, 1]) if (z < 18.2 || z > 31.8) bedSpots.push([sx * 4.5, z, 'hedge']);
-    for (const T of Object.values(TEMPLES)) for (const s of [-1, 1]) { const side = new THREE.Vector3(s * 4.2, 0, 11.6).applyAxisAngle(new THREE.Vector3(0, 1, 0), T.rot).add(T.pos); bedSpots.push([side.x, side.z, 'temple']); }
-    const bushGeo = new THREE.SphereGeometry(1, 12, 8); bushGeo.scale(1, 0.45, 1);
-    const bushes = new THREE.InstancedMesh(bushGeo, new THREE.MeshStandardMaterial({ color: '#4a7232', roughness: 0.9 }), bedSpots.length);
-    const fGeo = new THREE.IcosahedronGeometry(0.11, 0);
-    const per = 34, flowers = new THREE.InstancedMesh(fGeo, windify(new THREE.MeshStandardMaterial({ roughness: 0.7 }), { amp: 0.02, freq: 2.0, axis: 'x', weightBy: 'height' }, this.windTime), bedSpots.length * per);
-    const palettes = [['#f29a17', '#f6c025'], ['#c2387e', '#e35d9a'], ['#ffffff', '#f6e9c8'], ['#e35d9a', '#f6c025'], ['#d42a26', '#f2a516'], ['#9b5fc0', '#e35d9a'], ['#c2387e', '#ffffff']];
-    let bi = 0, fi = 0;
-    for (const [x, z, kind] of bedSpots) {
-      const r = kind === 'hedge' ? 0.7 : 1.0 + Math.random() * 0.4;
-      m.compose(new THREE.Vector3(x, 0.15, z), q.identity(), new THREE.Vector3(r, r, r)); bushes.setMatrixAt(bi++, m);
-      if (kind !== 'hedge') this.colliders.circles.push({ x, z, r: r * 0.9 });
-      const pal = palettes[Math.floor(Math.random() * palettes.length)];
-      for (let k = 0; k < per; k++) {
-        const a = Math.random() * Math.PI * 2, rr = Math.sqrt(Math.random()) * r * 0.85;
-        const y = 0.15 + Math.sqrt(Math.max(0, 1 - (rr / r) ** 2)) * r * 0.45 + 0.02;
-        m.compose(new THREE.Vector3(x + Math.cos(a) * rr, y, z + Math.sin(a) * rr), q.identity(), new THREE.Vector3(1, 0.7, 1).multiplyScalar(0.7 + Math.random() * 0.6)); flowers.setMatrixAt(fi, m);
-        flowers.setColorAt(fi++, col.set(pal[k % 3 === 0 ? 1 : 0]));
-      }
-    }
+    while (bedSpots.length < (this.quality.level === 'low' ? 26 : 46) && tries++ < 6000) { const [x, z] = krishnaBias(); if (keepClear(x, z, 1.3) && bedSpots.every(s => Math.hypot(s[0] - x, s[1] - z) > 3.2) && spots.every(s => Math.hypot(s[0] - x, s[1] - z) > 2.8)) bedSpots.push([x, z]); }
+    const palettes = [['marigold'], ['marigold', 'marigold', 'hibiscus'], ['hibiscus', 'jasmine'], ['jasmine', 'marigold'], ['marigold', 'jasmine', 'hibiscus']];
+    for (const [x, z] of bedSpots) { const r = 1.0 + Math.random() * 0.45; this.flora.addBed(x, z, r, palettes[Math.floor(Math.random() * palettes.length)]); this.colliders.circles.push({ x, z, r: r + 0.1 }); }
+    for (let z = 14; z < 37; z += 2.4) for (const sx of [-1, 1]) if (z < 18.2 || z > 31.8) { this.flora.addHedge(sx * 4.6, z, 0.85, true); bedSpots.push([sx * 4.6, z, 'hedge']); }
+    for (const T of Object.values(TEMPLES)) for (const s of [-1, 1]) { const side = new THREE.Vector3(s * 4.4, 0, 11.4).applyAxisAngle(new THREE.Vector3(0, 1, 0), T.rot).add(T.pos); this.flora.addBed(side.x, side.z, 0.9, ['marigold', 'hibiscus']); this.colliders.circles.push({ x: side.x, z: side.z, r: 1.0 }); bedSpots.push([side.x, side.z, 'temple']); }
     this.bedSpots = bedSpots.filter(b => b[2] !== 'hedge');
-    bushes.receiveShadow = true; bushes.castShadow = this.quality.level === 'high';
-    S.add(bushes, flowers);
   }
 
   _diyaGeo() { return this._dg || (this._dg = diyaGeometry()); }

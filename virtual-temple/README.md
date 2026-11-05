@@ -43,7 +43,7 @@ Opening `index.html` straight from disk (`file://`) does not work, because brows
 
 ### Using recorded audio
 
-Drop licensed files into `virtual-temple/audio/` and add `audio/manifest.json`, for example:
+Drop licensed files into `virtual-temple/audio/` and fill in the matching slot in `audio/manifest.json` (every slot is already listed, empty), for example:
 
 ```json
 {
@@ -66,6 +66,7 @@ css/app.css         UI layer
 js/main.js          app state machine, input, cameras, UI wiring, render loop
 js/world.js         campus: terrain, temples, gardens, NPC devotees, waypoint graph, collisions, time-of-day presets
 js/scenery.js       mountains, waterfalls, river, clouds, mist, bird flocks, butterflies, fireflies, stars, moon
+js/flora.js         trees (neem, gulmohar, bougainvillea, jacaranda, ashoka, coconut palm), flower beds and hedges, grass, lotus ponds, urli bowls
 js/dome.js          prayer hall: shell, per-deity sanctum, 12 spots, offerings, aarti choreography
 js/architecture.js  shared pieces: pillars, bells (pendulum + clapper), diyas, lamp stands, shikhara
 js/avatar.js        procedural avatars and their poses (walk, namaste, bow, offer, ring, aarti)

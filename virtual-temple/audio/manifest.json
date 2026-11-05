@@ -1,1 +1,12 @@
-{}
+{
+  "_readme": "Fill in a path to use a recording for that slot; leave it empty to keep the built-in sound. See audio/README.md.",
+  "ambience.morning": "",
+  "ambience.afternoon": "",
+  "ambience.evening": "",
+  "ambience.night": "",
+  "music.morning": "",
+  "music.afternoon": "",
+  "music.evening": "",
+  "music.night": "",
+  "aarti": ""
+}

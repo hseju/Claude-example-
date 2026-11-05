@@ -149,7 +149,9 @@ export function chhatri(s = 1, stone = ivory, trim = paleGold) {
   const g = new THREE.Group();
   const add = (geo, m, x, y, z) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = true; o.receiveShadow = true; g.add(o); return o; };
   add(new THREE.BoxGeometry(3.0 * s, 0.35 * s, 3.0 * s), stone, 0, 0.175 * s, 0);
-  add(new THREE.BoxGeometry(3.1 * s, 0.08 * s, 3.1 * s), trim, 0, 0.36 * s, 0);
+  add(new THREE.BoxGeometry(3.12 * s, 0.06 * s, 3.12 * s), trim, 0, 0.33 * s, 0);
+  add(new THREE.BoxGeometry(2.9 * s, 0.06 * s, 2.9 * s), stone, 0, 0.37 * s, 0);
+  for (const r of [0.8, 0.45]) { const inlay = new THREE.Mesh(new THREE.RingGeometry(r * s, (r + 0.06) * s, 32), trim); inlay.rotation.x = -Math.PI / 2; inlay.position.y = 0.405 * s; g.add(inlay); }
   const pg = pillarGeometry(2.0 * s, 0.11 * s);
   for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const p = new THREE.Mesh(pg, stone); p.position.set(x * 1.12 * s, 0.4 * s, z * 1.12 * s); p.castShadow = true; g.add(p); }
   for (let i = 0; i < 4; i++) {
@@ -161,8 +163,18 @@ export function chhatri(s = 1, stone = ivory, trim = paleGold) {
   add(new THREE.CylinderGeometry(1.0 * s, 1.05 * s, 0.22 * s, 20), trim, 0, 2.9 * s, 0);
   const dome = new THREE.LatheGeometry([[0, 0], [1.0, 0], [1.08, 0.22], [1.02, 0.55], [0.8, 0.9], [0.45, 1.15], [0.14, 1.32], [0, 1.36]].map(([x, y]) => new THREE.Vector2(x * s, y * s)), 24);
   add(dome, stone, 0, 3.0 * s, 0);
-  const k = kalasha(0.55 * s); k.position.y = 4.32 * s; g.add(k);
-  g.userData.top = 4.9 * s; g.userData.radius = 1.6 * s;
+  // gilded ribs following the dome, a ring of lotus petals at its foot and an inverted lotus at the crown
+  const prof = [[1.0, 0], [1.08, 0.22], [1.02, 0.55], [0.8, 0.9], [0.45, 1.15], [0.14, 1.32]];
+  for (let i = 0; i < 12; i++) {
+    const a = i / 12 * Math.PI * 2, pts = prof.map(([r, y]) => new THREE.Vector3(Math.cos(a) * r * 1.01 * s, (3.0 + y) * s, Math.sin(a) * r * 1.01 * s));
+    g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 16, 0.025 * s, 5), trim));
+  }
+  const petal = new THREE.SphereGeometry(0.16 * s, 10, 6); petal.scale(0.6, 1, 0.3); petal.translate(0, 0.12 * s, 0);
+  for (let i = 0; i < 18; i++) { const a = i / 18 * Math.PI * 2, pm = new THREE.Mesh(petal, stone); pm.position.set(Math.cos(a) * 1.03 * s, 3.0 * s, Math.sin(a) * 1.03 * s); pm.rotation.y = -a + Math.PI / 2; pm.rotateX(0.35); g.add(pm); }
+  const crown = new THREE.LatheGeometry([[0.05, 0], [0.32, 0.05], [0.36, 0.1], [0.2, 0.16], [0.08, 0.2]].map(([r, y]) => new THREE.Vector2(r * s, y * s)), 16);
+  add(crown, trim, 0, 4.3 * s, 0);
+  const k = kalasha(0.55 * s); k.position.y = 4.48 * s; g.add(k);
+  g.userData.top = 5.05 * s; g.userData.radius = 1.6 * s;
   return g;
 }
 
