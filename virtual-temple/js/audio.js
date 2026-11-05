@@ -76,7 +76,8 @@ export class TempleAudio {
     this.layers = {};
     this._timers = [];
     this.ceremony = null;
-    this.library = {};       // optional recorded beds: { 'ambience.morning': AudioBuffer, ... }
+    this.library = {};       // recorded beds: { 'ambience.morning': AudioBuffer, ... }
+    this.synthMelody = false; // raga phrases on synthesised bansuri/sitar; off now that recordings carry the music
   }
 
   get ready() { return !!this.ctx && this.ctx.state === 'running'; }
@@ -397,7 +398,7 @@ export class TempleAudio {
 
   _phrase() {
     const m = TOD_MIX[this.tod], ctx = this.ctx; this._nextPhrase = 6 + Math.random() * 6;
-    if (this.library['music.' + this.tod] || this.ceremony || m.music === 0) return;
+    if (!this.synthMelody || this.library['music.' + this.tod] || this.ceremony || m.music === 0) return;
     const raga = RAGAS[this.tod];
     const t0 = ctx.currentTime + 0.1;
     const beat = (m.instrument === 'sitar' ? 0.42 : 0.55) * (0.85 + Math.random() * 0.3);
@@ -436,14 +437,16 @@ export class TempleAudio {
     set(L.cicadas, rec ? 0 : 0.05 * m.insects);
     set(L.crickets, rec ? 0 : 0.7 * m.crickets);
     set(L.night, 0.6); set(L.cows, 0.5); set(L.bells, 0.5);
-    set(L.recorded, 0.8);
+    set(L.recorded, 1.1);
     // music: a quiet bed in the courtyard, fuller by the shrines and inside the halls
-    const music = this.library['music.' + this.tod] ? 0 : m.music;
+    const recMusic = !!this.library['music.' + this.tod], music = recMusic ? 0 : m.music;
     const near = Math.max(z.corridor, z.dome);
-    set(L.tanpura, music * (0.2 + near * 0.45) * (this.ceremony ? 0.3 : 1));
+    // without a recording the music is just a soft tanpura drone, mostly heard by the shrines
+    set(L.tanpura, music * (0.04 + near * 0.3) * (this.ceremony ? 0.3 : 1));
+    if (this._libMusic) this._ramp(this._libMusic.gain, (0.32 + near * 0.35) * (this.ceremony ? 0.1 : 1), tc);
     set(L.melody, music * (0.3 + near * 0.3 + z.krishna * 0.25) * (this.ceremony ? 0 : 1));
     set(L.tabla, music * m.tabla * (0.25 + near * 0.3));
-    set(L.chant, m.chant * (0.5 * z.dome + 0.05 * z.corridor));
+    set(L.chant, m.chant * (recMusic ? 0.15 : 0.35) * z.dome);
     set(L.shivaDrone, 0.5 * z.shiva * (0.2 + z.dome));
     this._ramp(this.hallReturn.gain, 0.12 + z.dome * 0.7, tc);
     this._ramp(this.stoneReturn.gain, 0.15 + z.corridor * 0.55, tc);
@@ -465,10 +468,13 @@ export class TempleAudio {
   _applyLibrary() {
     for (const s of this._libSources || []) { try { s.gain.gain.setTargetAtTime(0, this.ctx.currentTime, 1); s.src.stop(this.ctx.currentTime + 4); } catch (e) {} }
     this._libSources = [];
+    this._libMusic = null;
     for (const [kind, dest] of [['ambience', this.layers.recorded], ['music', this.buses.music]]) {
       const buf = this.library[`${kind}.${this.tod}`]; if (!buf) continue;
-      const src = this.ctx.createBufferSource(); src.buffer = buf; src.loop = true; const g = this.ctx.createGain(); g.gain.value = 0; g.gain.setTargetAtTime(kind === 'music' ? 0.6 : 0.9, this.ctx.currentTime, 1.5);
-      src.connect(g).connect(dest); if (kind === 'music') this._send(g, { hall: 0.3 }); src.start(); this._libSources.push({ src, gain: g });
+      const src = this.ctx.createBufferSource(); src.buffer = buf; src.loop = true;
+      src.loopStart = Math.min(0.06, buf.duration / 4); src.loopEnd = Math.max(src.loopStart + 1, buf.duration - 0.06);   // step over encoder padding so the loop is seamless
+      const g = this.ctx.createGain(); g.gain.value = 0; g.gain.setTargetAtTime(kind === 'music' ? 0.35 : 1.0, this.ctx.currentTime, 1.5);
+      src.connect(g).connect(dest); if (kind === 'music') { this._send(g, { hall: 0.25 }); this._libMusic = g; } src.start(0, Math.random() * buf.duration * 0.5); this._libSources.push({ src, gain: g });
     }
   }
 

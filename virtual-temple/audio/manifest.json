@@ -1,12 +1,12 @@
 {
-  "_readme": "Fill in a path to use a recording for that slot; leave it empty to keep the built-in sound. See audio/README.md.",
-  "ambience.morning": "",
-  "ambience.afternoon": "",
-  "ambience.evening": "",
-  "ambience.night": "",
-  "music.morning": "",
+  "_readme": "Each slot points at a recording; an empty slot uses the built-in sound. Credits and licences: audio/CREDITS.md.",
+  "ambience.morning": "audio/ambience-morning.mp3",
+  "ambience.afternoon": "audio/ambience-afternoon.mp3",
+  "ambience.evening": "audio/ambience-evening.mp3",
+  "ambience.night": "audio/ambience-night.mp3",
+  "music.morning": "audio/music-morning.mp3",
   "music.afternoon": "",
-  "music.evening": "",
+  "music.evening": "audio/music-evening.mp3",
   "music.night": "",
-  "aarti": ""
+  "aarti": "audio/aarti.mp3"
 }

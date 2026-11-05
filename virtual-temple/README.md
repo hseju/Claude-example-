@@ -40,11 +40,11 @@ Opening `index.html` straight from disk (`file://`) does not work, because brows
 ## Honest limits
 
 * **Every other devotee is simulated.** The HUD says "Multiplayer offline · N simulated devotees", hall occupancy notes how many are simulated, and their name tags read "simulated" while you choose a spot.
-* **Audio is synthesised, not recorded.** The tanpura and sitar are plucked-string models (Karplus-Strong with a jawari buzz), the bansuri is a breathy sine voice with meend and andolan, tabla strokes are tuned membranes, birds and insects are modelled calls, bells use inharmonic partials. Raga phrases and the aarti melody are written for this project. It is a convincing placeholder; recorded performances will always sound better.
+* **Audio: recorded where it matters.** Morning, afternoon, evening and night ambience, the morning and evening music, and the aarti are real field recordings from Indian temples and landscapes (Radio Aporee; public domain and CC BY-SA, see `audio/CREDITS.md`), trimmed, filtered and looped. Bells you ring, the conch, footsteps, offerings, the tanpura drone and the hall chant are still synthesised. Afternoon and night have no recorded music, by design: just ambience and a soft drone by the shrines.
 
 ### Using recorded audio
 
-Drop licensed files into `virtual-temple/audio/` and fill in the matching slot in `audio/manifest.json` (every slot is already listed, empty), for example:
+Drop licensed files into `virtual-temple/audio/` and point the matching slot in `audio/manifest.json` at them (empty slots use the built-in sound). For example:
 
 ```json
 {
