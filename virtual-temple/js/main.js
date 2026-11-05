@@ -1,7 +1,7 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 import { World, TEMPLES, lerpAngle } from './world.js';
 import { PrayerHall, SPOTS, ENTRANCE } from './dome.js';
-import { Avatar, defaultConfig, randomConfig, SKIN_TONES, HAIR_COLORS, HAIR_STYLES, OUTFITS, CLOTH_COLORS, PRESENTATIONS, BUILDS, AGES, FACIAL, MARKS, JEWELLERY } from './avatar.js';
+import { Avatar, defaultConfig, randomConfig, SKIN_TONES, HAIR_COLORS, HAIR_STYLES, OUTFITS, CLOTH_COLORS, PRESENTATIONS, BUILDS, AGES, FACIAL, MARKS, JEWELLERY, HEADWEAR } from './avatar.js';
 import { TempleAudio } from './audio.js';
 import { HallDirectory, LocalSimulation, HALL_CAPACITY } from './presence.js';
 import { ProfileStore, storageAvailable } from './profile.js';
@@ -139,6 +139,7 @@ function refreshCreator() {
   chipGroup($('cSkin'), SKIN_TONES, 'skin', (b, it) => { b.className = 'swatch'; b.style.background = it; b.setAttribute('aria-label', 'Skin tone'); });
   chipGroup($('cHair'), HAIR_STYLES, 'hair');
   chipGroup($('cHairColor'), HAIR_COLORS, 'hairColor', (b, it) => { b.className = 'swatch'; b.style.background = it; b.setAttribute('aria-label', 'Hair colour'); });
+  chipGroup($('cHeadwear'), HEADWEAR, 'headwear');
   chipGroup($('cBuild'), BUILDS, 'build'); chipGroup($('cAge'), AGES, 'age');
   chipGroup($('cFacial'), FACIAL, 'facial'); $('cFacial').hidden = me.config.presentation === 'fem';
   chipGroup($('cMark'), MARKS, 'mark'); chipGroup($('cJewel'), JEWELLERY, 'jewellery');
