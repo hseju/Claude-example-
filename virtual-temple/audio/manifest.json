@@ -5,8 +5,8 @@
   "ambience.evening": "audio/ambience-evening.mp3",
   "ambience.night": "audio/ambience-night.mp3",
   "music.morning": "audio/music-morning.mp3",
-  "music.afternoon": "",
+  "music.afternoon": "audio/music-afternoon.mp3",
   "music.evening": "audio/music-evening.mp3",
-  "music.night": "",
+  "music.night": "audio/music-night.mp3",
   "aarti": "audio/aarti.mp3"
 }

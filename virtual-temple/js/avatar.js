@@ -29,7 +29,9 @@ export const CLOTH_COLORS = [
   { id: 'peacock', base: '#1f6b73', accent: '#e2b555' }, { id: 'leaf', base: '#4f7a3a', accent: '#f0d27a' },
   { id: 'lotus', base: '#e7a1a8', accent: '#8e2338' }, { id: 'indigo', base: '#2f3d73', accent: '#d9b25c' },
 ];
-export const PRESENTATIONS = [{ id: 'masc', label: 'Masculine' }, { id: 'fem', label: 'Feminine' }, { id: 'neutral', label: 'Neutral' }];
+export const PRESENTATIONS = [{ id: 'masc', label: 'Male' }, { id: 'fem', label: 'Female' }];
+// older saved profiles may say 'neutral'; read them by their attire
+const normalise = (c) => (c.presentation === 'fem' || c.presentation === 'masc' ? c : { ...c, presentation: c.outfit === 'saree' || c.outfit === 'salwar' ? 'fem' : 'masc' });
 export const BUILDS = [{ id: 'slim', label: 'Slim' }, { id: 'average', label: 'Average' }, { id: 'broad', label: 'Broad' }];
 export const AGES = [{ id: 'adult', label: 'Adult' }, { id: 'elder', label: 'Elder' }];
 export const FACIAL = [{ id: 'none', label: 'Clean-shaven' }, { id: 'moustache', label: 'Moustache' }, { id: 'beard', label: 'Beard' }];
@@ -43,7 +45,7 @@ const NPC_NAMES = ['Asha', 'Ravi', 'Meera', 'Arjun', 'Lakshmi', 'Kiran', 'Devi',
 export function randomConfig(seed = Math.random(), opts = {}) {
   let s = Math.floor(seed * 1e9) >>> 0; const r = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
   const pick = (a) => a[Math.floor(r() * a.length)];
-  const presentation = opts.presentation || (r() < 0.48 ? 'fem' : (r() < 0.92 ? 'masc' : 'neutral'));
+  const presentation = opts.presentation || (r() < 0.48 ? 'fem' : 'masc');
   const age = opts.age || (r() < 0.2 ? 'elder' : 'adult');
   const fem = presentation === 'fem';
   const outfit = fem ? pick(['saree', 'saree', 'salwar']) : pick(['kurta', 'kurta', 'dhoti']);
@@ -142,6 +144,8 @@ const tubeOf = (pts, r, seg = 16, rad = 5, closed = false) => new THREE.TubeGeom
 const torus = (R, r, x, y, z, rx = Math.PI / 2, seg = 20) => { const g = new THREE.TorusGeometry(R, r, 5, seg); g.rotateX(rx); g.translate(x, y, z); return g; };
 const darken = (hex, k) => new THREE.Color(hex).multiplyScalar(k);
 const sstep = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+// resample a (radius, y) profile into rows no more than `step` apart, keeping its shape
+const dense = (prof, step = 0.012) => { const out = []; for (let i = 0; i < prof.length - 1; i++) { const [r0, y0] = prof[i], [r1, y1] = prof[i + 1], n = Math.max(1, Math.ceil(Math.abs(y1 - y0) / step)); for (let k = 0; k < n; k++) out.push([r0 + (r1 - r0) * k / n, y0 + (y1 - y0) * k / n]); } out.push(prof[prof.length - 1]); return out; };
 
 // a drape that follows a path over the body, with folds
 function ribbon(points, widthFn, { segs = 40, across = 6, fold = 0.006, folds = 3, lift = 0.006 } = {}) {
@@ -187,7 +191,7 @@ const PARENT = { hips: 'root', spine: 'hips', chest: 'spine', neck: 'chest', hea
 function buildFigure(cfg) {
   const fem = cfg.presentation === 'fem', masc = cfg.presentation === 'masc', elder = cfg.age === 'elder';
   const bw = { slim: 0.9, average: 1, broad: 1.14 }[cfg.build] || 1;
-  const sw = (fem ? 0.172 : masc ? 0.195 : 0.184) * (0.94 + (bw - 1) * 0.6);
+  const sw = (fem ? 0.172 : 0.195) * (0.94 + (bw - 1) * 0.6);
   const J = {
     root: [0, 0, 0], hips: [0, 0.94, 0], spine: [0, 1.06, 0], chest: [0, 1.24, 0], neck: [0, 1.42, 0], head: [0, 1.5, 0],
     shL: [sw, 1.395, -0.01], elL: [sw + 0.01, 1.105, -0.01], wrL: [sw + 0.012, 0.855, 0], shR: [-sw, 1.395, -0.01], elR: [-sw - 0.01, 1.105, -0.01], wrR: [-sw - 0.012, 0.855, 0],
@@ -222,7 +226,18 @@ function buildFigure(cfg) {
     : [[0.148, 0.86], [0.156, 0.94], [0.15, 1.0], [0.142, 1.08], [0.15, 1.16], [0.172, 1.24], [0.182, 1.32], [0.18, 1.38], [0.15, 1.425], [0.072, 1.462]];
   const tp = tProf.map(([r, y]) => [r * bw, y]);
   const torsoShade = (c, x, y, z) => { if (!fem && z > 0.06 && y > 1.2 && y < 1.26) c.multiplyScalar(0.9); if (z > 0.08 && Math.abs(x) < 0.006 && y > 1.0 && y < 1.2) c.multiplyScalar(0.92); };
-  P.add(lathe(tp, 26).scale(1, 1, 0.68), BI.chest, skin, MAT.body, torsoShade, W.torso);
+  const bust = (g, amp = 0.03) => {
+    if (!fem) return g;
+    const p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+      const x = p.getX(i), y = p.getY(i), z = p.getZ(i); if (z <= 0) continue;
+      const dy = y - 1.238, wy = dy < 0 ? 0.056 : 0.042;
+      const k = Math.exp(-(((Math.abs(x) - 0.066 * bw) / 0.048) ** 2) - (dy / wy) ** 2) * Math.min(1, z / 0.05);
+      p.setZ(i, z + amp * bw * k);
+    }
+    g.computeVertexNormals(); return g;
+  };
+  P.add(bust(lathe(dense(tp, 0.014), 32).scale(1, 1, 0.68)), BI.chest, skin, MAT.body, torsoShade, W.torso);
   if (!fem && cfg.outfit === 'dhoti') for (const s of [-1, 1]) P.add(ell(0.07, 1.0 * bw, 0.5, 0.24, s * 0.06 * bw, 1.255, 0.09), BI.chest, skin, MAT.body, null, W.torso); // pectorals, shown on a bare chest
   P.add(new THREE.CylinderGeometry(masc ? 0.05 : 0.045, masc ? 0.058 : 0.052, 0.13, 14, 4).translate(0, 1.475, 0.0), BI.neck, skin, MAT.body, null, W.neck);
   // ---- head
@@ -359,26 +374,26 @@ function buildFigure(cfg) {
 
   // ---- garments
   const base = cloth.base, accent = cloth.accent, lb = (k) => k * bw;
-  const neckline = (g, depth) => { const p = g.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i); if (z > 0.02 && y > 1.42 - depth + Math.abs(x) * 0.9) p.setXYZ(i, x * 0.92, y, z * 0.85); } g.computeVertexNormals(); return g; };
+  const neckline = (g, depth) => { const p = g.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i); if (z <= 0.02) continue;
+    const yb = 1.455 - depth + 4 * x * x, w = sstep(yb - 0.005, yb + 0.005, y) * Math.min(1, (z - 0.02) / 0.03); if (w > 0) p.setXYZ(i, x * (1 - 0.06 * w), y, z * (1 - 0.22 * w)); } g.computeVertexNormals(); return g; };
   const sleeve = (side, len, color, mat = MAT.body) => {
     const sh = 'sh' + side, el = 'el' + side;
-    const prof = over(ARM, -len, 0.04, 0.009, 12, len > 0.3 ? 0.006 : 0.003);
+    const prof = over(ARM, -len, 0.03, 0.009, 12, len > 0.3 ? 0.006 : 0.003).concat([[radAt(ARM, 0.04) + 0.008, 0.042], [0.012 + 0.006, 0.052], [0.002, 0.056]]);
     P.add(at(lathe(prof, 16), sh), BI[sh], color, mat, null, W.arm(side));
     const hemR = prof[0][0] + 0.002, hem = at(torus(hemR, 0.005, 0, -len, 0, Math.PI / 2, 18), sh);
     P.add(hem, BI[sh], accent, MAT.body, null, W.arm(side));
   };
   if (cfg.outfit === 'saree') {
     // blouse with a scooped neck and short sleeves
-    const blouse = shell([[lb(0.135), 1.1], [lb(0.155), 1.2], [lb(0.165), 1.28], [lb(0.17), 1.35], [lb(0.152), 1.41], [0.076, 1.455]], { sz: 0.7 });
-    neckline(blouse, 0.1); P.add(blouse, BI.chest, accent, MAT.body, null, W.torso);
-    for (const s of [-1, 1]) P.add(ell(0.062, 1, 0.82, 0.78, s * 0.064 * bw, 1.235, 0.068), BI.chest, accent);
+    const blouse = shell(dense([[lb(0.135), 1.1], [lb(0.155), 1.2], [lb(0.165), 1.28], [lb(0.17), 1.35], [lb(0.152), 1.41], [0.076, 1.455]], 0.007), { sz: 0.7, seg: 48 });
+    neckline(blouse, 0.085); P.add(bust(blouse, 0.032), BI.chest, accent, MAT.body, null, W.torso);
     sleeve('L', 0.13, accent); sleeve('R', 0.13, accent);
     // skirt with front pleats, tucked at the waist, zari border at the hem
     const skirt = shell([[lb(0.255), 0.06], [lb(0.225), 0.3], [lb(0.205), 0.6], [lb(0.195), 0.85], [lb(0.18), 0.95], [lb(0.15), 1.04], [lb(0.14), 1.08]], { sz: 0.82, pleats: 46, pleatFront: 0.5, hemWave: 0.006, seg: 56 });
     P.add(skirt, BI.hips, '#ffffff', MAT.skirt);
     P.add(torus(lb(0.148), 0.012, 0, 1.06, 0), BI.hips, base);
     // the pallu: from the waist across the chest, over the left shoulder, falling down the back
-    const pallu = ribbon([new V(-0.1, 1.0, 0.13), new V(-0.03, 1.14, 0.16), new V(0.07, 1.29, 0.14), new V(0.16, 1.43, 0.03), new V(0.17, 1.37, -0.1), new V(0.14, 1.12, -0.16), new V(0.12, 0.7, -0.18)],
+    const pallu = ribbon([new V(-0.1, 1.0, 0.13), new V(-0.03, 1.14, 0.168), new V(0.07, 1.29, 0.168), new V(0.16, 1.43, 0.03), new V(0.17, 1.37, -0.1), new V(0.14, 1.12, -0.16), new V(0.12, 0.7, -0.18)],
       (u) => (u < 0.42 ? 0.2 - u * 0.15 : u < 0.55 ? 0.13 : 0.13 + (u - 0.55) * 0.42), { segs: 48, fold: 0.008, folds: 4 });
     P.add(pallu, BI.chest, '#ffffff', MAT.ribbon);
     // mangalsutra: black beads with a gold pendant
@@ -389,9 +404,8 @@ function buildFigure(cfg) {
   if (cfg.outfit === 'kurta' || cfg.outfit === 'salwar') {
     const sal = cfg.outfit === 'salwar', hem = sal ? 0.4 : 0.5;
     const chestR = fem ? 0.165 : 0.188;
-    const prof = [[lb(sal ? 0.24 : 0.21), hem], [lb(0.2), 0.7], [lb(fem ? 0.185 : 0.175), 0.92], [lb(fem ? 0.15 : 0.165), 1.06], [lb(fem ? 0.16 : 0.172), 1.16], [lb(chestR), 1.27], [lb(chestR + 0.01), 1.35], [lb(0.158), 1.42], [0.075, 1.462]];
-    P.add(shell(prof, { sz: 0.73, seg: 48, hemWave: 0.004 }), BI.chest, '#ffffff', MAT.skirt, null, W.torso);
-    if (fem) for (const s of [-1, 1]) P.add(ell(0.064, 1, 0.82, 0.8, s * 0.064 * bw, 1.235, 0.07), BI.chest, base);
+    const prof = [[lb(sal ? 0.24 : 0.21), hem], [lb(0.2), 0.7], [lb(fem ? 0.185 : 0.175), 0.92], [lb(fem ? 0.15 : 0.165), 1.06], [lb(fem ? 0.16 : 0.172), 1.16], [lb(chestR), 1.27], [lb(chestR + 0.01), 1.35], [lb(fem ? 0.158 : 0.164), 1.42], [lb(fem ? 0.122 : 0.13), 1.446], [0.076, 1.463]];   // clear of the shoulder slope
+    P.add(bust(shell(dense(prof, 0.014), { sz: 0.73, seg: 48, hemWave: 0.004 }), 0.033), BI.chest, '#ffffff', MAT.skirt, null, W.torso);
     // mandarin collar, embroidered placket and buttons
     P.add(new THREE.CylinderGeometry(masc ? 0.064 : 0.058, masc ? 0.068 : 0.062, 0.038, 18, 1, true).translate(0, 1.475, 0.002), BI.chest, base);
     const frontZ = (y) => { for (let i = 0; i < prof.length - 1; i++) { const [r0, y0] = prof[i], [r1, y1] = prof[i + 1]; if (y >= y0 && y <= y1) return (r0 + (r1 - r0) * (y - y0) / (y1 - y0)) * 0.72 + 0.004; } return 0.1; };
@@ -408,7 +422,7 @@ function buildFigure(cfg) {
       for (let i = 0; i < 6; i++) P.add(at(torus(radAt(LEG, -0.8 + i * 0.022) + 0.008 + (i % 2) * 0.004, 0.006, 0, -0.8 + i * 0.022, 0), th), BI[th], darken('#' + leg.getHexString(), 0.92 + (i % 2) * 0.08), MAT.body, null, W.leg(side));
     }
     if (sal) { // dupatta over both shoulders, falling behind
-      const d = ribbon([new V(0.15, 0.82, -0.17), new V(0.17, 1.22, -0.11), new V(0.165, 1.43, 0.0), new V(0.08, 1.33, 0.14), new V(0, 1.25, 0.17), new V(-0.08, 1.33, 0.14), new V(-0.165, 1.43, 0.0), new V(-0.17, 1.22, -0.11), new V(-0.15, 0.82, -0.17)],
+      const d = ribbon([new V(0.15, 0.82, -0.17), new V(0.17, 1.22, -0.11), new V(0.165, 1.43, 0.0), new V(0.08, 1.33, 0.152), new V(0, 1.25, 0.175), new V(-0.08, 1.33, 0.152), new V(-0.165, 1.43, 0.0), new V(-0.17, 1.22, -0.11), new V(-0.15, 0.82, -0.17)],
         (u) => 0.17 + Math.abs(u - 0.5) * 0.08, { segs: 60, fold: 0.007, folds: 3 });
       P.add(d, BI.chest, '#ffffff', MAT.ribbon);
     }
@@ -454,7 +468,7 @@ function buildFigure(cfg) {
 export class Avatar {
   constructor(config, { simulated = false, shadows = true } = {}) {
     this.root = new THREE.Group();
-    this.config = { ...DEFAULTS, ...config };
+    this.config = normalise({ ...DEFAULTS, ...config });
     this.simulated = simulated; this.shadows = shadows;
     this.state = 'idle'; this.stateTime = 0; this.walkPhase = 0; this.speed = 0; this.seed = Math.random() * 10;
     this.build();
@@ -473,7 +487,7 @@ export class Avatar {
     this.mesh = mesh; this.b = F.bones; this.root.add(mesh);
     this.rest = {}; for (const [n, b] of Object.entries(F.bones)) this.rest[n] = b.position.clone();
   }
-  setConfig(c) { this.config = { ...DEFAULTS, ...c }; this.build(); }
+  setConfig(c) { this.config = normalise({ ...DEFAULTS, ...c }); this.build(); }
   setState(s) { if (this.state !== s) { this.state = s; this.stateTime = 0; } }
 
   _targets(t) {

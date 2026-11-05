@@ -2,7 +2,7 @@
 
 A browser-based, mobile-first 3D prototype of a living temple campus. You create a small devotee avatar, walk a stone temple complex with three shrines, enter a 12-place prayer hall, take a lotus-marked spot and offer prayers: namaste, the hall bell, a diya, flowers, incense, abhishek at the Shiva shrine, and a simulated shared aarti.
 
-It is plain HTML, CSS and ES modules on top of [three.js](https://threejs.org) 0.160 (loaded from jsDelivr). There is no build step and no image or audio asset: architecture, textures and sound are all generated in the browser.
+It is plain HTML, CSS and ES modules on top of [three.js](https://threejs.org) 0.160 (loaded from jsDelivr). There is no build step and no image asset: architecture and textures are generated in the browser. Music and ambience are licensed recordings in `audio/` (see `audio/CREDITS.md`); effects are synthesised.
 
 ## Run it
 
@@ -21,8 +21,8 @@ Opening `index.html` straight from disk (`file://`) does not work, because brows
 | Area | Status |
 | --- | --- |
 | Miniature campus at golden hour: ivory-and-gold temples with shikharas, domed mandapas and rooftop chhatris; gateway with swinging brass bells; courtyard fountain, lotus ponds and kunds with pavilions; carved balustrades, lamp posts and rangoli; flowering trees, a brass Nandi, peacocks, hills and a waterfall; diyas, bunting, birds; tilt-shift and bloom | Working |
-| Devotees: rigged characters (27-bone skeleton with eyes, lids, brows, jaw and mouth corners; one skinned mesh each, smoothly weighted across shoulders, elbows, wrists, waist, knees and neck). Faces blink, glance around, smile, close their eyes in prayer and chant during aarti. Hair: short, wavy, bun, braid, ponytail, long open, curly, top knot, shikha, receding; head coverings: safa turban or Gandhi topi. with sculpted bodies by presentation, build and age; faces with eyes, lids, brows, nose, lips and ears; fingers; bare feet. Saree with pleats, zari border and pallu; kurta with collar, placket and churidar; dhoti with angavastram, sacred thread and mala; salwar kameez with dupatta. Bangles, earrings, mangalsutra, anklets, bindi, tilak or tripundra, moustache or beard, glasses; elders with walking sticks, devotees carrying puja thalis, children walking with a parent | Working |
-| Avatar creator: name, presentation, attire, colour, skin tone, hair, head covering, build, age, facial hair, forehead mark, glasses, jewellery; scroll or pinch to look closely | Working |
+| Devotees: rigged characters (27-bone skeleton with eyes, lids, brows, jaw and mouth corners; one skinned mesh each, smoothly weighted across shoulders, elbows, wrists, waist, knees and neck). Faces blink, glance around, smile, close their eyes in prayer and chant during aarti. Hair: short, wavy, bun, braid, ponytail, long open, curly, top knot, shikha, receding; head coverings: safa turban or Gandhi topi. with sculpted bodies by gender, build and age; faces with eyes, lids, brows, nose, lips and ears; fingers; bare feet. Saree with pleats, zari border and pallu; kurta with collar, placket and churidar; dhoti with angavastram, sacred thread and mala; salwar kameez with dupatta. Bangles, earrings, mangalsutra, anklets, bindi, tilak or tripundra, moustache or beard, glasses; elders with walking sticks, devotees carrying puja thalis, children walking with a parent | Working |
+| Avatar creator: name, gender (male or female), attire, colour, skin tone, hair, head covering, build, age, facial hair, forehead mark, glasses, jewellery; scroll or pinch to look closely | Working |
 | Movement: WASD/arrows, click or tap to walk, on-screen joystick on touch screens, drag to orbit, wheel/pinch zoom from overview down to a close over-the-shoulder view (also a Close view button), map with shrine destinations, collisions | Working |
 | Simulated devotees walking between shrines and pausing in namaste | Working, labelled as simulated |
 | Prayer hall per temple: 3 × 4 lotus spots, occupancy (`7 / 12`), pick a spot or "Choose for me", walk-in animation, cinematic prayer camera | Working |
@@ -31,7 +31,7 @@ Opening `index.html` straight from disk (`file://`) does not work, because brows
 | Aarti: schedule with countdown, preview on demand, warming altar light, conch, hand bells, drone and melody, panch-pradip lamp circled by a simulated pujari, synchronised gestures, wide camera, closing bell and bow | Working, simulated |
 | Backdrop: forested mountain ranges with snow peaks behind, three large waterfalls with spray, plunge pools and a river, drifting clouds and valley mist, flocks of egrets, crows, parakeets and pigeons, butterflies; fireflies, stars and moon at night | Working |
 | Time of day: Morning, Afternoon, Evening, Night, or Auto (follows the device's local time). Sky, sun or moon, light, lamps, wildlife and sound all change and blend over a few seconds | Working |
-| Temple soundscape: tanpura drone and raga phrases for the time of day (Bhairav at dawn on bansuri, Brindavani Sarang in the afternoon, Yaman at dusk on sitar with tabla, Malkauns at night); Indian birds (koel, bulbul, sparrow, myna, crow, barbet, parakeet, peacock, dove), cowbells, cicadas, crickets, frogs, owl; bells near and far; conch at dawn and dusk; waterfall roar; outdoor sound muffles inside the halls | Working, synthesised |
+| Peaceful soundscape: solo bamboo-flute alapanas for the time of day (raga Mayamalavagowla at dawn, Hemavathi in the afternoon, Kapi at dusk) and crystal singing bowls with crickets at night, over a soft bed of birdsong or crickets; a rare, far-off temple bell; soft fountain and waterfall; outdoor sound muffles inside the halls, where the flute carries a little more | Working, recorded (licensed) |
 | Settings: master, ambience, bells & effects and temple music volumes, mute, quality tiers, time of day, incense on/off, reduced motion | Working, saved per browser |
 | Guest mode, local email profiles that save the avatar | Working (device only) |
 | Google / Apple sign-in | Not connected (see below) |
@@ -40,7 +40,7 @@ Opening `index.html` straight from disk (`file://`) does not work, because brows
 ## Honest limits
 
 * **Every other devotee is simulated.** The HUD says "Multiplayer offline · N simulated devotees", hall occupancy notes how many are simulated, and their name tags read "simulated" while you choose a spot.
-* **Audio: recorded where it matters.** Morning, afternoon, evening and night ambience, the morning and evening music, and the aarti are real field recordings from Indian temples and landscapes (Radio Aporee; public domain and CC BY-SA, see `audio/CREDITS.md`), trimmed, filtered and looped. Bells you ring, the conch, footsteps, offerings, the tanpura drone and the hall chant are still synthesised. Afternoon and night have no recorded music, by design: just ambience and a soft drone by the shrines.
+* **Audio: recorded, and kept calm.** The music for every time of day, the ambience and the aarti are real recordings under CC BY-SA, CC BY or public domain terms (see `audio/CREDITS.md`). They are trimmed, filtered and looped, with the flute mixed above the birds. Bells you ring, the conch, footsteps, offerings and the hall chant are synthesised, and so is the fallback for any empty manifest slot.
 
 ### Using recorded audio
 

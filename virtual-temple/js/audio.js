@@ -1,17 +1,15 @@
 // Temple soundscape, built with the Web Audio API.
 //
-// Every sound is synthesised in the browser; nothing here is a recording.
-//   * Music: a plucked tanpura drone (Karplus-Strong strings with a jawari buzz, rendered once
-//     into a seamless loop) under raga phrases chosen for the time of day: Bhairav at dawn,
-//     Brindavani Sarang in the afternoon, Yaman at dusk, Malkauns at night. Bansuri carries the
-//     melody by day; sitar and soft tabla take over in the evening.
-//   * Nature: Indian birds (koel, bulbul, sparrows, mynas, crows, barbet, parakeets, peacock,
-//     doves), cowbells in the morning, cicadas in the afternoon, crickets, frogs and an owl at
-//     night, wind, fountain and the distant waterfalls.
-//   * Temple: bells near and far, conch, footsteps on stone, offerings, and one shared aarti
-//     track per prayer hall.
-// Licensed recordings can replace any time-of-day bed or the music: see `loadLibrary()` and the
-// README section "Using recorded audio".
+// The mood is meant to be calm. Recorded loops listed in audio/manifest.json carry it:
+//   * Music: solo bamboo-flute alapanas by day (Mayamalavagowla at dawn, Hemavathi in the
+//     afternoon, Kapi at dusk) and crystal singing bowls with crickets at night.
+//   * Ambience: a soft bed of birdsong by day and crickets at night, quieter than the music.
+//   * Aarti: a recorded temple ceremony, only while an aarti is running.
+// Synthesised in the browser: bells you ring, a rare far-off temple bell, the conch during aarti,
+// footsteps on stone, offerings, wind, fountain and distant waterfalls, the hall chant, and a
+// fallback for any slot without a recording (a Karplus-Strong tanpura drone, Indian birds,
+// cicadas, crickets, frogs and an owl). See `loadLibrary()` and the README section
+// "Using recorded audio".
 
 const BELL_PARTIALS = [
   [0.5, 0.55, 5.5], [1.0, 1.0, 4.2], [1.183, 0.55, 3.4], [1.506, 0.38, 2.8],
@@ -56,13 +54,13 @@ export const RAGAS = {
 
 // How each time of day is mixed. Bird weights choose which species call.
 const TOD_MIX = {
-  morning: { birds: 1.0, birdRate: [0.25, 1.1], insects: 0, crickets: 0, wind: 0.6, bells: [7, 14], cow: 1, music: 1.0, instrument: 'bansuri', tabla: 0, chant: 0.7, owl: 0, frogs: 0,
+  morning: { birds: 1.0, birdRate: [0.25, 1.1], insects: 0, crickets: 0, wind: 0.6, bells: [45, 90], cow: 0, music: 1.0, instrument: 'bansuri', tabla: 0, chant: 0.7, owl: 0, frogs: 0,
     species: { koel: 0.2, bulbul: 0.18, sparrow: 0.2, myna: 0.12, barbet: 0.1, peacock: 0.06, dove: 0.08, crow: 0.04, parakeet: 0.02 } },
-  afternoon: { birds: 0.45, birdRate: [0.9, 2.6], insects: 1, crickets: 0, wind: 1.0, bells: [12, 22], cow: 0.2, music: 0.75, instrument: 'bansuri', tabla: 0, chant: 0.4, owl: 0, frogs: 0,
+  afternoon: { birds: 0.45, birdRate: [0.9, 2.6], insects: 1, crickets: 0, wind: 1.0, bells: [70, 130], cow: 0, music: 0.75, instrument: 'bansuri', tabla: 0, chant: 0.4, owl: 0, frogs: 0,
     species: { crow: 0.28, myna: 0.18, sparrow: 0.14, bulbul: 0.16, koel: 0.08, dove: 0.12, parakeet: 0.04 } },
-  evening: { birds: 0.85, birdRate: [0.3, 1.3], insects: 0.15, crickets: 0.25, wind: 0.5, bells: [5, 11], cow: 0.3, music: 1.0, instrument: 'sitar', tabla: 1, chant: 0.8, owl: 0, frogs: 0.3,
+  evening: { birds: 0.85, birdRate: [0.3, 1.3], insects: 0.15, crickets: 0.25, wind: 0.5, bells: [40, 80], cow: 0, music: 1.0, instrument: 'sitar', tabla: 1, chant: 0.8, owl: 0, frogs: 0,
     species: { crow: 0.28, myna: 0.3, parakeet: 0.16, bulbul: 0.1, peacock: 0.08, sparrow: 0.08 } },
-  night: { birds: 0.05, birdRate: [4, 9], insects: 0, crickets: 1, wind: 0.35, bells: [18, 34], cow: 0, music: 0.6, instrument: 'bansuri', tabla: 0, chant: 0.5, owl: 1, frogs: 1,
+  night: { birds: 0.05, birdRate: [4, 9], insects: 0, crickets: 1, wind: 0.35, bells: null, cow: 0, music: 0.6, instrument: 'bansuri', tabla: 0, chant: 0.5, owl: 0.3, frogs: 0,
     species: { owl: 1 } },
 };
 
@@ -379,8 +377,7 @@ export class TempleAudio {
 
   _distantBell() {
     const a = Math.random() * Math.PI * 2;
-    const n = Math.random() < 0.5 ? 1 : 2 + Math.floor(Math.random() * 3);
-    for (let i = 0; i < n; i++) this.bell({ x: Math.cos(a) * 40, y: 4, z: Math.sin(a) * 40 }, { size: 0.8 + Math.random() * 0.5, gain: 0.32, dest: this.layers.bells, hall: 0, stone: 0, when: i * 0.9 });
+    this.bell({ x: Math.cos(a) * 46, y: 4, z: Math.sin(a) * 46 }, { size: 1.1 + Math.random() * 0.4, gain: 0.12, dest: this.layers.bells, hall: 0, stone: 0 });
   }
 
   // ---------------------------------------------------------------- scheduling
@@ -390,7 +387,7 @@ export class TempleAudio {
     const outside = () => 1 - this.zone.dome;
     every(() => { const m = M(); if (!this.library['ambience.' + this.tod] && outside() > 0.2 && Math.random() < m.birds) { const k = this._pick(m.species); this._call(k); if (k === 'peacock') return 6; }
       return m.birdRate[0] + Math.random() * (m.birdRate[1] - m.birdRate[0]); }, 1);
-    every(() => { this._distantBell(); const [a, b] = M().bells; return a + Math.random() * (b - a); }, 4);
+    every(() => { const b = M().bells; if (!b || this.ceremony) return 30; if (outside() > 0.5) this._distantBell(); return b[0] + Math.random() * (b[1] - b[0]); }, 25);
     every(() => { const m = M(); if (m.cow && Math.random() < m.cow) this._call('cow', { x: -38 + Math.random() * 10, y: 1, z: -30 + Math.random() * 60 }); return 14 + Math.random() * 18; }, 9);
     every(() => { const m = M(); if (m.frogs && Math.random() < m.frogs) this._call('frog', { x: (Math.random() < 0.5 ? -8.5 : 8.5), y: 0.3, z: 25 + (Math.random() - 0.5) * 8 }); return 3 + Math.random() * 6; }, 5);
     every(() => { this._phrase(); return this._nextPhrase || 8; }, 3);
@@ -419,7 +416,6 @@ export class TempleAudio {
     const changed = tod !== this.tod; this.tod = tod;
     if (!this.ctx) return;
     this.applyZone(this.zone, 2.5);
-    if (changed && (tod === 'morning' || tod === 'evening')) this.conch(0.5, this.layers.bells, 0.35);   // a far conch greets dawn and dusk
     if (changed) this._applyLibrary();
   }
 
@@ -430,23 +426,23 @@ export class TempleAudio {
     const set = (g, v) => this._ramp(g.gain, v, tc);
     set(this.outdoor, 0.4 + out * 0.6);
     this._ramp(this.outdoorLP.frequency, 700 + out * 17000, tc);
-    set(L.wind, 0.10 * m.wind * (0.4 + z.entrance + z.garden * 0.6));
-    set(L.fountain, 0.3 * (0.2 + z.courtyard) * (this.tod === 'night' ? 0.6 : 1));
-    set(L.falls, 0.05 + 0.04 * z.garden);
+    set(L.wind, 0.06 * m.wind * (0.4 + z.entrance + z.garden * 0.6));
+    set(L.fountain, 0.15 * (0.2 + z.courtyard) * (this.tod === 'night' ? 0.6 : 1));
+    set(L.falls, 0.03 + 0.03 * z.garden);
     set(L.birds, rec ? 0 : 1.6 * (0.45 + z.entrance * 0.5 + z.garden * 0.6));
     set(L.cicadas, rec ? 0 : 0.05 * m.insects);
     set(L.crickets, rec ? 0 : 0.7 * m.crickets);
-    set(L.night, 0.6); set(L.cows, 0.5); set(L.bells, 0.5);
-    set(L.recorded, 1.1);
+    set(L.night, 0.4); set(L.cows, 0); set(L.bells, 0.35);
+    set(L.recorded, 0.7);   // recorded birds or crickets: a soft bed under the music
     // music: a quiet bed in the courtyard, fuller by the shrines and inside the halls
     const recMusic = !!this.library['music.' + this.tod], music = recMusic ? 0 : m.music;
     const near = Math.max(z.corridor, z.dome);
     // without a recording the music is just a soft tanpura drone, mostly heard by the shrines
     set(L.tanpura, music * (0.04 + near * 0.3) * (this.ceremony ? 0.3 : 1));
-    if (this._libMusic) this._ramp(this._libMusic.gain, (0.32 + near * 0.35) * (this.ceremony ? 0.1 : 1), tc);
+    if (this._libMusic) this._ramp(this._libMusic.gain, (0.42 + near * 0.3) * (this.ceremony ? 0.08 : 1), tc);   // the flute leads, everywhere
     set(L.melody, music * (0.3 + near * 0.3 + z.krishna * 0.25) * (this.ceremony ? 0 : 1));
     set(L.tabla, music * m.tabla * (0.25 + near * 0.3));
-    set(L.chant, m.chant * (recMusic ? 0.15 : 0.35) * z.dome);
+    set(L.chant, m.chant * (recMusic ? 0.05 : 0.3) * z.dome);
     set(L.shivaDrone, 0.5 * z.shiva * (0.2 + z.dome));
     this._ramp(this.hallReturn.gain, 0.12 + z.dome * 0.7, tc);
     this._ramp(this.stoneReturn.gain, 0.15 + z.corridor * 0.55, tc);

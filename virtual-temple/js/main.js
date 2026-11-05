@@ -77,7 +77,7 @@ async function boot() {
   buildLabels(); buildCreator(); bindUI(); applySettingsUI();
   onResize();
   const restored = storageAvailable ? profiles.restore() : null;
-  if (restored && restored.avatar) { me.config = { ...defaultConfig(), ...restored.avatar }; }
+  if (restored && restored.avatar) { me.config = { ...defaultConfig(), ...restored.avatar }; if (me.config.presentation === 'neutral') me.config.presentation = /saree|salwar/.test(me.config.outfit) ? 'fem' : 'masc'; }
   me.avatar = new Avatar(me.config, { shadows: Q.level !== 'low' });
   me.avatar.root.position.set(0, 0, 46.5); me.avatar.root.rotation.y = Math.PI;
   world.scene.add(me.avatar.root);
