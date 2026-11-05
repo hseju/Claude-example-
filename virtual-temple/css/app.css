@@ -116,6 +116,18 @@ input[type=range] { width: 100%; accent-color: var(--saffron); }
 .cam { display: flex; gap: 6px; }
 #presence { font-size: 12px; color: var(--muted); }
 #aartiChip { cursor: pointer; }
+#todChip { gap: 6px; padding-left: 10px; }
+#todChip svg { width: 18px; height: 18px; stroke: var(--gold); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+#todChip .tag { font-size: 10px; }
+#todPop { position: fixed; right: max(12px, env(safe-area-inset-right)); top: calc(max(12px, env(safe-area-inset-top)) + 52px); width: min(340px, calc(100vw - 24px)); background: var(--glass-strong); border: 1px solid var(--line); border-radius: 16px; padding: 12px; z-index: 22; display: grid; gap: 6px; box-shadow: 0 16px 40px rgba(0,0,0,.4); }
+#todPop h3 { margin: 2px 4px 4px; font-size: 11.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--gold); font-weight: 600; }
+#todPop button { display: flex; gap: 10px; align-items: flex-start; text-align: left; background: rgba(255,255,255,.03); border: 1px solid var(--line); border-radius: 12px; padding: 9px 10px; }
+#todPop button[aria-pressed=true] { border-color: var(--gold); background: rgba(226,181,85,.14); }
+#todPop i { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: rgba(226,181,85,.12); }
+#todPop i svg { width: 18px; height: 18px; stroke: var(--gold); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+#todPop b { display: block; font-weight: 600; font-size: 14px; }
+#todPop small { display: block; color: var(--muted); font-size: 12px; line-height: 1.35; margin-top: 2px; }
+.seg.wide { display: flex; width: 100%; } .seg.wide button { flex: 1; padding: 8px 4px; }
 #aartiChip b { color: var(--gold); font-weight: 600; font-variant-numeric: tabular-nums; }
 
 /* world labels */
@@ -153,6 +165,8 @@ body.touch #prompt .btn { justify-content: center; }
   .tl { flex-direction: column; align-items: flex-start; }
   #presence { font-size: 11px; min-height: 30px; padding: 4px 10px; max-width: calc(100vw - 200px); white-space: normal; line-height: 1.25; }
   .tr { flex-wrap: wrap; justify-content: flex-end; max-width: 150px; }
+  #todChip { order: 5; }
+  #todPop { top: calc(max(12px, env(safe-area-inset-top)) + 150px); }
   #aartiChip { order: 4; }
   #prompt span { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .hallinfo { max-width: calc(100vw - 140px); }

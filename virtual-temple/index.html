@@ -76,6 +76,7 @@
     <span class="pill" id="presence" title="Other devotees here are simulated in this prototype"><span>Multiplayer offline · <span id="simCount">0</span> simulated devotees</span></span>
   </div>
   <div class="chipbar tr">
+    <button class="pill" id="todChip" aria-haspopup="true" aria-expanded="false">Morning</button>
     <button class="pill" id="aartiChip" aria-label="Aarti schedule"><span>Aarti</span> <b id="aartiCountdown">--</b></button>
     <button class="icon-btn" id="mapBtn" aria-label="Temple map" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14"/></svg></button>
     <button class="icon-btn" id="soundBtn" aria-label="Mute sound" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path class="wave" d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg></button>
@@ -90,6 +91,7 @@
     </div>
     <button class="round-act" id="pranamBtn" aria-label="Pranam (P)"><svg viewBox="0 0 32 32"><path d="M16 4c-1.5 2-2.5 6-2.5 10v9l-3 4M16 4c1.5 2 2.5 6 2.5 10v9l3 4M13.5 18h5"/></svg>Pranam</button>
   </div>
+  <div id="todPop" hidden role="dialog" aria-label="Time of day"></div>
   <div id="map" aria-label="Temple map">
     <canvas id="mapCanvas" width="400" height="400" aria-label="Map: tap a shrine to walk there"></canvas>
     <div class="dest">
@@ -153,11 +155,12 @@
   <div class="setrow"><span>Master</span><span id="vMasterV">80</span><input type="range" id="vMaster" min="0" max="100" value="80"></div>
   <div class="setrow"><span>Ambience</span><span id="vAmbienceV">70</span><input type="range" id="vAmbience" min="0" max="100" value="70"></div>
   <div class="setrow"><span>Bells &amp; effects</span><span id="vEffectsV">85</span><input type="range" id="vEffects" min="0" max="100" value="85"></div>
-  <div class="setrow"><span>Ceremony music</span><span id="vCeremonyV">80</span><input type="range" id="vCeremony" min="0" max="100" value="80"></div>
+  <div class="setrow"><span>Temple music</span><span id="vCeremonyV">80</span><input type="range" id="vCeremony" min="0" max="100" value="80"></div>
   <div class="setrow"><span>Mute everything</span><button class="toggle" id="tMute" role="switch" aria-checked="false" aria-label="Mute everything"></button></div>
   <h3>Graphics</h3>
   <div class="setrow"><span>Quality</span><span class="seg" id="qSeg"><button data-q="low">Low</button><button data-q="medium">Medium</button><button data-q="high">High</button></span></div>
-  <div class="setrow"><span>Time of day</span><span class="seg" id="todSeg"><button data-t="0">Day</button><button data-t="0.45">Golden</button><button data-t="0.9">Evening</button></span></div>
+  <div class="setrow"><span>Time of day</span></div>
+  <div class="seg wide" id="todSeg"><button data-t="auto">Auto</button><button data-t="morning">Morning</button><button data-t="afternoon">Afternoon</button><button data-t="evening">Evening</button><button data-t="night">Night</button></div>
   <div class="setrow"><span>Incense smoke</span><button class="toggle" id="tIncense" role="switch" aria-checked="true" aria-label="Incense smoke"></button></div>
   <div class="setrow"><span>Reduced motion</span><button class="toggle" id="tMotion" role="switch" aria-checked="false" aria-label="Reduced motion"></button></div>
   <p class="note">Quality changes reload the scene.</p>

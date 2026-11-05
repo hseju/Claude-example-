@@ -28,8 +28,10 @@ Opening `index.html` straight from disk (`file://`) does not work, because brows
 | Full hall: join an identical second hall, or wait in line for a spot | Working (Shiva hall 1 starts full to show this) |
 | Prayer actions: namaste and bow, hall bell with pendulum physics, diya that stays lit with its own light, petals that land on the thali, incense with drifting smoke, abhishek at the Shiva lingam, darshan close-up | Working |
 | Aarti: schedule with countdown, preview on demand, warming altar light, conch, hand bells, drone and melody, panch-pradip lamp circled by a simulated pujari, synchronised gestures, wide camera, closing bell and bow | Working, simulated |
-| Zone-based spatial audio: birds and wind near the gate, fountain in the courtyard, stone reverb near shrines, chant drone in the hall, flute near Krishna, low drone near Shiva | Working, synthesised |
-| Settings: four volume buses, mute, quality tiers, time of day, incense on/off, reduced motion | Working, saved per browser |
+| Backdrop: forested mountain ranges with snow peaks behind, three large waterfalls with spray, plunge pools and a river, drifting clouds and valley mist, flocks of egrets, crows, parakeets and pigeons, butterflies; fireflies, stars and moon at night | Working |
+| Time of day: Morning, Afternoon, Evening, Night, or Auto (follows the device's local time). Sky, sun or moon, light, lamps, wildlife and sound all change and blend over a few seconds | Working |
+| Temple soundscape: tanpura drone and raga phrases for the time of day (Bhairav at dawn on bansuri, Brindavani Sarang in the afternoon, Yaman at dusk on sitar with tabla, Malkauns at night); Indian birds (koel, bulbul, sparrow, myna, crow, barbet, parakeet, peacock, dove), cowbells, cicadas, crickets, frogs, owl; bells near and far; conch at dawn and dusk; waterfall roar; outdoor sound muffles inside the halls | Working, synthesised |
+| Settings: master, ambience, bells & effects and temple music volumes, mute, quality tiers, time of day, incense on/off, reduced motion | Working, saved per browser |
 | Guest mode, local email profiles that save the avatar | Working (device only) |
 | Google / Apple sign-in | Not connected (see below) |
 | Real-time multiplayer | Not connected (architecture ready, see below) |
@@ -37,7 +39,23 @@ Opening `index.html` straight from disk (`file://`) does not work, because brows
 ## Honest limits
 
 * **Every other devotee is simulated.** The HUD says "Multiplayer offline · N simulated devotees", hall occupancy notes how many are simulated, and their name tags read "simulated" while you choose a spot.
-* **Audio is synthesised.** Bells use inharmonic additive partials, the conch is a filtered breathy sawtooth, chanting is a formant-filtered vocal drone, and the aarti melody is original and simple. These are stand-ins, not recordings. To use licensed recordings, load them as `AudioBuffer`s and play them through the same buses in `js/audio.js` (`ambience`, `effects`, `ceremony`, plus the `hall`/`stone` reverb sends).
+* **Audio is synthesised, not recorded.** The tanpura and sitar are plucked-string models (Karplus-Strong with a jawari buzz), the bansuri is a breathy sine voice with meend and andolan, tabla strokes are tuned membranes, birds and insects are modelled calls, bells use inharmonic partials. Raga phrases and the aarti melody are written for this project. It is a convincing placeholder; recorded performances will always sound better.
+
+### Using recorded audio
+
+Drop licensed files into `virtual-temple/audio/` and add `audio/manifest.json`, for example:
+
+```json
+{
+  "ambience.morning": "audio/dawn-birds.mp3",
+  "ambience.night": "audio/night-crickets.mp3",
+  "music.morning": "audio/bhairav-bansuri.mp3",
+  "music.evening": "audio/sandhya-bhajan.mp3",
+  "aarti": "audio/aarti.mp3"
+}
+```
+
+Keys are `ambience.<morning|afternoon|evening|night>`, `music.<same>` and `aarti`. Each file loops while its time of day is active and replaces the matching synthesised layer; bells, conch, footsteps and offerings stay synthesised. Anything missing falls back to synthesis. Use MP3 or AAC for Safari support, and keep the licence and attribution for each file next to it.
 * **Deity representations are deliberately restrained.** The Shiva shrine has a lingam on its pitha with tripundra, bilva and a dhara-patra; Ganesha is a sindoor-coated svayambhu form with inlaid eyes, silver mukut and modak, as seen in many historic shrines; Krishna is a shyam-stone murti in yellow pitambar with mukut, peacock feather, flute and vaijayanti mala. A production version should replace these with sculpted, reviewed models.
 
 ## Architecture
@@ -46,13 +64,14 @@ Opening `index.html` straight from disk (`file://`) does not work, because brows
 index.html          screens and HUD markup
 css/app.css         UI layer
 js/main.js          app state machine, input, cameras, UI wiring, render loop
-js/world.js         campus: terrain, temples, gardens, NPC devotees, waypoint graph, collisions, time of day
+js/world.js         campus: terrain, temples, gardens, NPC devotees, waypoint graph, collisions, time-of-day presets
+js/scenery.js       mountains, waterfalls, river, clouds, mist, bird flocks, butterflies, fireflies, stars, moon
 js/dome.js          prayer hall: shell, per-deity sanctum, 12 spots, offerings, aarti choreography
 js/architecture.js  shared pieces: pillars, bells (pendulum + clapper), diyas, lamp stands, shikhara
 js/avatar.js        procedural avatars and their poses (walk, namaste, bow, offer, ring, aarti)
 js/fx.js            GPU flames, incense smoke, petals, dust motes, fountain droplets, wind sway
 js/postfx.js        tilt-shift (miniature look) and colour grade
-js/audio.js         Web Audio graph, zones, synthesised voices, shared aarti track
+js/audio.js         Web Audio graph, zones and time-of-day mixes, tanpura/bansuri/sitar/tabla, birds and insects, shared aarti track, optional recorded library
 js/presence.js      hall capacity rules and the local simulation
 js/profile.js       auth providers, profiles and settings storage
 ```

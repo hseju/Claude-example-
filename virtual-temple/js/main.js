@@ -15,7 +15,7 @@ if (isTouch) document.body.classList.add('touch');
 // ---------------------------------------------------------------- settings & quality
 const profiles = new ProfileStore();
 const prefersReduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const settings = profiles.loadSettings({ quality: 'auto', evening: 0.5, incense: true, reducedMotion: prefersReduced, master: 80, ambience: 70, effects: 85, ceremony: 80, muted: false });
+const settings = profiles.loadSettings({ quality: 'auto', tod: 'auto', incense: true, reducedMotion: prefersReduced, master: 80, ambience: 70, effects: 85, ceremony: 80, muted: false });
 const dpr = window.devicePixelRatio || 1;
 function qualityPreset(q) {
   if (q === 'auto') q = (isTouch && Math.min(screen.width, screen.height) < 820) ? 'medium' : 'high';
@@ -43,7 +43,7 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure
 renderer.shadowMap.enabled = Q.shadows > 0; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 setAnisotropy(Math.min(8, renderer.capabilities.getMaxAnisotropy()));
 const post = new PostFX(renderer); post.enabled = Q.post;
-const camera = new THREE.PerspectiveCamera(32, innerWidth / innerHeight, 0.1, 900);
+const camera = new THREE.PerspectiveCamera(32, innerWidth / innerHeight, 0.1, 2200);
 
 const audio = new TempleAudio();
 audio.levels = { master: settings.master / 100, ambience: settings.ambience / 100, effects: settings.effects / 100, ceremony: settings.ceremony / 100 };
@@ -52,7 +52,7 @@ audio.muted = settings.muted;
 let world, hall, directory, sim, playerRing;
 const app = { mode: 'loading', hallState: null, currentHall: null, templeId: null, camMode: 'world', time: 0 };
 const me = { id: null, config: defaultConfig(), avatar: null };
-const cam = { yaw: 0, pitch: 0.5, dist: 30, tYaw: 0, tPitch: 0.5, tDist: 30, eff: 30, pos: new THREE.Vector3(), target: new THREE.Vector3(), fov: 32 };
+const cam = { yaw: 0, pitch: 0.27, dist: 27, tYaw: 0, tPitch: 0.27, tDist: 27, eff: 27, pos: new THREE.Vector3(), target: new THREE.Vector3(), fov: 32 };
 const input = { keys: new Set(), joy: new THREE.Vector2(), auto: [], pointers: new Map(), drag: false };
 
 // ---------------------------------------------------------------- boot
@@ -62,10 +62,11 @@ async function boot() {
   $('loadText').textContent = 'Laying the stones';
   await frame();
   world = new World(renderer, Q);
-  world.setEvening(settings.evening);
   $('loadText').textContent = 'Lighting the lamps';
   await frame();
   hall = new PrayerHall(renderer, Q, audio);
+  applyTOD(true);
+  setInterval(() => applyTOD(), 30000);
   directory = new HallDirectory(Object.keys(TEMPLES));
   sim = new LocalSimulation(directory, randomConfig);
   sim.seed({ ganesha: 7, shiva: 12, krishna: 4 });
@@ -82,7 +83,7 @@ async function boot() {
   world.scene.add(me.avatar.root);
   playerRing = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.68, 48), new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffc861').multiplyScalar(2.2), transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending }));
   playerRing.rotation.x = -Math.PI / 2; world.scene.add(playerRing);
-  if (/[?&]debug\b/.test(location.search)) window.__vt = { app, me, world, hall, directory, cam, input, settings }; // local testing hook
+  if (/[?&]debug\b/.test(location.search)) window.__vt = { app, me, world, hall, directory, cam, input, settings, audio }; // local testing hook
   setMode('welcome');
   $('loading').style.opacity = '0'; setTimeout(() => $('loading').remove(), 900);
   last = performance.now(); requestAnimationFrame(loop);
@@ -433,7 +434,7 @@ function bindInput() {
     const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
     if (Math.hypot(e.clientX - p.sx, e.clientY - p.sy) > 8) input.drag = true;
     if (input.pointers.size === 2) { const d = pinchDist(); if (input.pinch) zoom((input.pinch - d) * 0.06); input.pinch = d; return; }
-    if (input.drag && (app.mode === 'world' || app.mode === 'welcome')) { cam.tYaw -= dx * 0.006; cam.tPitch = THREE.MathUtils.clamp(cam.tPitch + dy * 0.004, 0.32, 1.25); }
+    if (input.drag && (app.mode === 'world' || app.mode === 'welcome')) { cam.tYaw -= dx * 0.006; cam.tPitch = THREE.MathUtils.clamp(cam.tPitch + dy * 0.004, 0.1, 1.25); }
     if (input.drag && app.mode === 'creator' && preview.avatar) preview.avatar.root.rotation.y += dx * 0.012;
   });
   const up = (e) => {
@@ -475,7 +476,7 @@ function showTapMarker(p) {
 }
 
 // ---------------------------------------------------------------- UI wiring
-function closeAllPanels() { for (const id of ['auth', 'schedule', 'settings']) $(id).hidden = true; $('map').classList.remove('on'); $('mapBtn').setAttribute('aria-pressed', 'false'); }
+function closeAllPanels() { for (const id of ['auth', 'schedule', 'settings', 'todPop']) $(id).hidden = true; $('map').classList.remove('on'); $('mapBtn').setAttribute('aria-pressed', 'false'); }
 function toggleMap() { const on = !$('map').classList.contains('on'); $('map').classList.toggle('on', on); $('mapBtn').setAttribute('aria-pressed', String(on)); }
 let authMode = 'signin';
 function setAuthMode(m) { authMode = m; $('tabSignin').setAttribute('aria-selected', String(m === 'signin')); $('tabCreate').setAttribute('aria-selected', String(m === 'create')); $('authSubmit').textContent = m === 'signin' ? 'Sign in' : 'Create profile'; $('authPass').autocomplete = m === 'signin' ? 'current-password' : 'new-password'; $('authErr').textContent = ''; }
@@ -541,7 +542,8 @@ function bindUI() {
   $('tIncense').onclick = () => { settings.incense = !settings.incense; applySettingsUI(); persist(); };
   $('tMotion').onclick = () => { settings.reducedMotion = !settings.reducedMotion; document.body.classList.toggle('reduced', settings.reducedMotion); applySettingsUI(); persist(); };
   $('qSeg').querySelectorAll('button').forEach(b => b.onclick = () => { if (settings.quality === b.dataset.q) return; settings.quality = b.dataset.q; persist(); toast('Reloading with the new quality setting'); setTimeout(() => location.reload(), 500); });
-  $('todSeg').querySelectorAll('button').forEach(b => b.onclick = () => { settings.evening = +b.dataset.t; applySettingsUI(); persist(); });
+  $('todSeg').querySelectorAll('button').forEach(b => b.onclick = () => setTOD(b.dataset.t));
+  $('todChip').addEventListener('click', () => { const on = $('todPop').hidden; closeAllPanels(); $('todPop').hidden = !on; $('todChip').setAttribute('aria-expanded', String(on)); renderTodPop(); });
   addEventListener('resize', onResize);
   setInterval(updateCountdown, 15000); updateCountdown();
 }
@@ -554,7 +556,7 @@ function applySettingsUI() {
   $('soundBtn').querySelector('.wave').style.opacity = settings.muted ? '0.15' : '1';
   $('tIncense').setAttribute('aria-checked', String(settings.incense)); $('tMotion').setAttribute('aria-checked', String(settings.reducedMotion));
   $('qSeg').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.q === Q.level)));
-  $('todSeg').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(Math.abs(+b.dataset.t - settings.evening) < 0.01)));
+  $('todSeg').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.t === settings.tod)));
 }
 function renderAccount() {
   const u = profiles.user, box = $('accountBox');
@@ -577,6 +579,7 @@ function onResize() {
   post.setSize(innerWidth, innerHeight, Q.pr);
   for (const o of [world?.flames, hall?.flames]) if (o) o.uniforms.uPx.value = Q.pr * innerHeight / 900;
   if (hall) { hall.smoke.uniforms.uPx.value = Q.pr * innerHeight / 900; hall.dust.material.uniforms.uPx.value = Q.pr * innerHeight / 900; }
+  if (world) world.scenery.setPixelScale(Q.pr * innerHeight / 900);
 }
 
 // ---------------------------------------------------------------- map
@@ -619,8 +622,6 @@ function loop(now) {
 }
 
 function updateWorld(dt, t, ctx) {
-  // time of day eases toward the chosen setting (a slow day-to-evening transition)
-  if (Math.abs(world.evening - settings.evening) > 0.002) world.setEvening(world.evening + (settings.evening - world.evening) * Math.min(1, dt * (settings.reducedMotion ? 10 : 0.6)));
   const av = me.avatar, p = av.root.position;
   let mx = 0, mz = 0;
   if (app.mode === 'world') {
@@ -678,13 +679,14 @@ function updateWorld(dt, t, ctx) {
   // camera
   const lerp = 1 - Math.exp(-dt * (settings.reducedMotion ? 14 : 6));
   if (app.mode === 'welcome' || app.mode === 'loading') {
-    const a = settings.reducedMotion ? 0.6 : 0.6 + t * 0.04;
-    cam.pos.set(Math.sin(a) * 56, 21, Math.cos(a) * 56 + 4); cam.target.set(0, 3, -6); camera.fov = 40;
+    // a slow sweep across the campus toward the mountains and waterfalls in the north
+    const a = settings.reducedMotion ? 0 : Math.sin(t * 0.05) * 0.4;
+    cam.pos.set(Math.sin(a) * 22, 13, 33); cam.target.set(Math.sin(a) * 14, 11, -60); camera.fov = 54;
     camera.position.lerp(cam.pos, 1 - Math.exp(-dt * 2)); camera.lookAt(cam.target);
     world.update(dt, t, new THREE.Vector3(0, 0, 0), ctx);
   } else {
     cam.yaw += (cam.tYaw - cam.yaw) * lerp; cam.pitch += (cam.tPitch - cam.pitch) * lerp; cam.dist += (cam.tDist - cam.dist) * lerp;
-    const focus = p.clone().add(new THREE.Vector3(0, 0.9, 0));
+    const focus = p.clone().add(new THREE.Vector3(0, 1.5, 0));
     cam.target.lerp(focus, 1 - Math.exp(-dt * 8));
     // portrait screens get a little more distance; temples and the gateway pull the camera in rather than hide you
     let want = cam.dist * (camera.aspect < 1 ? 1 + (1 - camera.aspect) * 0.6 : 1);
@@ -705,12 +707,12 @@ function updateWorld(dt, t, ctx) {
     cam.eff += (allowed - cam.eff) * (allowed < cam.eff ? 1 - Math.exp(-dt * 10) : 1 - Math.exp(-dt * 2));
     const dir = dirAt(cam.effPitch, tmp);
     camera.position.copy(cam.target).addScaledVector(dir, cam.eff);
-    camera.lookAt(cam.target); camera.fov = 42;
+    camera.lookAt(cam.target); camera.fov = 52;
     world.update(dt, t, p, ctx);
     if (playerRing) { playerRing.position.set(p.x, 0.06, p.z); const k = settings.reducedMotion ? 1 : 1 + Math.sin(t * 2.4) * 0.06; playerRing.scale.set(k, k, k); }
   }
   camera.updateProjectionMatrix();
-  post.tilt.amount = app.mode === 'welcome' ? Q.tilt * 0.45 : Q.tilt * 0.55; post.tilt.focus = 0.47; post.tilt.band = app.mode === 'welcome' ? 0.22 : 0.24;
+  post.tilt.amount = Q.tilt * (app.mode === 'welcome' ? 0.15 : 0.22); post.tilt.focus = 0.4; post.tilt.band = 0.32; renderer.toneMappingExposure = world.tod.exposure;
   post.finalMat.uniforms.uVignette.value = 0.34; post.finalMat.uniforms.uWarm.value = 0.12 + world.evening * 0.2; post.bloom.strength = Q.bloom; post.bloom.threshold = 1.5;
   post.render(world.scene, camera);
 }
@@ -737,12 +739,47 @@ function updateHall(dt, t, ctx) {
   if (!Q.post) post.tilt.amount = 0;
   post.bloom.strength = Q.bloom * 1.2; post.bloom.threshold = 1.2;
   post.finalMat.uniforms.uVignette.value = app.aarti ? 0.6 : 0.42; post.finalMat.uniforms.uWarm.value = app.aarti ? 0.45 : 0.25;
+  renderer.toneMappingExposure = 1.05;
   post.render(hall.scene, camera);
 }
 function footsteps(av) {
   if (av.state !== 'walk') return;
   const i = Math.floor(av.walkPhase / Math.PI); if (i !== stepIdx) { stepIdx = i; audio.footstep(app.mode === 'hall' ? 0.7 : 1); }
 }
+// ---------------------------------------------------------------- time of day
+const TOD_INFO = {
+  morning: { label: 'Morning', icon: 'sunrise', sound: 'Dawn chorus: koel, bulbul and sparrows, cowbells, raga Bhairav on bansuri' },
+  afternoon: { label: 'Afternoon', icon: 'sun', sound: 'Warm and still: cicadas, crows and doves, raga Brindavani Sarang' },
+  evening: { label: 'Evening', icon: 'sunset', sound: 'Sandhya bells and conch, mynas and parakeets, sitar and tabla in raga Yaman' },
+  night: { label: 'Night', icon: 'moon', sound: 'Crickets, frogs by the ponds, an owl, a low drone and raga Malkauns' },
+};
+const TOD_ICONS = {
+  sunrise: '<svg viewBox="0 0 24 24"><path d="M3 18h18M6 18a6 6 0 0 1 12 0M12 4v4M4.9 9.9l2 2M19.1 9.9l-2 2M8 22h8"/></svg>',
+  sun: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+  sunset: '<svg viewBox="0 0 24 24"><path d="M3 18h18M6 18a6 6 0 0 1 12 0M12 9V5M9 7l3 3 3-3M8 22h8"/></svg>',
+  moon: '<svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>',
+};
+function localTOD(d = new Date()) { const h = d.getHours() + d.getMinutes() / 60; return h >= 5 && h < 10.5 ? 'morning' : h < 16.5 && h >= 10.5 ? 'afternoon' : h >= 16.5 && h < 19.75 ? 'evening' : 'night'; }
+function currentTOD() { return settings.tod === 'auto' ? localTOD() : settings.tod; }
+let activeTOD = null;
+function applyTOD(instant = false) {
+  const t = currentTOD(); updateTodChip(t);
+  if (t === activeTOD && !instant) return;
+  activeTOD = t; world.setTimeOfDay(t, instant); hall.setTimeOfDay(t); audio.setTimeOfDay(t);
+}
+function setTOD(v) { settings.tod = v; persist(); applyTOD(); applySettingsUI(); renderTodPop(); const i = TOD_INFO[currentTOD()]; toast(`${i.label}${v === 'auto' ? ' (your local time)' : ''}. ${i.sound}.`, 4200); }
+function updateTodChip(t = currentTOD()) {
+  const i = TOD_INFO[t]; $('todChip').innerHTML = `${TOD_ICONS[i.icon]}<span>${i.label}</span>${settings.tod === 'auto' ? '<span class="tag">auto</span>' : ''}`;
+  $('todChip').setAttribute('aria-label', `Time of day: ${i.label}${settings.tod === 'auto' ? ', following your local time' : ''}. Change`);
+}
+function renderTodPop() {
+  const now = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const opt = (v, label, sub, icon) => `<button data-tod="${v}" aria-pressed="${settings.tod === v}"><i>${TOD_ICONS[icon]}</i><span><b>${label}</b><small>${sub}</small></span></button>`;
+  $('todPop').innerHTML = `<h3>Time of day</h3>` + opt('auto', 'Match my local time', `${now} here, so ${TOD_INFO[localTOD()].label.toLowerCase()}`, TOD_INFO[localTOD()].icon) +
+    Object.entries(TOD_INFO).map(([k, i]) => opt(k, i.label, i.sound, i.icon)).join('');
+  $('todPop').querySelectorAll('[data-tod]').forEach(b => b.onclick = () => { setTOD(b.dataset.tod); $('todPop').hidden = true; $('todChip').setAttribute('aria-expanded', 'false'); });
+}
+
 function snapCamera() { cam.hallInit = false; cam.target.copy(me.avatar.root.position).add(new THREE.Vector3(0, 0.9, 0)); }
 const clamp01 = (x) => Math.max(0, Math.min(1, x));
 

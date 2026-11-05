@@ -3,6 +3,7 @@ import * as TX from './textures.js';
 import { brass, gold, clay, darkStone, pillarGeometry, HangingBell, diyaGeometry, kalasha, amalaka, garland, stoneMat, bandMat, shikhara, chhatri, balusterGeometry, lampPostGeometry, ivory, paleGold } from './architecture.js';
 import { FlameField, fountainJets, windify } from './fx.js';
 import { Avatar, randomConfig } from './avatar.js';
+import { Scenery } from './scenery.js';
 
 export const TEMPLES = {
   ganesha: { id: 'ganesha', name: 'Ganesha Temple', short: 'Ganesha', pos: new THREE.Vector3(-31, 0, 0), rot: Math.PI / 2, entrance: new THREE.Vector3(-19.5, 0, 0), stone: '#f1e4cf', accent: '#b8442a', icon: 'modak', flag: '#e8731c', blurb: 'Remover of obstacles. Flower offerings and aarti.' },
@@ -20,6 +21,13 @@ const EDGES = [['spawn', 'gateOut'], ['gateOut', 'gateIn'], ['gateIn', 's1'], ['
   ['cW', 'w1'], ['w1', 'ganesha'], ['cE', 'e1'], ['e1', 'krishna'], ['cN', 'n1'], ['n1', 'shiva'],
   ['cSW', 'gSW'], ['cNW', 'gNW'], ['cSE', 'gSE'], ['cNE', 'gNE'], ['gSW', 'w1'], ['gNW', 'w1'], ['gSE', 'e1'], ['gNE', 'e1']];
 
+const TOD_PRESETS = {
+  morning: { sky: '#7fb2e2', mid: '#f2cdbf', hor: '#ffe3bd', sun: '#ffd39b', sunI: 2.4, hemi: 0.85, ground: '#6b5a3a', elev: 14, az: 18, fogNear: 80, fogFar: 600, lamps: 0.8, stars: 0, mist: 0.75, warm: 0.22, night: 0, exposure: 1.05, cloud: '#fff1e6' },
+  afternoon: { sky: '#4a8bd6', mid: '#a8cbea', hor: '#e8eff2', sun: '#fff4e2', sunI: 3.0, hemi: 1.0, ground: '#6b5f45', elev: 62, az: 140, fogNear: 110, fogFar: 760, lamps: 0.25, stars: 0, mist: 0.12, warm: 0.04, night: 0, exposure: 1.0, cloud: '#ffffff' },
+  evening: { sky: '#5856a0', mid: '#ec9c95', hor: '#ffc683', sun: '#ffa35a', sunI: 2.2, hemi: 0.6, ground: '#4a3528', elev: 7, az: 196, fogNear: 80, fogFar: 600, lamps: 2.8, stars: 0.06, mist: 0.35, warm: 0.45, night: 0.12, exposure: 1.06, cloud: '#ffc4a8' },
+  night: { sky: '#060b24', mid: '#121c46', hor: '#283063', sun: '#9fb4ff', sunI: 0.75, hemi: 0.32, ground: '#22202c', elev: 40, az: -55, fogNear: 70, fogFar: 520, lamps: 6.0, stars: 1, mist: 0.3, warm: 0.3, night: 1, exposure: 1.3, cloud: '#3a4468' },
+};
+
 export class World {
   constructor(renderer, quality) {
     this.renderer = renderer; this.quality = quality;
@@ -31,7 +39,7 @@ export class World {
     this.scene.add(this.flames.points);
     this.graph = this._buildGraph();
     this.labels = [];
-    this.evening = 0.35;
+    this.todName = 'morning';
     this.build();
   }
 
@@ -79,9 +87,9 @@ export class World {
     this._gardens();
     this._pathDiyas();
     this._bunting();
-    this._birds();
+    this.scenery = new Scenery(this.scene, this.quality, this.water, this.bedSpots || []);
     this._npcs();
-    this.setEvening(this.evening);
+    this.setTimeOfDay(this.todName, true);
   }
 
   _sky() {
@@ -95,7 +103,7 @@ export class World {
           float s = max(dot(normalize(vW), normalize(sunDir)), 0.0); c += sunCol*(smoothstep(0.9993, 0.9997, s)*6.0 + pow(s, 10.0)*0.5 + pow(s, 3.0)*0.12);
           gl_FragColor = vec4(c, 1.0); }`,
     });
-    this.sky = new THREE.Mesh(new THREE.SphereGeometry(400, 32, 16), m); this.scene.add(this.sky);
+    this.sky = new THREE.Mesh(new THREE.SphereGeometry(800, 32, 16), m); this.scene.add(this.sky);
   }
 
   _ground() {
@@ -109,20 +117,7 @@ export class World {
     strip(17.5, 0, 12, 5, [3, 1.25]);   // east to Krishna
     strip(0, -17.5, 5, 12, [1.25, 3]);  // north to Shiva
     // distant hills for a soft horizon
-    // layered green hills on the horizon, softened by haze, with a waterfall to the north-west
-    const hillGeo = new THREE.SphereGeometry(1, 28, 12, 0, Math.PI * 2, 0, Math.PI / 2);
-    const hills = new THREE.InstancedMesh(hillGeo, new THREE.MeshStandardMaterial({ roughness: 1 }), 26);
-    const hm = new THREE.Matrix4(), hq = new THREE.Quaternion(), hc = new THREE.Color(), hillCols = ['#5d7c43', '#4f6f3b', '#6c8a4c', '#587a48'];
-    for (let i = 0; i < 26; i++) {
-      const a = i / 26 * Math.PI * 2 + (Math.random() - 0.5) * 0.15, r = (i % 2 ? 175 : 140) + Math.random() * 20;
-      const w = 34 + Math.random() * 26, h = (i % 2 ? 34 : 20) + Math.random() * 14;
-      hm.compose(new THREE.Vector3(Math.cos(a) * r, -2, Math.sin(a) * r), hq.setFromAxisAngle(new THREE.Vector3(0, 1, 0), a), new THREE.Vector3(w, h, w * 0.7)); hills.setMatrixAt(i, hm); hills.setColorAt(i, hc.set(hillCols[i % 4]));
-    }
-    this.scene.add(hills);
-    const wfT = TX.waterfall(); wfT.repeat.set(1, 2); this.waterfallTex = wfT;
-    const wf = new THREE.Mesh(new THREE.PlaneGeometry(5, 26), new THREE.MeshBasicMaterial({ map: wfT, transparent: true, opacity: 0.85 }));
-    wf.position.set(-38, 11, -128); wf.lookAt(0, 11, 0); this.scene.add(wf);
-    const mist = new THREE.Mesh(new THREE.SphereGeometry(5, 12, 8), new THREE.MeshBasicMaterial({ color: '#eef6f6', transparent: true, opacity: 0.5 })); mist.scale.set(1.3, 0.5, 1); mist.position.set(-37, -1, -126); this.scene.add(mist);
+    // the mountains, waterfalls and sky life live in scenery.js
   }
 
   _wall() {
@@ -515,6 +510,7 @@ export class World {
         flowers.setColorAt(fi++, col.set(pal[k % 3 === 0 ? 1 : 0]));
       }
     }
+    this.bedSpots = bedSpots.filter(b => b[2] !== 'hedge');
     bushes.receiveShadow = true; bushes.castShadow = this.quality.level === 'high';
     S.add(bushes, flowers);
   }
@@ -561,16 +557,6 @@ export class World {
     this.scene.add(im);
   }
 
-  _birds() {
-    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0.12, 0, 0, -0.1, 0.32, 0, 0, 0, 0, 0.12, 0, 0, -0.1, -0.32, 0, 0], 3)); geo.computeVertexNormals();
-    const m = new THREE.MeshBasicMaterial({ color: '#3a302a', side: THREE.DoubleSide, fog: true });
-    this.birds = [];
-    for (let i = 0; i < 9; i++) {
-      const b = new THREE.Mesh(geo.clone(), m); this.scene.add(b);
-      this.birds.push({ mesh: b, r: 14 + Math.random() * 26, h: 13 + Math.random() * 10, sp: (0.12 + Math.random() * 0.1) * (Math.random() < 0.5 ? 1 : -1), ph: Math.random() * 6, cx: (Math.random() - 0.5) * 30, cz: (Math.random() - 0.5) * 30, flap: 8 + Math.random() * 4 });
-    }
-  }
-
   _npcs() {
     const n = this.quality.npcs;
     const ids = Object.keys(this.graph);
@@ -589,29 +575,41 @@ export class World {
     npc.goal = goal; npc.path = this.route(npc.avatar.root.position, goal).map(p => p.add(new THREE.Vector3((Math.random() - 0.5) * 2.2, 0, (Math.random() - 0.5) * 2.2)));
   }
 
-  setEvening(k) {
-    this.evening = k;
-    const day = { sky: '#7ea6cc', mid: '#c9dbe6', hor: '#f3e2c4', sun: '#fff0d2', sunI: 2.8, hemi: 0.95, elev: 52 };
-    const gold = { sky: '#6d6aa8', mid: '#e9a3a6', hor: '#ffd29a', sun: '#ffc27a', sunI: 2.7, hemi: 0.78, elev: 13 };
-    const dusk = { sky: '#2b2f5e', mid: '#9a5a7e', hor: '#f08a52', sun: '#ff9a55', sunI: 1.0, hemi: 0.36, elev: 4 };
-    const lerp = (a, b, t) => ({ mid: new THREE.Color(a.mid).lerp(new THREE.Color(b.mid), t), sky: new THREE.Color(a.sky).lerp(new THREE.Color(b.sky), t), hor: new THREE.Color(a.hor).lerp(new THREE.Color(b.hor), t), sun: new THREE.Color(a.sun).lerp(new THREE.Color(b.sun), t), sunI: a.sunI + (b.sunI - a.sunI) * t, hemi: a.hemi + (b.hemi - a.hemi) * t, elev: a.elev + (b.elev - a.elev) * t });
-    const s = k < 0.5 ? lerp(day, gold, k * 2) : lerp(gold, dusk, (k - 0.5) * 2);
-    this.skyU.top.value.copy(s.sky); this.skyU.mid.value.copy(s.mid); this.skyU.bottom.value.copy(s.hor); this.skyU.sunCol.value.copy(s.sun);
-    const el = THREE.MathUtils.degToRad(s.elev), az = THREE.MathUtils.degToRad(-62);
-    this.sunDir = new THREE.Vector3(Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az)).normalize();
-    this.skyU.sunDir.value.copy(this.sunDir);
+  // Time of day: morning, afternoon, evening, night. Presets blend smoothly over a few seconds.
+  setTimeOfDay(name, instant = false) {
+    const P = TOD_PRESETS[name]; if (!P) return;
+    this.todName = name;
+    const el = THREE.MathUtils.degToRad(P.elev), az = THREE.MathUtils.degToRad(P.az);
+    this.todTarget = { ...P, sky: new THREE.Color(P.sky), mid: new THREE.Color(P.mid), hor: new THREE.Color(P.hor), sun: new THREE.Color(P.sun), cloud: new THREE.Color(P.cloud), ground: new THREE.Color(P.ground),
+      sunDir: new THREE.Vector3(Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az)).normalize() };
+    if (instant || !this.tod) { this.tod = { ...this.todTarget, sky: this.todTarget.sky.clone(), mid: this.todTarget.mid.clone(), hor: this.todTarget.hor.clone(), sun: this.todTarget.sun.clone(), cloud: this.todTarget.cloud.clone(), ground: this.todTarget.ground.clone(), sunDir: this.todTarget.sunDir.clone() }; this._applyTOD(); }
+  }
+  _blendTOD(k) {
+    const a = this.tod, b = this.todTarget;
+    for (const key of ['sky', 'mid', 'hor', 'sun', 'cloud', 'ground']) a[key].lerp(b[key], k);
+    for (const key of ['sunI', 'hemi', 'fogNear', 'fogFar', 'lamps', 'stars', 'mist', 'warm', 'night', 'exposure']) a[key] += (b[key] - a[key]) * k;
+    a.sunDir.lerp(b.sunDir, k).normalize();
+    this._applyTOD();
+  }
+  _applyTOD() {
+    const s = this.tod;
+    this.skyU.top.value.copy(s.sky); this.skyU.mid.value.copy(s.mid); this.skyU.bottom.value.copy(s.hor); this.skyU.sunCol.value.copy(s.sun).multiplyScalar(1 - s.night * 0.6);
+    this.sunDir = s.sunDir; this.skyU.sunDir.value.copy(s.sunDir);
     this.sun.color.copy(s.sun); this.sun.intensity = s.sunI;
-    this.hemi.intensity = s.hemi; this.hemi.color.copy(s.hor).lerp(new THREE.Color('#ffffff'), 0.4); this.hemi.groundColor.set(k > 0.6 ? '#3a2c22' : '#6b5a3a');
-    this.scene.fog.color.copy(s.hor).lerp(s.mid, 0.45);
-    this.flames.uniforms.uBoost.value = 0.75 + k * 0.6;
-    this.lampIntensity = 0.4 + Math.pow(k, 1.5) * 5.5;
+    this.hemi.intensity = s.hemi; this.hemi.color.copy(s.hor).lerp(new THREE.Color('#ffffff'), 0.4 * (1 - s.night)); this.hemi.groundColor.copy(s.ground);
+    this.scene.fog.color.copy(s.hor).lerp(s.mid, 0.45); this.scene.fog.near = s.fogNear; this.scene.fog.far = s.fogFar;
+    this.flames.uniforms.uBoost.value = 0.8 + Math.min(0.7, s.lamps * 0.1);
+    this.lampIntensity = s.lamps;
+    s.moonDir = s.sunDir;
+    this.evening = s.warm;
   }
 
   update(dt, t, focus, ctx) {
+    if (this.todTarget && this.tod) this._blendTOD(ctx.reducedMotion ? 1 : 1 - Math.exp(-dt * 0.9));
+    this.scenery.update(dt, t, focus, this.tod, ctx.reducedMotion ? 0.35 : 1);
     this.windTime.value = t * (ctx.reducedMotion ? 0.3 : 1);
     this.flames.update(t);
-    if (this.waterfallTex) this.waterfallTex.offset.y = t * 0.6;
-    if (this.water.normalMap) { this.water.normalMap.offset.x = t * 0.012; this.water.normalMap.offset.y = t * 0.008; }
+        if (this.water.normalMap) { this.water.normalMap.offset.x = t * 0.012; this.water.normalMap.offset.y = t * 0.008; }
     // sun follows the focus so the shadow map stays crisp near the player
     this.sun.position.copy(focus).addScaledVector(this.sunDir, 70); this.sun.target.position.copy(focus);
     this.sky.position.copy(focus).setY(0);
@@ -622,11 +620,6 @@ export class World {
     }
     for (const b of this.bells) b.update(dt, t);
     for (const u of this.updaters) u(dt, t);
-    for (const b of this.birds) {
-      const a = b.ph + t * b.sp; b.mesh.position.set(b.cx + Math.cos(a) * b.r, b.h + Math.sin(t * 0.3 + b.ph) * 1.5, b.cz + Math.sin(a) * b.r);
-      b.mesh.rotation.y = -a + (b.sp > 0 ? Math.PI : 0); const f = Math.sin(t * b.flap) * 0.6;
-      const pos = b.mesh.geometry.attributes.position; pos.setY(2, f * 0.3); pos.setY(5, f * 0.3); pos.needsUpdate = true;
-    }
     // NPC devotees
     for (const npc of this.npcs) {
       const av = npc.avatar, p = av.root.position;

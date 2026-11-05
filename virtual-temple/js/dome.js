@@ -31,7 +31,7 @@ export class PrayerHall {
   buildShell() {
     const S = this.scene;
     this.hemi = new THREE.HemisphereLight('#ffe6c4', '#3a2618', 0.55); S.add(this.hemi);
-    this.ambientBase = 0.55;
+    this.ambientBase = 0.55; this.sunBase = 2.2;
     // late-afternoon sun entering through the side jalis
     this.sun = new THREE.DirectionalLight('#ffd49a', 2.2); this.sun.position.set(-16, 13, 3); this.sun.target.position.set(1, 0, 0);
     this.sun.castShadow = this.quality.shadows > 0; this.sun.shadow.mapSize.set(this.quality.shadows || 512, this.quality.shadows || 512);
@@ -63,13 +63,13 @@ export class PrayerHall {
     // jali windows with sunbeams (west side) and a softer east window
     const jaliT = TX.jali(); jaliT.repeat.set(2, 2);
     const jaliM = new THREE.MeshStandardMaterial({ color: '#d8bc90', alphaMap: jaliT, transparent: true, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.9 });
-    const glowM = new THREE.MeshBasicMaterial({ color: '#ffd9a0', fog: false });
-    const beamM = new THREE.MeshBasicMaterial({ map: TX.beam(), transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false });
+    const glowM = this.windowGlow = new THREE.MeshBasicMaterial({ color: '#ffd9a0', fog: false }); this.windowGlowEast = new THREE.MeshBasicMaterial({ color: '#c99e70', fog: false });
+    const beamM = this.beamMat = new THREE.MeshBasicMaterial({ map: TX.beam(), transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false });
     this.beams = [];
     for (const a of [Math.PI * 0.86, Math.PI * 1.0, Math.PI * 1.14, Math.PI * 0.0, Math.PI * 0.14, -Math.PI * 0.14]) {
       const x = Math.cos(a) * (R - 0.08), z = Math.sin(a) * (R - 0.08), west = x < 0;
       const win = new THREE.Group(); win.position.set(x, 3.3, z); win.lookAt(0, 3.3, 0); S.add(win);
-      const glow = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 2.4), glowM); glow.position.z = -0.06; win.add(glow); if (!west) glow.material = new THREE.MeshBasicMaterial({ color: '#c99e70', fog: false });
+      const glow = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 2.4), glowM); glow.position.z = -0.06; win.add(glow); if (!west) glow.material = this.windowGlowEast;
       const j = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 2.4), jaliM); win.add(j);
       const frame = new THREE.Mesh(new THREE.BoxGeometry(2.1, 2.8, 0.2), stoneFine); frame.position.z = -0.12; frame.scale.set(1, 1, 0.5); win.add(frame);
       if (west) {
@@ -107,6 +107,17 @@ export class PrayerHall {
       return { group: g, stick, ember, flamePos: new THREE.Vector3(p.x, 0.43, p.z - 0.85 + 0.03), tip: new THREE.Vector3(p.x + 0.2, 0.37, p.z - 0.85) };
     });
     this.pmrem = new THREE.PMREMGenerator(this.renderer);
+  }
+
+  // light through the jalis follows the time of day; at night the hall is lit by its lamps
+  setTimeOfDay(tod) {
+    const P = { morning: ['#ffe2b6', 2.3, 0.26, '#ffe6c2', '#d8b48a', 0.6, 1], afternoon: ['#fff3e2', 2.6, 0.2, '#fff4de', '#e0c49c', 0.65, 1], evening: ['#ffad6a', 1.8, 0.3, '#ffb27a', '#b07a58', 0.5, 0.8], night: ['#8da2e8', 0.22, 0.0, '#1a2550', '#141c3a', 0.3, 0.15] }[tod];
+    if (!P) return;
+    const [sun, si, beam, glow, glowE, hemi, dust] = P;
+    this.sun.color.set(sun); this.sunBase = si; this.ambientBase = hemi;
+    if (!this.aarti) { this.sun.intensity = si; this.hemi.intensity = hemi; }
+    this.beamMat.opacity = beam; this.windowGlow.color.set(glow); this.windowGlowEast.color.set(glowE);
+    this.dust.material.uniforms.uOpacity.value = dust;
   }
 
   // ---------- sanctum ----------
@@ -408,7 +419,7 @@ export class PrayerHall {
     if (this.aarti) {
       const A = this.aarti; A.t += dt; const k = A.t;
       const warm = smooth(2, 10, k) * (1 - smooth(A.dur - 6, A.dur, k));
-      this.hemi.intensity = this.ambientBase * (1 - 0.45 * warm); this.sun.intensity = 2.2 * (1 - 0.6 * warm);
+      this.hemi.intensity = this.ambientBase * (1 - 0.45 * warm); this.sun.intensity = this.sunBase * (1 - 0.6 * warm);
       this.sanct.intensity = 9 + 14 * warm; this.sanct.color.set('#ffb766').lerp(new THREE.Color('#ff9a3c'), warm);
       this.fill.intensity = 30 + 40 * warm;
       const active = k > 10 && k < A.dur - 9;
@@ -426,7 +437,7 @@ export class PrayerHall {
         else if (a.state !== 'bow') a.setState('bow');
       }
       if (!A.bellRung && k > A.dur - 7) { A.bellRung = true; this.bell.strike(0.25); }
-      if (k >= A.dur) { this.stopAarti(); for (const a of all) a.setState('namaste'); this.hemi.intensity = this.ambientBase; this.sun.intensity = 2.2; this.onAartiEnd && this.onAartiEnd(); }
+      if (k >= A.dur) { this.stopAarti(); for (const a of all) a.setState('namaste'); this.hemi.intensity = this.ambientBase; this.sun.intensity = this.sunBase; this.onAartiEnd && this.onAartiEnd(); }
     }
     this.priest.update(dt, t);
   }
