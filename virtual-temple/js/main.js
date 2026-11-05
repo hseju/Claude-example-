@@ -1,7 +1,7 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 import { World, TEMPLES, lerpAngle } from './world.js';
 import { PrayerHall, SPOTS, ENTRANCE } from './dome.js';
-import { Avatar, defaultConfig, randomConfig, SKIN_TONES, HAIR_COLORS, HAIR_STYLES, OUTFITS, CLOTH_COLORS, PRESENTATIONS } from './avatar.js';
+import { Avatar, defaultConfig, randomConfig, SKIN_TONES, HAIR_COLORS, HAIR_STYLES, OUTFITS, CLOTH_COLORS, PRESENTATIONS, BUILDS, AGES, FACIAL, MARKS, JEWELLERY } from './avatar.js';
 import { TempleAudio } from './audio.js';
 import { HallDirectory, LocalSimulation, HALL_CAPACITY } from './presence.js';
 import { ProfileStore, storageAvailable } from './profile.js';
@@ -52,7 +52,7 @@ audio.muted = settings.muted;
 let world, hall, directory, sim, playerRing;
 const app = { mode: 'loading', hallState: null, currentHall: null, templeId: null, camMode: 'world', time: 0 };
 const me = { id: null, config: defaultConfig(), avatar: null };
-const cam = { yaw: 0, pitch: 0.27, dist: 27, tYaw: 0, tPitch: 0.27, tDist: 27, eff: 27, pos: new THREE.Vector3(), target: new THREE.Vector3(), fov: 32 };
+const cam = { close: 0, yaw: 0, pitch: 0.27, dist: 27, tYaw: 0, tPitch: 0.27, tDist: 27, eff: 27, pos: new THREE.Vector3(), target: new THREE.Vector3(), fov: 32 };
 const input = { keys: new Set(), joy: new THREE.Vector2(), auto: [], pointers: new Map(), drag: false };
 
 // ---------------------------------------------------------------- boot
@@ -77,13 +77,13 @@ async function boot() {
   buildLabels(); buildCreator(); bindUI(); applySettingsUI();
   onResize();
   const restored = storageAvailable ? profiles.restore() : null;
-  if (restored && restored.avatar) { me.config = { ...restored.avatar }; }
+  if (restored && restored.avatar) { me.config = { ...defaultConfig(), ...restored.avatar }; }
   me.avatar = new Avatar(me.config, { shadows: Q.level !== 'low' });
   me.avatar.root.position.set(0, 0, 46.5); me.avatar.root.rotation.y = Math.PI;
   world.scene.add(me.avatar.root);
   playerRing = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.68, 48), new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffc861').multiplyScalar(2.2), transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending }));
   playerRing.rotation.x = -Math.PI / 2; world.scene.add(playerRing);
-  if (/[?&]debug\b/.test(location.search)) window.__vt = { app, me, world, hall, directory, cam, input, settings, audio }; // local testing hook
+  if (/[?&]debug\b/.test(location.search)) window.__vt = { app, me, world, hall, directory, cam, input, settings, audio, preview, refreshCreator }; // local testing hook
   setMode('welcome');
   $('loading').style.opacity = '0'; setTimeout(() => $('loading').remove(), 900);
   last = performance.now(); requestAnimationFrame(loop);
@@ -130,6 +130,7 @@ function presetsFor(c) {
   if (c.presentation === 'fem' && (c.outfit === 'dhoti' || c.outfit === 'kurta')) c.outfit = 'saree';
   if (c.presentation === 'masc' && (c.outfit === 'saree' || c.outfit === 'salwar')) c.outfit = 'kurta';
   if (c.presentation === 'masc' && (c.hair === 'braid' || c.hair === 'bun')) c.hair = 'short';
+  if (c.presentation === 'fem') { c.facial = 'none'; if (c.mark === 'tripundra') c.mark = 'bindi'; }
 }
 function refreshCreator() {
   chipGroup($('cPres'), PRESENTATIONS, 'presentation');
@@ -138,6 +139,10 @@ function refreshCreator() {
   chipGroup($('cSkin'), SKIN_TONES, 'skin', (b, it) => { b.className = 'swatch'; b.style.background = it; b.setAttribute('aria-label', 'Skin tone'); });
   chipGroup($('cHair'), HAIR_STYLES, 'hair');
   chipGroup($('cHairColor'), HAIR_COLORS, 'hairColor', (b, it) => { b.className = 'swatch'; b.style.background = it; b.setAttribute('aria-label', 'Hair colour'); });
+  chipGroup($('cBuild'), BUILDS, 'build'); chipGroup($('cAge'), AGES, 'age');
+  chipGroup($('cFacial'), FACIAL, 'facial'); $('cFacial').hidden = me.config.presentation === 'fem';
+  chipGroup($('cMark'), MARKS, 'mark'); chipGroup($('cJewel'), JEWELLERY, 'jewellery');
+  chipGroup($('cGlasses'), [{ id: false, label: 'No glasses' }, { id: true, label: 'Glasses' }], 'glasses');
   if (preview.avatar) preview.avatar.setConfig(me.config);
 }
 function buildCreator() {
@@ -376,7 +381,7 @@ function project(p, el, yOff = 0) {
 function positionLabels() {
   if (app.mode === 'world') {
     for (const T of Object.values(TEMPLES)) { const d = T.entrance.distanceTo(me.avatar.root.position); project(T.labelPos, labelEls[T.id]); labelEls[T.id].style.opacity = d < 6 ? '0.35' : '1'; }
-    const nm = me.config.name || 'You'; if (labelEls.me.dataset.n !== nm) { labelEls.me.dataset.n = nm; labelEls.me.innerHTML = `<i>${escapeHtml(nm[0].toUpperCase())}</i>${escapeHtml(nm)}`; } project(me.avatar.root.position, labelEls.me, 2.05);
+    const nm = me.config.name || 'You'; if (labelEls.me.dataset.n !== nm) { labelEls.me.dataset.n = nm; labelEls.me.innerHTML = `<i>${escapeHtml(nm[0].toUpperCase())}</i>${escapeHtml(nm)}`; } project(me.avatar.root.position, labelEls.me, 2.05); if ((cam.close || 0) > 0.55) labelEls.me.style.display = 'none';
     labelEls.sims.forEach(e => (e.style.display = 'none'));
   } else if (app.mode === 'hall') {
     for (const T of Object.values(TEMPLES)) labelEls[T.id].style.display = 'none';
@@ -452,7 +457,7 @@ function bindInput() {
   joy.addEventListener('pointerup', jend); joy.addEventListener('pointercancel', jend);
 }
 function pinchDist() { const a = [...input.pointers.values()]; return a.length < 2 ? 0 : Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y); }
-function zoom(d) { cam.tDist = THREE.MathUtils.clamp(cam.tDist + d, 9, 44); }
+function zoom(d) { if (app.mode === 'creator') { preview.dist = THREE.MathUtils.clamp((preview.dist || 4.4) + d * 0.25, 1.1, 5); return; } cam.tDist = THREE.MathUtils.clamp(cam.tDist + d * Math.max(0.25, cam.tDist / 22), 2.4, 44); }
 const ray = new THREE.Raycaster(), occRay = new THREE.Raycaster();
 function tap(x, y) {
   ray.setFromCamera(new THREE.Vector2(x / innerWidth * 2 - 1, -(y / innerHeight) * 2 + 1), camera);
@@ -523,6 +528,7 @@ function bindUI() {
   hold('camLeft', () => (cam.tYaw += 0.12)); hold('camRight', () => (cam.tYaw -= 0.12)); hold('zoomIn', () => zoom(-1.5)); hold('zoomOut', () => zoom(1.5));
   $('enterBtn').addEventListener('click', () => { const T = nearShrine(); if (T) enterTemple(T.id); });
   $('pranamBtn').addEventListener('click', worldPranam);
+  $('closeBtn').addEventListener('click', () => { const near = cam.tDist < 6; if (!near) cam.farDist = cam.tDist; cam.tDist = near ? (cam.farDist || 27) : 3.2; if (!near) cam.tYaw = me.avatar.root.rotation.y + Math.PI; $('closeBtn').setAttribute('aria-pressed', String(!near)); });
   document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => goTo(b.dataset.go)));
   $('mapCanvas').addEventListener('click', (e) => {
     const r = e.target.getBoundingClientRect(); const x = (e.clientX - r.left) / r.width * 100 - 50, z = (e.clientY - r.top) / r.height * 100 - 50;
@@ -613,7 +619,8 @@ function loop(now) {
     preview.avatar.update(dt, t); if (!input.drag) preview.avatar.root.rotation.y += dt * (settings.reducedMotion ? 0 : 0.35);
     const narrow = innerWidth < 720;
     camera.fov = 30;
-    if (narrow) { camera.position.set(0, 1.4, 8); camera.lookAt(0, -0.2, 0); } else { camera.position.set(0.95, 1.25, 4.4); camera.lookAt(0.95, 0.92, 0); }
+    const pd = preview.dist || 4.4, zk = THREE.MathUtils.clamp((4.4 - pd) / 3.3, 0, 1), lookY = 0.92 + zk * 0.7;
+    if (narrow) { camera.position.set(0, 1.4 + zk * 0.25, 8 * pd / 4.4); camera.lookAt(0, -0.2 + zk * 1.55, 0); } else { camera.position.set(0.95 * pd / 4.4, 1.25 + zk * 0.35, pd); camera.lookAt(0.95 * pd / 4.4, lookY, 0); }
     camera.updateProjectionMatrix(); post.tilt.amount = 0; post.bloom.strength = 0; post.finalMat.uniforms.uVignette.value = 0.5; post.render(preview.scene, camera); return;
   }
   if (app.mode === 'hall') { updateHall(dt, t, ctx); positionLabels(); return; }
@@ -685,34 +692,39 @@ function updateWorld(dt, t, ctx) {
     camera.position.lerp(cam.pos, 1 - Math.exp(-dt * 2)); camera.lookAt(cam.target);
     world.update(dt, t, new THREE.Vector3(0, 0, 0), ctx);
   } else {
+    // close up, the camera drops to just behind the shoulder and follows your devotee
+    if (app.mode === 'world' && input.auto.length && cam.close > 0.3) cam.tYaw = lerpAngle(cam.tYaw, av.root.rotation.y + Math.PI, 1 - Math.exp(-dt * 1.5 * cam.close));
     cam.yaw += (cam.tYaw - cam.yaw) * lerp; cam.pitch += (cam.tPitch - cam.pitch) * lerp; cam.dist += (cam.tDist - cam.dist) * lerp;
-    const focus = p.clone().add(new THREE.Vector3(0, 1.5, 0));
+    cam.close = clamp01((10 - cam.dist) / 7);
+    const right = new THREE.Vector3(Math.cos(cam.yaw), 0, -Math.sin(cam.yaw));
+    const focus = p.clone().add(new THREE.Vector3(0, 1.5 - cam.close * 0.05, 0)).addScaledVector(right, cam.close * 0.32);
     cam.target.lerp(focus, 1 - Math.exp(-dt * 8));
     // portrait screens get a little more distance; temples and the gateway pull the camera in rather than hide you
-    let want = cam.dist * (camera.aspect < 1 ? 1 + (1 - camera.aspect) * 0.6 : 1);
+    let want = cam.dist * (camera.aspect < 1 ? 1 + (1 - camera.aspect) * 0.6 * (1 - cam.close) : 1);
     // inside the walls, keep the camera inside too, so the gateway never fills the foreground
     const cz = Math.cos(cam.yaw) * Math.cos(cam.pitch);
-    if (p.z < 39.5 && cz > 0.05) want = Math.max(9, Math.min(want, (38.5 - cam.target.z) / cz));
+    if (p.z < 39.5 && cz > 0.05) want = Math.max(Math.min(9, want), Math.min(want, (38.5 - cam.target.z) / cz));
     const dirAt = (pitch, out) => out.set(Math.sin(cam.yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(cam.yaw) * Math.cos(pitch));
     // first try lifting the camera over the obstacle, then pull it closer as a last resort
-    let pitch = cam.pitch, allowed = want;
+    const basePitch = cam.pitch + (0.14 - cam.pitch) * cam.close;
+    let pitch = basePitch, allowed = want;
     for (let i = 0; i < 6; i++) {
-      const pt = Math.min(1.3, cam.pitch + i * 0.12); occRay.set(cam.target, dirAt(pt, tmp)); occRay.far = want;
+      const pt = Math.min(1.3, basePitch + i * 0.12); occRay.set(cam.target, dirAt(pt, tmp)); occRay.far = want;
       const hit = world.occluders.length ? occRay.intersectObjects(world.occluders, true)[0] : null;
       if (!hit) { pitch = pt; allowed = want; break; }
-      if (i === 5) { pitch = pt; allowed = Math.max(5, hit.distance - 1); }
+      if (i === 5) { pitch = basePitch; allowed = Math.max(Math.min(2.2, want), hit.distance - 0.6); }
     }
-    cam.effPitch = cam.effPitch ?? cam.pitch;
+    cam.effPitch = cam.effPitch ?? basePitch;
     cam.effPitch += (pitch - cam.effPitch) * (1 - Math.exp(-dt * (pitch > cam.effPitch ? 6 : 1.5)));
     cam.eff += (allowed - cam.eff) * (allowed < cam.eff ? 1 - Math.exp(-dt * 10) : 1 - Math.exp(-dt * 2));
     const dir = dirAt(cam.effPitch, tmp);
     camera.position.copy(cam.target).addScaledVector(dir, cam.eff);
-    camera.lookAt(cam.target); camera.fov = 52;
+    camera.lookAt(cam.target); camera.fov = 52 - cam.close * 8;
     world.update(dt, t, p, ctx);
-    if (playerRing) { playerRing.position.set(p.x, 0.06, p.z); const k = settings.reducedMotion ? 1 : 1 + Math.sin(t * 2.4) * 0.06; playerRing.scale.set(k, k, k); }
+    if (playerRing) { playerRing.position.set(p.x, 0.06, p.z); const k = settings.reducedMotion ? 1 : 1 + Math.sin(t * 2.4) * 0.06; playerRing.scale.set(k, k, k); playerRing.material.opacity = 0.85 * (1 - cam.close * 0.8); }
   }
   camera.updateProjectionMatrix();
-  post.tilt.amount = Q.tilt * (app.mode === 'welcome' ? 0.15 : 0.22); post.tilt.focus = 0.4; post.tilt.band = 0.32; renderer.toneMappingExposure = world.tod.exposure;
+  post.tilt.amount = Q.tilt * (app.mode === 'welcome' ? 0.15 : 0.22 * (1 - (cam.close || 0))); post.tilt.focus = 0.4; post.tilt.band = 0.32; renderer.toneMappingExposure = world.tod.exposure;
   post.finalMat.uniforms.uVignette.value = 0.34; post.finalMat.uniforms.uWarm.value = 0.12 + world.evening * 0.2; post.bloom.strength = Q.bloom; post.bloom.threshold = 1.5;
   post.render(world.scene, camera);
 }

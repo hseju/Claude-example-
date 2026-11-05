@@ -591,6 +591,15 @@ export class World {
       this.scene.add(a.root);
       this.npcs.push({ avatar: a, path: [], wait: Math.random() * 4, goal: null });
     }
+    // a few children walk with a parent
+    const adults = this.npcs.slice();
+    for (let i = 0; i < (this.quality.level === 'low' ? 0 : 3); i++) {
+      const fem = Math.random() < 0.5, cfg = randomConfig(Math.random(), { presentation: fem ? 'fem' : 'masc', age: 'child' });
+      Object.assign(cfg, { age: 'child', outfit: fem ? 'salwar' : 'kurta', hair: fem ? 'braid' : 'short', facial: 'none', glasses: false, carry: 'none', hairColor: '#1b1512', mark: fem ? 'bindi' : 'none' });
+      const parent = adults[i % adults.length], a = new Avatar(cfg, { simulated: true, shadows: this.quality.level !== 'low' });
+      a.root.position.copy(parent.avatar.root.position).add(new THREE.Vector3(0.7, 0, 0)); this.scene.add(a.root);
+      this.npcs.push({ avatar: a, follow: parent, off: new THREE.Vector3(0.65, 0, -0.35) });
+    }
   }
 
   _npcPlan(npc) {
@@ -659,13 +668,20 @@ export class World {
     // NPC devotees
     for (const npc of this.npcs) {
       const av = npc.avatar, p = av.root.position;
+      if (npc.follow) {
+        const par = npc.follow.avatar, tgt = npc.off.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), par.root.rotation.y).add(par.root.position);
+        const d = new THREE.Vector3(tgt.x - p.x, 0, tgt.z - p.z), dist = d.length();
+        if (dist > 0.15) { const sp = Math.min(2.6, dist * 2.2); d.normalize(); p.addScaledVector(d, sp * dt); this.resolve(p, 0.22); av.speed = sp; av.setState('walk'); av.root.rotation.y = lerpAngle(av.root.rotation.y, Math.atan2(d.x, d.z), 1 - Math.exp(-dt * 8)); }
+        else { av.speed = 0; av.setState(par.state === 'walk' ? 'idle' : par.state); av.root.rotation.y = lerpAngle(av.root.rotation.y, par.root.rotation.y, 1 - Math.exp(-dt * 4)); }
+        av.update(dt, t); continue;
+      }
       if (npc.wait > 0) { npc.wait -= dt; av.speed = 0; if (npc.wait <= 0) { av.setState('idle'); this._npcPlan(npc); } }
       else if (npc.path.length) {
         const tgt = npc.path[0]; const d = new THREE.Vector3(tgt.x - p.x, 0, tgt.z - p.z); const dist = d.length();
         if (dist < 0.4) { npc.path.shift(); if (!npc.path.length) { const atShrine = TEMPLES[npc.goal]; npc.wait = atShrine ? 5 + Math.random() * 6 : 2 + Math.random() * 6; av.setState(atShrine ? 'namaste' : 'idle'); if (atShrine) { const dir = atShrine.pos.clone().sub(p); av.root.rotation.y = Math.atan2(dir.x, dir.z); } } }
         else {
           // yield to the player when close in front
-          const sp = 1.25;
+          const sp = av.config.age === 'elder' ? 0.85 : 1.25;
           d.normalize(); const step = d.multiplyScalar(sp * dt); const np = p.clone().add(step); this.resolve(np, 0.3); p.copy(np);
           av.speed = sp; av.setState('walk'); const ang = Math.atan2(step.x, step.z); av.root.rotation.y = lerpAngle(av.root.rotation.y, ang, 1 - Math.exp(-dt * 8));
         }

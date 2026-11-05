@@ -21,8 +21,9 @@ Opening `index.html` straight from disk (`file://`) does not work, because brows
 | Area | Status |
 | --- | --- |
 | Miniature campus at golden hour: ivory-and-gold temples with shikharas, domed mandapas and rooftop chhatris; gateway with swinging brass bells; courtyard fountain, lotus ponds and kunds with pavilions; carved balustrades, lamp posts and rangoli; flowering trees, a brass Nandi, peacocks, hills and a waterfall; diyas, bunting, birds; tilt-shift and bloom | Working |
-| Avatar creator: name, presentation, attire (kurta, dhoti, saree, salwar kameez), colour, skin tone, hair | Working |
-| Movement: WASD/arrows, click or tap to walk, on-screen joystick on touch screens, drag to orbit, wheel/pinch zoom, map with shrine destinations, collisions | Working |
+| Devotees: rigged characters (18-bone skeleton, one skinned mesh each) with sculpted bodies by presentation, build and age; faces with eyes, lids, brows, nose, lips and ears; fingers; bare feet. Saree with pleats, zari border and pallu; kurta with collar, placket and churidar; dhoti with angavastram, sacred thread and mala; salwar kameez with dupatta. Bangles, earrings, mangalsutra, anklets, bindi, tilak or tripundra, moustache or beard, glasses; elders with walking sticks, devotees carrying puja thalis, children walking with a parent | Working |
+| Avatar creator: name, presentation, attire, colour, skin tone, hair, build, age, facial hair, forehead mark, glasses, jewellery; scroll or pinch to look closely | Working |
+| Movement: WASD/arrows, click or tap to walk, on-screen joystick on touch screens, drag to orbit, wheel/pinch zoom from overview down to a close over-the-shoulder view (also a Close view button), map with shrine destinations, collisions | Working |
 | Simulated devotees walking between shrines and pausing in namaste | Working, labelled as simulated |
 | Prayer hall per temple: 3 × 4 lotus spots, occupancy (`7 / 12`), pick a spot or "Choose for me", walk-in animation, cinematic prayer camera | Working |
 | Full hall: join an identical second hall, or wait in line for a spot | Working (Shiva hall 1 starts full to show this) |
@@ -69,7 +70,7 @@ js/scenery.js       mountains, waterfalls, river, clouds, mist, bird flocks, but
 js/flora.js         trees (neem, gulmohar, bougainvillea, jacaranda, ashoka, coconut palm), flower beds and hedges, grass, lotus ponds, urli bowls
 js/dome.js          prayer hall: shell, per-deity sanctum, 12 spots, offerings, aarti choreography
 js/architecture.js  shared pieces: pillars, bells (pendulum + clapper), diyas, lamp stands, shikhara
-js/avatar.js        procedural avatars and their poses (walk, namaste, bow, offer, ring, aarti)
+js/avatar.js        rigged devotees: body, face, garments, jewellery, props, and their poses (walk, namaste, bow, offer, ring, aarti)
 js/fx.js            GPU flames, incense smoke, petals, dust motes, fountain droplets, wind sway
 js/postfx.js        tilt-shift (miniature look) and colour grade
 js/audio.js         Web Audio graph, zones and time-of-day mixes, tanpura/bansuri/sitar/tabla, birds and insects, shared aarti track, optional recorded library
