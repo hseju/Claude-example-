@@ -5,6 +5,7 @@ import { FlameField, fountainJets, windify } from './fx.js';
 import { Avatar, randomConfig } from './avatar.js';
 import { Scenery } from './scenery.js';
 import { Flora, normalFromCanvas } from './flora.js';
+import { HUT, buildHut } from './hut.js';
 
 export const TEMPLES = {
   ganesha: { id: 'ganesha', name: 'Ganesha Temple', short: 'Ganesha', pos: new THREE.Vector3(-31, 0, 0), rot: Math.PI / 2, entrance: new THREE.Vector3(-19.5, 0, 0), stone: '#f1e4cf', accent: '#b8442a', icon: 'modak', flag: '#e8731c', blurb: 'Remover of obstacles. Flower offerings and aarti.' },
@@ -21,6 +22,8 @@ const EDGES = [['spawn', 'gateOut'], ['gateOut', 'gateIn'], ['gateIn', 's1'], ['
   ['cS', 'cSE'], ['cSE', 'cE'], ['cE', 'cNE'], ['cNE', 'cN'], ['cN', 'cNW'], ['cNW', 'cW'], ['cW', 'cSW'], ['cSW', 'cS'],
   ['cW', 'w1'], ['w1', 'ganesha'], ['cE', 'e1'], ['e1', 'krishna'], ['cN', 'n1'], ['n1', 'shiva'],
   ['cSW', 'gSW'], ['cNW', 'gNW'], ['cSE', 'gSE'], ['cNE', 'gNE'], ['gSW', 'w1'], ['gNW', 'w1'], ['gSE', 'e1'], ['gNE', 'e1']];
+// the meditation hut sits off the south-west garden walk
+NODES.hut = [HUT.entrance.x, HUT.entrance.z]; EDGES.push(['gSW', 'hut']);
 
 const TOD_PRESETS = {
   morning: { sky: '#7fb2e2', mid: '#f2cdbf', hor: '#ffe3bd', sun: '#ffd39b', sunI: 2.4, hemi: 0.85, ground: '#6b5a3a', elev: 14, az: 18, fogNear: 80, fogFar: 600, lamps: 0.8, stars: 0, mist: 0.75, warm: 0.22, night: 0, exposure: 1.05, cloud: '#fff1e6' },
@@ -81,6 +84,7 @@ export class World {
     this._ponds();
     for (const t of Object.values(TEMPLES)) this._temple(t);
     this._chhatris();
+    buildHut(this);
     this._approach();
     this._courtNandi();
     this._peacock(new THREE.Vector3(23.5, 0, 9.5), -2.2);
@@ -94,6 +98,7 @@ export class World {
     this._bunting();
     this.scenery = new Scenery(this.scene, this.quality, this.water, this.bedSpots || []);
     this._npcs();
+    this._hutSitters();
     this.setTimeOfDay(this.todName, true);
   }
 
@@ -602,6 +607,19 @@ export class World {
     }
   }
 
+  // two simulated devotees meditating in the hut
+  _hutSitters() {
+    this.hutSitters = [];
+    if (this.quality.level === 'low') return;
+    HUT.sitters.forEach((seat, i) => {
+      const cfg = randomConfig(Math.random(), { presentation: i ? 'masc' : 'fem' });
+      Object.assign(cfg, { carry: 'none', age: cfg.age === 'child' ? 'adult' : cfg.age, glasses: false });
+      const a = new Avatar(cfg, { simulated: true, shadows: true });
+      a.root.position.copy(seat.pos).setY(seat.pos.y - 0.012); a.root.rotation.y = seat.rotY; a.setState('meditate'); this.scene.add(a.root);
+      this.hutSitters.push(a);
+    });
+  }
+
   _npcPlan(npc) {
     const dests = ['ganesha', 'shiva', 'krishna', 'pondW', 'pondE', 'gSW', 'gNE', 'gSE', 'gNW', 'cSE', 'cNW', 'gateIn'];
     const goal = dests[Math.floor(Math.random() * dests.length)];
@@ -643,6 +661,7 @@ export class World {
     this.flora.update(dt, t * (ctx.reducedMotion ? 0.5 : 1), 1 - this.tod.night);
     this.windTime.value = t * (ctx.reducedMotion ? 0.3 : 1);
     this.flames.update(t);
+    for (const a of this.hutSitters || []) if (a.root.position.distanceToSquared(focus) < 2500) a.update(dt, t);
         if (this.water.normalMap) { this.water.normalMap.offset.x = t * 0.012; this.water.normalMap.offset.y = t * 0.008; }
     // sun follows the focus so the shadow map stays crisp near the player
     this.sun.position.copy(focus).addScaledVector(this.sunDir, 70); this.sun.target.position.copy(focus);

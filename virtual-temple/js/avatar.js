@@ -100,7 +100,7 @@ const V = THREE.Vector3;
 const MAT = { body: 0, skirt: 1, ribbon: 2, metal: 3, glow: 4 };
 class Parts {
   constructor() { this.list = []; }
-  add(geo, bone, color, mat = MAT.body, shade, weights) {
+  add(geo, bone, color, mat = MAT.body, shade, weights, seat) {
     if (!geo.attributes.normal) geo.computeVertexNormals();
     let g = geo.index ? geo.toNonIndexed() : geo;
     const n = g.attributes.position.count;
@@ -111,18 +111,20 @@ class Parts {
       for (let i = 0; i < n; i++) { tmp.copy(c); if (shade) shade(tmp, p.getX(i), p.getY(i), p.getZ(i), i); a.set([tmp.r, tmp.g, tmp.b], i * 3); }
       g.setAttribute('color', new THREE.BufferAttribute(a, 3));
     }
-    this.list.push({ g, bone, mat, weights }); return g;
+    this.list.push({ g, bone, mat, weights, seat }); return g;
   }
   build() {
     this.list.sort((a, b) => a.mat - b.mat);
     const total = this.list.reduce((s, p) => s + p.g.attributes.position.count, 0);
     const pos = new Float32Array(total * 3), nor = new Float32Array(total * 3), uv = new Float32Array(total * 2), col = new Float32Array(total * 3), si = new Uint16Array(total * 4), sw = new Float32Array(total * 4);
+    const seat = new Float32Array(total * 3); let hasSeat = false;
     const geo = new THREE.BufferGeometry(); let o = 0, groupStart = 0, groupMat = this.list.length ? this.list[0].mat : 0;
     for (const p of this.list) {
       if (p.mat !== groupMat) { geo.addGroup(groupStart, o - groupStart, groupMat); groupStart = o; groupMat = p.mat; }
       const n = p.g.attributes.position.count;
       pos.set(p.g.attributes.position.array, o * 3); nor.set(p.g.attributes.normal.array, o * 3); uv.set(p.g.attributes.uv.array, o * 2); col.set(p.g.attributes.color.array, o * 3);
       const P = p.g.attributes.position;
+      if (p.seat) { hasSeat = true; for (let i = 0; i < n; i++) { const d = p.seat(P.getX(i), P.getY(i), P.getZ(i)); if (d) seat.set(d, (o + i) * 3); } }
       for (let i = 0; i < n; i++) {
         const k = (o + i) * 4;
         if (!p.weights) { si[k] = p.bone; sw[k] = 1; continue; }
@@ -135,6 +137,8 @@ class Parts {
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
     geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
     geo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4)); geo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sw, 4));
+    // morph target 0: garments draped over crossed legs for the seated meditation pose
+    geo.morphAttributes.position = [new THREE.BufferAttribute(hasSeat ? seat : new Float32Array(total * 3), 3)]; geo.morphTargetsRelative = true;
     geo.computeBoundingSphere(); return geo;
   }
 }
@@ -182,6 +186,51 @@ function shell(prof, { seg = 40, sz = 0.72, sx = 1, pleats = 0, pleatFront = 0.5
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setIndex(idx); g.computeVertexNormals(); return g;
 }
+
+// ------------------------------------------------------------------ seated meditation (sukhasana)
+// The hips drop by SEAT onto a cushion; legs cross with each foot under the opposite knee; hands rest
+// palms-up on the thighs. Angles were solved numerically against this skeleton (see README).
+export const SEAT = 0.65;
+const SIT = {
+  thL: [-2.45, 0.965, 1.286], knL: [2.19, 0, 0], anL: [0.757, -0.078, -0.023],
+  thR: [-2.248, -0.866, -1.167], knR: [2.399, 0, 0], anR: [0.663, 0.169, 0.05],
+  shL: [-0.048, -0.327, 0.223], elL: [-0.52, 1.237, 0], wrL: [-0.297, 0.796, -0.511],
+  shR: [-0.046, 0.316, -0.222], elR: [-0.525, -1.183, 0], wrR: [-0.313, -0.83, 0.486],
+};
+// nadi shodhana: the right hand comes up to the nose (thumb and ring finger at the nostrils)
+const SIT_NADI = { ...SIT, shR: [-0.912, 0.762, 0.082], elR: [-2.311, -1.405, 0], wrR: [-0.316, -0.982, 0.038] };
+// where the folded legs and the cushion are once seated (root space, floor at 0): capsules [a, b, radius a, radius b]
+const LAP = [
+  [[0.088, 0.25, 0], [0.326, 0.131, 0.325], 0.085, 0.058], [[0.326, 0.131, 0.325], [-0.073, 0.088, 0.267], 0.052, 0.04], [[-0.073, 0.088, 0.267], [-0.22, 0.05, 0.32], 0.035, 0.025],
+  [[-0.088, 0.25, 0], [-0.346, 0.127, 0.308], 0.085, 0.058], [[-0.346, 0.127, 0.308], [0.037, 0.09, 0.181], 0.052, 0.04], [[0.037, 0.09, 0.181], [0.187, 0.05, 0.223], 0.035, 0.025],
+];
+const CUSHION = { x: 0, z: -0.03, r: 0.27, y: 0.15 };
+function lapHeight(x, z, extra = 0) {
+  let h = Math.hypot(x - CUSHION.x, z - CUSHION.z) < CUSHION.r ? CUSHION.y : -1;
+  for (const [a, b, ra, rb] of LAP) {
+    const dx = b[0] - a[0], dz = b[2] - a[2], L2 = dx * dx + dz * dz;
+    const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[2]) * dz) / (L2 || 1)));
+    const px = a[0] + dx * t, pz = a[2] + dz * t, d = Math.hypot(x - px, z - pz), r = ra + (rb - ra) * t + extra;
+    if (d < r) h = Math.max(h, a[1] + (b[1] - a[1]) * t + Math.sqrt(r * r - d * d));
+  }
+  return h;
+}
+const smax = (a, b, k = 0.03) => { const h = Math.max(0, Math.min(1, 0.5 + 0.5 * (a - b) / k)); return b + (a - b) * h + k * h * (1 - h); };
+// cloth below `top` (bind-space y) falls outward over the lap: `hem` is its lowest bind y, `reach(theta)` the
+// radius it spreads to, `lift` how far it rides above the legs. Returns a morph delta in bind space.
+function lapDrape(top, hem, reach, lift = 0.022, minY = 0.012, legExtra = 0) {
+  return (x, y, z) => {
+    if (y >= top) return null;
+    const t = Math.min(1, (top - y) / (top - hem)), th = Math.atan2(x, z), r0 = Math.hypot(x, z);
+    const R = Math.max(r0, reach(th)), r = r0 + (R - r0) * Math.pow(t, 0.75);
+    const nx = r0 > 1e-4 ? x / r0 : Math.sin(th), nz = r0 > 1e-4 ? z / r0 : Math.cos(th);
+    const px = nx * r, pz = nz * r;
+    const yTop = top - SEAT, fall = yTop - (yTop - minY) * Math.pow(t, 1.7);
+    const under = lapHeight(px, pz, legExtra), py = under > -1 ? smax(fall, under + lift) : Math.max(minY, fall);
+    return [px - x, py + SEAT - y, pz - z];
+  };
+}
+const lobes = (th, base, k) => base + k * Math.max(Math.pow(Math.max(0, Math.cos(th - 0.8)), 1.5), Math.pow(Math.max(0, Math.cos(th + 0.8)), 1.5));
 
 // ------------------------------------------------------------------ the figure
 const BONES = ['root', 'hips', 'spine', 'chest', 'neck', 'head', 'shL', 'elL', 'wrL', 'shR', 'elR', 'wrR', 'thL', 'knL', 'anL', 'thR', 'knR', 'anR', 'eyeL', 'eyeR', 'lidL', 'lidR', 'browL', 'browR', 'jaw', 'mouthL', 'mouthR'];
@@ -389,8 +438,8 @@ function buildFigure(cfg) {
     neckline(blouse, 0.085); P.add(bust(blouse, 0.032), BI.chest, accent, MAT.body, null, W.torso);
     sleeve('L', 0.13, accent); sleeve('R', 0.13, accent);
     // skirt with front pleats, tucked at the waist, zari border at the hem
-    const skirt = shell([[lb(0.255), 0.06], [lb(0.225), 0.3], [lb(0.205), 0.6], [lb(0.195), 0.85], [lb(0.18), 0.95], [lb(0.15), 1.04], [lb(0.14), 1.08]], { sz: 0.82, pleats: 46, pleatFront: 0.5, hemWave: 0.006, seg: 56 });
-    P.add(skirt, BI.hips, '#ffffff', MAT.skirt);
+    const skirt = shell(dense([[lb(0.255), 0.06], [lb(0.225), 0.3], [lb(0.205), 0.6], [lb(0.195), 0.85], [lb(0.18), 0.95], [lb(0.15), 1.04], [lb(0.14), 1.08]], 0.04), { sz: 0.82, pleats: 46, pleatFront: 0.5, hemWave: 0.006, seg: 56 });
+    P.add(skirt, BI.hips, '#ffffff', MAT.skirt, null, null, lapDrape(1.0, 0.06, (th) => lobes(th, 0.3, 0.3)));
     P.add(torus(lb(0.148), 0.012, 0, 1.06, 0), BI.hips, base);
     // the pallu: from the waist across the chest, over the left shoulder, falling down the back
     const pallu = ribbon([new V(-0.1, 1.0, 0.13), new V(-0.03, 1.14, 0.168), new V(0.07, 1.29, 0.168), new V(0.16, 1.43, 0.03), new V(0.17, 1.37, -0.1), new V(0.14, 1.12, -0.16), new V(0.12, 0.7, -0.18)],
@@ -405,7 +454,7 @@ function buildFigure(cfg) {
     const sal = cfg.outfit === 'salwar', hem = sal ? 0.4 : 0.5;
     const chestR = fem ? 0.165 : 0.188;
     const prof = [[lb(sal ? 0.24 : 0.21), hem], [lb(0.2), 0.7], [lb(fem ? 0.185 : 0.175), 0.92], [lb(fem ? 0.15 : 0.165), 1.06], [lb(fem ? 0.16 : 0.172), 1.16], [lb(chestR), 1.27], [lb(chestR + 0.01), 1.35], [lb(fem ? 0.158 : 0.164), 1.42], [lb(fem ? 0.122 : 0.13), 1.446], [0.076, 1.463]];   // clear of the shoulder slope
-    P.add(bust(shell(dense(prof, 0.014), { sz: 0.73, seg: 48, hemWave: 0.004 }), 0.033), BI.chest, '#ffffff', MAT.skirt, null, W.torso);
+    P.add(bust(shell(dense(prof, 0.014), { sz: 0.73, seg: 48, hemWave: 0.004 }), 0.033), BI.chest, '#ffffff', MAT.skirt, null, W.torso, lapDrape(1.0, hem, (th) => lobes(th, 0.24, sal ? 0.24 : 0.15), sal ? 0.03 : 0.02, 0.1, sal ? 0.045 : 0.008));
     // mandarin collar, embroidered placket and buttons
     P.add(new THREE.CylinderGeometry(masc ? 0.064 : 0.058, masc ? 0.068 : 0.062, 0.038, 18, 1, true).translate(0, 1.475, 0.002), BI.chest, base);
     const frontZ = (y) => { for (let i = 0; i < prof.length - 1; i++) { const [r0, y0] = prof[i], [r1, y1] = prof[i + 1]; if (y >= y0 && y <= y1) return (r0 + (r1 - r0) * (y - y0) / (y1 - y0)) * 0.72 + 0.004; } return 0.1; };
@@ -429,14 +478,14 @@ function buildFigure(cfg) {
   }
   if (cfg.outfit === 'dhoti') {
     // waist wrap with a rolled fold, loose drape around each leg, front pleats with a border
-    P.add(shell([[lb(0.17), 0.8], [lb(0.172), 0.9], [lb(0.162), 1.0], [lb(0.15), 1.05]], { sz: 0.78 }), BI.hips, '#ffffff', MAT.skirt);
+    P.add(shell(dense([[lb(0.17), 0.8], [lb(0.172), 0.9], [lb(0.162), 1.0], [lb(0.15), 1.05]], 0.03), { sz: 0.78 }), BI.hips, '#ffffff', MAT.skirt, null, null, lapDrape(1.0, 0.8, (th) => lobes(th, 0.2, 0.08), 0.018, 0.12));
     P.add(torus(lb(0.152), 0.016, 0, 1.045, 0), BI.hips, base);
     for (const side of ['L', 'R']) {
       const th = 'th' + side, kn = 'kn' + side;
       // loose drape from the waist to mid-calf, bending with the knee
       P.add(at(shell(over(LEG, -0.68, 0.06, 0.042, 14), { sz: 1, seg: 22, hemWave: 0.005 }), th), BI[th], '#ffffff', MAT.skirt, null, W.leg(side));
     }
-    P.add(ribbon([new V(0, 1.02, 0.135), new V(0.005, 0.8, 0.16), new V(0, 0.5, 0.17)], (u) => 0.13 - u * 0.03, { segs: 20, fold: 0.012, folds: 5 }), BI.hips, '#ffffff', MAT.ribbon);
+    P.add(ribbon([new V(0, 1.02, 0.135), new V(0.005, 0.8, 0.16), new V(0, 0.5, 0.17)], (u) => 0.13 - u * 0.03, { segs: 20, fold: 0.012, folds: 5 }), BI.hips, '#ffffff', MAT.ribbon, null, null, lapDrape(1.0, 0.5, () => 0.42, 0.03, 0.06));
     // angavastram around the neck, falling in front; the sacred thread and a rudraksha mala
     P.add(ribbon([new V(0.11, 0.92, 0.15), new V(0.13, 1.22, 0.135), new V(0.16, 1.43, 0.02), new V(0, 1.45, -0.085), new V(-0.16, 1.43, 0.02), new V(-0.13, 1.22, 0.135), new V(-0.11, 0.92, 0.15)],
       () => 0.13, { segs: 56, fold: 0.006, folds: 3, lift: 0.012 }), BI.chest, '#ffffff', MAT.ribbon);
@@ -471,6 +520,7 @@ export class Avatar {
     this.config = normalise({ ...DEFAULTS, ...config });
     this.simulated = simulated; this.shadows = shadows;
     this.state = 'idle'; this.stateTime = 0; this.walkPhase = 0; this.speed = 0; this.seed = Math.random() * 10;
+    this.breath = null;   // 0..1 set by a breathing session; otherwise a slow natural breath while meditating
     this.build();
   }
   build() {
@@ -513,6 +563,10 @@ export class Avatar {
     } else if (s === 'ring') {
       const k = Math.min(1, this.stateTime / 0.35), pull = Math.sin(this.stateTime * 9) * 0.15;
       T.sx = [-2.7 * k + pull, -0.1]; T.sz = [-0.15, 0.08]; T.ex = [-0.25, -0.12]; T.headX = -0.25 * k;
+    } else if (s === 'meditate') {
+      // sukhasana, palms up on the thighs; the chest rises and falls with the breath
+      const br = this.breath ?? (0.5 + 0.5 * Math.sin(t * 0.6 + this.seed));
+      T.pose = this.mudra === 'nadi' ? SIT_NADI : SIT; T.seat = SEAT; T.spine = -0.01 * br; T.chest = -0.035 * br; T.neck = 0.05 + 0.03 * br; T.headX = 0.06;
     } else if (s === 'aartiPriest') {
       const a = this.lampAngle || 0;
       T.sx = [-1.25 + Math.sin(a) * 0.35, -0.9]; T.sz = [0.1 + Math.cos(a) * 0.3, -0.3]; T.ex = [-0.6, -1.4]; T.ez = [0, -0.5]; T.headX = 0.1;
@@ -531,16 +585,23 @@ export class Avatar {
   update(dt, t) {
     this.stateTime += dt;
     if (this.state === 'walk') this.walkPhase += dt * (4 + this.speed * 2.6) * (this.config.age === 'elder' ? 0.85 : 1);
-    const T = this._targets(t), k = 1 - Math.exp(-dt * 12), b = this.b;
+    const T = this._targets(t), b = this.b;
+    // sitting down and standing up are slower than everyday movement
+    const seated = this.state === 'meditate' || b.hips.position.y < this.rest.hips.y - 0.1;
+    const k = 1 - Math.exp(-dt * (seated ? 3.2 : 12));
     const L = (o, prop, v) => { o[prop] += (v - o[prop]) * k; };
+    const R = (bone, x, y = 0, z = 0) => { const r = b[bone].rotation, p = T.pose && T.pose[bone]; if (p) { x = p[0]; y = p[1]; z = p[2]; } L(r, 'x', x); L(r, 'y', y); L(r, 'z', z); };
     const arm = [['shR', 'elR', 'wrR'], ['shL', 'elL', 'wrL']];
-    arm.forEach(([sh, el, wr], i) => { L(b[sh].rotation, 'x', T.sx[i]); L(b[sh].rotation, 'z', T.sz[i]); L(b[el].rotation, 'x', T.ex[i]); L(b[el].rotation, 'y', T.ez[i] * 0.6); L(b[el].rotation, 'z', T.ez[i] * 0.5); L(b[wr].rotation, 'x', T.wx[i]); });
-    [['thR', 'knR', 'anR'], ['thL', 'knL', 'anL']].forEach(([th, kn, an], i) => { L(b[th].rotation, 'x', T.th[i] - T.kn[i] * 0.35); L(b[kn].rotation, 'x', T.kn[i]); L(b[an].rotation, 'x', T.an[i] + T.kn[i] * 0.25 - T.th[i] * 0.3); });
+    arm.forEach(([sh, el, wr], i) => { R(sh, T.sx[i], 0, T.sz[i]); R(el, T.ex[i], T.ez[i] * 0.6, T.ez[i] * 0.5); R(wr, T.wx[i]); });
+    [['thR', 'knR', 'anR'], ['thL', 'knL', 'anL']].forEach(([th, kn, an], i) => { R(th, T.th[i] - T.kn[i] * 0.35); R(kn, T.kn[i]); R(an, T.an[i] + T.kn[i] * 0.25 - T.th[i] * 0.3); });
+    if (T.pose) { const sh = T.chest; b.shL.rotation.z += -sh * 0.4 * k; b.shR.rotation.z += sh * 0.4 * k; }   // shoulders lift a touch on the in-breath
     L(b.spine.rotation, 'x', T.spine); L(b.chest.rotation, 'x', T.chest); L(b.chest.rotation, 'y', -T.hipY * 0.8);
     L(b.neck.rotation, 'x', T.neck); L(b.head.rotation, 'x', T.headX); L(b.head.rotation, 'y', T.headY);
     L(b.hips.rotation, 'y', T.hipY); L(b.hips.rotation, 'z', T.hipZ);
+    // garments drape over the lap as the hips come down
+    if (this.mesh.morphTargetInfluences) { const m = this.mesh.morphTargetInfluences; m[0] += ((T.seat ? 1 : 0) - m[0]) * Math.min(1, k * 2.2); }   // the cloth settles a little ahead of the legs
     // the face: blinking, a wandering gaze, eyes closed in prayer, a gentle smile, chanting during aarti
-    const st = this.state, prayer = (st === 'namaste' && this.stateTime > 1.2) || st === 'bow' || st === 'aarti';
+    const st = this.state, prayer = (st === 'namaste' && this.stateTime > 1.2) || st === 'bow' || st === 'aarti' || (st === 'meditate' && this.stateTime > 1.5);
     this.blinkT = (this.blinkT ?? 1 + Math.random() * 3) - dt;
     if (this.blinkT <= 0) { this.blinkT = 2.2 + Math.random() * 4; this.blinkLeft = 0.15; }
     if (this.blinkLeft > 0) this.blinkLeft -= dt;
@@ -548,14 +609,14 @@ export class Avatar {
     for (const l of [b.lidL, b.lidR]) l.rotation.x += (lidT - l.rotation.x) * lk;
     if (!this.gazeT || t > this.gazeT) { this.gazeT = t + 1.2 + Math.random() * 3.5; this.gaze = [(Math.random() - 0.5) * 0.2, (Math.random() - 0.5) * 0.6]; }
     for (const e of [b.eyeL, b.eyeR]) { L(e.rotation, 'x', prayer ? 0.3 : this.gaze[0]); L(e.rotation, 'y', prayer ? 0 : this.gaze[1] + T.headY * -0.4); }
-    const smile = st === 'offer' ? 1 : prayer ? 0.65 : st === 'walk' ? 0.3 : 0.45;
+    const smile = st === 'offer' ? 1 : st === 'meditate' ? 0.4 : prayer ? 0.65 : st === 'walk' ? 0.3 : 0.45;
     const chant = st === 'aarti' ? Math.max(0, Math.sin(t * 6.2 + this.seed)) * (0.6 + 0.4 * Math.sin(t * 1.3 + this.seed)) : 0;
     L(b.jaw.rotation, 'x', chant * 0.1);
     const ms = (bone, sx) => { const r = this.rest[bone]; b[bone].position.x += (r.x + sx * smile * 0.0022 - b[bone].position.x) * k; b[bone].position.y += (r.y + smile * 0.0036 - b[bone].position.y) * k; };
     ms('mouthL', 1); ms('mouthR', -1);
     for (const n of ['browL', 'browR']) b[n].position.y += (this.rest[n].y + smile * 0.0012 + (st === 'ring' ? 0.003 : 0) - (prayer ? 0.0008 : 0) - b[n].position.y) * k;
     // keep the feet on the ground as the knees bend
-    const drop = (1 - Math.cos(Math.min(b.knL.rotation.x, b.knR.rotation.x))) * 0.42 * 0.6;
+    const drop = T.seat ?? (1 - Math.cos(Math.min(b.knL.rotation.x, b.knR.rotation.x))) * 0.42 * 0.6;
     b.hips.position.y += (this.rest.hips.y + T.bob - drop - b.hips.position.y) * k;
   }
 

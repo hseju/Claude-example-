@@ -1,6 +1,6 @@
 # Virtual Temple
 
-A browser-based, mobile-first 3D prototype of a living temple campus. You create a small devotee avatar, walk a stone temple complex with three shrines, enter a 12-place prayer hall, take a lotus-marked spot and offer prayers: namaste, the hall bell, a diya, flowers, incense, abhishek at the Shiva shrine, and a simulated shared aarti.
+A browser-based, mobile-first 3D prototype of a living temple campus. You create a small devotee avatar, walk a stone temple complex with three shrines, enter a 12-place prayer hall, take a lotus-marked spot and offer prayers: namaste, the hall bell, a diya, flowers, incense, abhishek at the Shiva shrine, and a simulated shared aarti. In the garden, a meditation hut offers guided breathwork and short guided meditations.
 
 It is plain HTML, CSS and ES modules on top of [three.js](https://threejs.org) 0.160 (loaded from jsDelivr). There is no build step and no image asset: architecture and textures are generated in the browser. Music and ambience are licensed recordings in `audio/` (see `audio/CREDITS.md`); effects are synthesised.
 
@@ -33,6 +33,9 @@ Opening `index.html` straight from disk (`file://`) does not work, because brows
 | Time of day: Morning, Afternoon, Evening, Night, or Auto (follows the device's local time). Sky, sun or moon, light, lamps, wildlife and sound all change and blend over a few seconds | Working |
 | Music and sound: three music stations from the speaker button: **Uplifting** (feel-good grooves with tabla, sitar, handpan and warm beats), **Meditation** (calm pads, piano, handpan, singing bowls) and **Classical flute** (solo Carnatic alapanas), or **Auto** (uplifting by day, meditation at night). Tracks stream, shuffle and crossfade; now playing and Next in the panel. Under it a quiet mountain stream with a songbird by day and crickets at night; soft bare-foot steps; bells that ring once and settle; outdoor sound muffles inside the halls | Working, recorded (licensed) |
 | Settings: master, ambience, bells & effects and temple music volumes, mute, quality tiers, time of day, incense on/off, reduced motion | Working, saved per browser |
+| Meditation hut (Dhyana Kutir): an octagonal thatched hut on a stone plinth in the south-west garden, with teak pillars, railings and a carved screen, a round durrie, cushions, a brass lamp, singing bowl, an altar with an Om panel, marigolds and incense, lanterns, a wind chime and a tulsi. Two simulated devotees meditate there. Walk up (or pick it on the map or its label) and enter; your devotee sits cross-legged (sukhasana) with palms up, eyes closed, and the garments drape over the lap. Three views: over the shoulder toward the gardens and waterfalls, facing your devotee, and your own view of the lamp | Working |
+| Breathwork with guidance: Calm breath (resonant, 5.5 s in and out), Box breathing (4-4-4-4), 4-7-8, Nadi shodhana (alternate nostril; your devotee raises the right hand), Bhramari (humming bee, with a hum to follow) and Three-part breath, for 2 to 10 minutes. A breathing light grows and shrinks with each phase and counts down; soft tones swell on the in-breath and ebb on the out-breath; a voice guides every breath, or the first few and then only now and then, or not at all; your devotee's chest rises with the breath | Working |
+| Guided meditations, 5 to 8 minutes: Breath awareness, Body scan, Loving-kindness (maitri), Om meditation (with a chanted Om) and Diya gazing (trataka, from your own view of the lamp); plus Silent sitting for 5 to 20 minutes with interval bells. Singing bowls open and close every session; captions show every spoken line; the background can be soft meditation music, nature, or near silence; the screen stays awake during a session where the browser allows; minutes, sessions and streaks are kept on the device | Working; voice uses the device's speech voices |
 | Guest mode, local email profiles that save the avatar | Working (device only) |
 | Google / Apple sign-in | Not connected (see below) |
 | Real-time multiplayer | Not connected (architecture ready, see below) |
@@ -45,6 +48,8 @@ Opening `index.html` straight from disk (`file://`) does not work, because brows
 ### Using recorded audio
 
 Everything is listed in `audio/manifest.json`: an ambience loop per time of day, the aarti, and `playlists` (the music stations). Add a track by putting an MP3 in `audio/music/` and an entry `{ "file", "title", "artist" }` in a playlist; see `audio/README.md`. Use MP3 or AAC for Safari support, and keep the licence and attribution for each file in `audio/CREDITS.md`.
+* **The meditation guide speaks with your device's own voices** (the Web Speech API), so it works offline and needs no download, but the voice depends on the device: voices named Natural, Neural or Enhanced, or English (India), sound best, and the hut lets you choose and preview one. Captions, breath tones and the breathing light guide you even where speech is unavailable. A recorded narration can replace any script: add `"guided": { "<session id>": "audio/guided/file.mp3" }` to `audio/manifest.json` (ids: `calm`, `box`, `relax`, `nadi`, `bhramari`, `dirga`, `breath`, `body`, `maitri`, `om`, `trataka`, `timer`). The scripts are original to this project.
+* **Breathwork is gentle by design.** No rapid or forceful breathing; holds are short and the panel says to skip them in pregnancy or with heart, lung or blood-pressure conditions. This is a wellbeing feature, not medical advice.
 * **Deity representations are deliberately restrained.** The Shiva shrine has a lingam on its pitha with tripundra, bilva and a dhara-patra; Ganesha is a sindoor-coated svayambhu form with inlaid eyes, silver mukut and modak, as seen in many historic shrines; Krishna is a shyam-stone murti in yellow pitambar with mukut, peacock feather, flute and vaijayanti mala. A production version should replace these with sculpted, reviewed models.
 
 ## Architecture
@@ -58,7 +63,9 @@ js/scenery.js       mountains, waterfalls, river, clouds, mist, bird flocks, but
 js/flora.js         trees (neem, gulmohar, bougainvillea, jacaranda, ashoka, coconut palm), flower beds and hedges, grass, lotus ponds, urli bowls
 js/dome.js          prayer hall: shell, per-deity sanctum, 12 spots, offerings, aarti choreography
 js/architecture.js  shared pieces: pillars, bells (pendulum + clapper), diyas, lamp stands, shikhara
-js/avatar.js        rigged devotees: body, face, garments, jewellery, props, and their poses (walk, namaste, bow, offer, ring, aarti)
+js/avatar.js        rigged devotees: body, face, garments, jewellery, props, and their poses (walk, namaste, bow, offer, ring, aarti, seated meditation with a lap-drape morph)
+js/hut.js           the meditation hut: building, furnishings, seats and camera views
+js/practice.js      breathwork and guided meditation: catalogue, scripts, session timeline, spoken guide, practice log
 js/fx.js            GPU flames, incense smoke, petals, dust motes, fountain droplets, wind sway
 js/postfx.js        tilt-shift (miniature look) and colour grade
 js/audio.js         Web Audio graph, zones and time-of-day mixes, music stations (streamed, shuffled, crossfaded), recorded ambience and aarti, synthesised bells and effects

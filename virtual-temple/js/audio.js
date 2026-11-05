@@ -394,7 +394,7 @@ export class TempleAudio {
     const outside = () => 1 - this.zone.dome;
     every(() => { const m = M(); if (!this._hasRec('ambience.' + this.tod) && outside() > 0.2 && Math.random() < m.birds) { const k = this._pick(m.species); this._call(k); if (k === 'peacock') return 6; }
       return m.birdRate[0] + Math.random() * (m.birdRate[1] - m.birdRate[0]); }, 1);
-    every(() => { const b = M().bells; if (!b || this.ceremony) return 30; if (outside() > 0.5) this._distantBell(); return b[0] + Math.random() * (b[1] - b[0]); }, 25);
+    every(() => { const b = M().bells; if (!b || this.ceremony || this.session) return 30; if (outside() > 0.5) this._distantBell(); return b[0] + Math.random() * (b[1] - b[0]); }, 25);
     every(() => { const m = M(); if (m.cow && Math.random() < m.cow) this._call('cow', { x: -38 + Math.random() * 10, y: 1, z: -30 + Math.random() * 60 }); return 14 + Math.random() * 18; }, 9);
     every(() => { const m = M(); if (m.frogs && Math.random() < m.frogs) this._call('frog', { x: (Math.random() < 0.5 ? -8.5 : 8.5), y: 0.3, z: 25 + (Math.random() - 0.5) * 8 }); return 3 + Math.random() * 6; }, 5);
     every(() => { this._phrase(); return this._nextPhrase || 8; }, 3);
@@ -429,24 +429,24 @@ export class TempleAudio {
   applyZone(z, tc = 0.9) {
     this.zone = z;
     if (!this.ctx || !this.layers.wind) return;
-    const L = this.layers, m = TOD_MIX[this.tod], out = 1 - z.dome, rec = this._hasRec('ambience.' + this.tod);
+    const L = this.layers, m = TOD_MIX[this.tod], out = 1 - z.dome, rec = this._hasRec('ambience.' + this.tod), sm = this.session, quiet = sm ? sm.ambience ?? 0.6 : 1;
     const set = (g, v) => this._ramp(g.gain, v, tc);
     set(this.outdoor, 0.4 + out * 0.6);
     this._ramp(this.outdoorLP.frequency, 700 + out * 17000, tc);
-    set(L.wind, 0.035 * m.wind * (0.4 + z.entrance + z.garden * 0.6));
-    set(L.fountain, 0.05 * z.courtyard * (this.tod === 'night' ? 0.6 : 1));   // a soft trickle, only close to the fountain
-    set(L.falls, 0.012 + 0.015 * z.garden);
+    set(L.wind, quiet * 0.035 * m.wind * (0.4 + z.entrance + z.garden * 0.6));
+    set(L.fountain, quiet * 0.05 * z.courtyard * (this.tod === 'night' ? 0.6 : 1));   // a soft trickle, only close to the fountain
+    set(L.falls, quiet * (0.012 + 0.015 * z.garden));
     set(L.birds, rec ? 0 : 1.6 * (0.45 + z.entrance * 0.5 + z.garden * 0.6));
     set(L.cicadas, rec ? 0 : 0.05 * m.insects);
     set(L.crickets, rec ? 0 : 0.7 * m.crickets);
     set(L.night, 0.4); set(L.cows, 0); set(L.bells, 0.35);
-    set(L.recorded, 0.6);   // recorded stream and birds, or crickets: a soft bed under the music
+    set(L.recorded, 0.6 * (sm ? sm.ambience ?? 0.6 : 1));   // recorded stream and birds, or crickets: a soft bed under the music
     // music: a quiet bed in the courtyard, fuller by the shrines and inside the halls
     const recMusic = this._musicOn(), music = recMusic ? 0 : m.music;
     const near = Math.max(z.corridor, z.dome);
     // without a recording the music is just a soft tanpura drone, mostly heard by the shrines
     set(L.tanpura, music * (0.04 + near * 0.3) * (this.ceremony ? 0.3 : 1));
-    if (this._musicIn) this._ramp(this._musicIn.gain, (0.6 + near * 0.2) * (this.ceremony ? 0.05 : 1), tc);   // the music leads, everywhere
+    if (this._musicIn) this._ramp(this._musicIn.gain, (sm ? sm.musicLevel ?? 0.35 : 0.6 + near * 0.2) * (this.ceremony ? 0.05 : 1), tc);   // the music leads, everywhere
     set(L.melody, music * (0.3 + near * 0.3 + z.krishna * 0.25) * (this.ceremony ? 0 : 1));
     set(L.tabla, music * m.tabla * (0.25 + near * 0.3));
     set(L.chant, recMusic ? 0 : m.chant * 0.3 * z.dome);
@@ -500,6 +500,7 @@ export class TempleAudio {
   // music stations: 'auto' plays uplifting music by day and meditation music at night
   get stations() { return Object.keys(this.playlists); }
   _station() {
+    if (this.session) return this.session.music && this.playlists[this.session.music] ? this.session.music : null;
     const s = this.musicStyle;
     if (s === 'off') return null;
     if (s === 'auto' || !this.playlists[s]) return this.tod === 'night' && this.playlists.meditation ? 'meditation' : (this.playlists.uplifting ? 'uplifting' : this.stations[0] || null);
@@ -643,6 +644,65 @@ export class TempleAudio {
     const ctx = this.ctx, t = ctx.currentTime; const o = ctx.createOscillator(); o.frequency.value = 1320; const g = ctx.createGain();
     g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.025, t + 0.005); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
     o.connect(g).connect(this.buses.effects); o.start(t); o.stop(t + 0.4);
+  }
+
+  // ---------------------------------------------------------------- meditation and breathwork
+  // While a practice session runs, the world gets quieter and the music follows the session's choice.
+  setSessionMix(mix) { this.session = mix; if (this.ctx) { this.playStation(); this.applyZone(this.zone, 1.6); } }
+  clearSessionMix() { this.session = null; if (this.ctx) { this.playStation(); this.applyZone(this.zone, 2); } }
+  _guideOut() {
+    if (!this._guide) { this._guide = this.ctx.createGain(); this._guide.gain.value = 1; this._guide.connect(this.buses.effects); this._send(this._guide, { hall: 0.25 }); }
+    return this._guide;
+  }
+  // a singing bowl: inharmonic partials in slowly beating pairs, with a soft strike
+  bowl(strength = 1, when = 0, pitch = 1) {
+    if (!this.ctx) return;
+    const ctx = this.ctx, t = ctx.currentTime + when, f0 = 196 * pitch, out = this._guideOut();
+    const bus = ctx.createGain(); bus.gain.value = 0.16 * strength; bus.connect(out); this._send(bus, { hall: 0.5 });
+    for (const [r, a, d] of [[1, 1, 14], [2.72, 0.5, 9], [5.18, 0.26, 6], [8.3, 0.12, 3.5], [11.9, 0.05, 2]]) for (const det of [-0.6, 0.6]) {
+      const o = ctx.createOscillator(); o.frequency.value = f0 * r + det * (1 + r * 0.3);
+      const g = ctx.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(a * 0.5, t + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+      o.connect(g).connect(bus); o.start(t); o.stop(t + d + 0.1);
+    }
+    const n = this._noiseSource(), bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2600; bp.Q.value = 1.2;
+    const ng = ctx.createGain(); ng.gain.setValueAtTime(0.18, t); ng.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+    n.connect(bp).connect(ng).connect(bus); n.start(t); n.stop(t + 0.1);
+  }
+  // breath cues: a warm chord that swells as you breathe in and ebbs as you breathe out, a quiet tone while holding,
+  // a hum to follow for bhramari. Soft enough to sit under a voice.
+  breathCue(kind, dur) {
+    if (!this.ctx) return;
+    const ctx = this.ctx, t = ctx.currentTime + 0.02, out = this._guideOut(), D = 146.83;
+    const voice = (freqs, type, from, to, curve = 'lin', lp = 1800) => {
+      const g = ctx.createGain(), f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = lp; f.Q.value = 0.5;
+      g.gain.setValueAtTime(from, t);
+      if (curve === 'exp') g.gain.setTargetAtTime(to, t, dur / 3); else g.gain.linearRampToValueAtTime(to, t + dur * 0.92);
+      g.gain.setTargetAtTime(0, t + dur * 0.96, 0.25);
+      for (const [fr, a] of freqs) { const o = ctx.createOscillator(); o.type = type; o.frequency.value = fr; const og = ctx.createGain(); og.gain.value = a; o.connect(og).connect(f); o.start(t); o.stop(t + dur + 1.5); }
+      f.connect(g).connect(out); return g;
+    };
+    const air = (f0, f1, peak) => {   // a whisper of breath under the chord
+      const n = this._noiseSource(), bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 0.9; bp.frequency.setValueAtTime(f0, t); bp.frequency.exponentialRampToValueAtTime(f1, t + dur);
+      const g = ctx.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(peak, t + dur * 0.5); g.gain.linearRampToValueAtTime(0, t + dur);
+      n.connect(bp).connect(g).connect(out); n.start(t); n.stop(t + dur + 0.1);
+    };
+    if (kind === 'in') { voice([[D, 0.5], [D * 1.5, 0.35], [D * 2, 0.22], [D * 3, 0.06]], 'sine', 0.0001, 0.07); air(450, 1300, 0.01); }
+    else if (kind === 'out') { voice([[D * 0.75, 0.5], [D * 1.125, 0.35], [D * 1.5, 0.2]], 'sine', 0.085, 0.0001, 'exp'); air(1300, 420, 0.009); }
+    else if (kind === 'hold') voice([[D * 2, 0.4], [D * 3, 0.12]], 'sine', 0.012, 0.012);
+    else if (kind === 'holdOut') voice([[D * 0.75, 0.5]], 'sine', 0.01, 0.01);
+    else if (kind === 'hum') { const g = voice([[130.81, 0.5], [130.81 * 2, 0.12]], 'sawtooth', 0.0001, 0.085, 'lin', 420); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.085, t + 0.5); g.gain.setValueAtTime(0.085, t + dur * 0.8); }
+  }
+  // a chanted "Aum": the vowel opens, rounds and closes into a long hum
+  om(dur = 7, when = 0) {
+    if (!this.ctx) return;
+    const ctx = this.ctx, t = ctx.currentTime + when, out = this._guideOut(), f0 = 110;
+    const g = ctx.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.1, t + 0.5); g.gain.setValueAtTime(0.1, t + dur * 0.75); g.gain.linearRampToValueAtTime(0, t + dur);
+    const f1 = ctx.createBiquadFilter(); f1.type = 'bandpass'; f1.Q.value = 5; f1.frequency.setValueAtTime(700, t); f1.frequency.linearRampToValueAtTime(450, t + dur * 0.3); f1.frequency.linearRampToValueAtTime(260, t + dur * 0.55);
+    const f2 = ctx.createBiquadFilter(); f2.type = 'bandpass'; f2.Q.value = 6; f2.frequency.setValueAtTime(1150, t); f2.frequency.linearRampToValueAtTime(800, t + dur * 0.3); f2.frequency.linearRampToValueAtTime(900, t + dur * 0.55);
+    const f2g = ctx.createGain(); f2g.gain.setValueAtTime(0.7, t); f2g.gain.linearRampToValueAtTime(0.05, t + dur * 0.6);   // the mouth closes: "mmm"
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.setValueAtTime(3000, t); lp.frequency.linearRampToValueAtTime(500, t + dur * 0.6);
+    for (const det of [-6, 0, 5]) { const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f0; o.detune.value = det; const vib = ctx.createOscillator(); vib.frequency.value = 4.6; const vg = ctx.createGain(); vg.gain.value = 1.2; vib.connect(vg).connect(o.frequency); o.connect(f1); o.connect(f2); o.start(t); o.stop(t + dur + 0.1); vib.start(t); vib.stop(t + dur + 0.1); }
+    f1.connect(lp); f2.connect(f2g).connect(lp); lp.connect(g).connect(out); this._send(g, { hall: 0.7 });
   }
 
   // ---------------------------------------------------------------- shared aarti ceremony

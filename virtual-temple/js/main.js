@@ -7,6 +7,8 @@ import { HallDirectory, LocalSimulation, HALL_CAPACITY } from './presence.js';
 import { ProfileStore, storageAvailable } from './profile.js';
 import { PostFX } from './postfx.js';
 import { setAnisotropy } from './textures.js';
+import { HUT } from './hut.js';
+import { BREATHWORK, MEDITATIONS, TIMER, Guide, Session, PracticeLog } from './practice.js';
 
 const $ = (id) => document.getElementById(id);
 const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
@@ -15,7 +17,7 @@ if (isTouch) document.body.classList.add('touch');
 // ---------------------------------------------------------------- settings & quality
 const profiles = new ProfileStore();
 const prefersReduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const settings = profiles.loadSettings({ quality: 'auto', tod: 'auto', incense: true, reducedMotion: prefersReduced, master: 80, ambience: 70, effects: 85, ceremony: 80, muted: false, musicStyle: 'auto' });
+const settings = profiles.loadSettings({ quality: 'auto', tod: 'auto', incense: true, reducedMotion: prefersReduced, master: 80, ambience: 70, effects: 85, ceremony: 80, muted: false, musicStyle: 'auto', guideMode: 'guide', voiceURI: '', practiceBg: 'auto', breathTones: true });
 const dpr = window.devicePixelRatio || 1;
 function qualityPreset(q) {
   if (q === 'auto') q = (isTouch && Math.min(screen.width, screen.height) < 820) ? 'medium' : 'high';
@@ -73,7 +75,7 @@ async function boot() {
   sim.start();
   directory.on(onHallChange);
   for (const b of world.bells) b.onStrike = (bell, e = 1) => audio.bell(bell.worldPos, { size: bell.soundSize || 1, gain: 0.42 * (0.25 + 0.75 * e * e), hall: 0.05, stone: 0.35 });
-  $('simCount').textContent = world.npcs.length;
+  $('simCount').textContent = world.npcs.length + (world.hutSitters || []).length;
   buildLabels(); buildCreator(); bindUI(); applySettingsUI();
   onResize();
   const restored = storageAvailable ? profiles.restore() : null;
@@ -83,7 +85,7 @@ async function boot() {
   world.scene.add(me.avatar.root);
   playerRing = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.68, 48), new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffc861').multiplyScalar(2.2), transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending }));
   playerRing.rotation.x = -Math.PI / 2; world.scene.add(playerRing);
-  if (/[?&]debug\b/.test(location.search)) window.__vt = { app, me, world, hall, directory, cam, input, settings, audio, preview, refreshCreator }; // local testing hook
+  if (/[?&]debug\b/.test(location.search)) window.__vt = { app, me, world, hall, directory, cam, input, settings, audio, preview, refreshCreator, hut: { state: hutState, guide, enter: enterHut, leave: leaveHut, start: startSession, end: endSession } }; // local testing hook
   setMode('welcome');
   $('loading').style.opacity = '0'; setTimeout(() => $('loading').remove(), 900);
   last = performance.now(); requestAnimationFrame(loop);
@@ -96,6 +98,7 @@ function setMode(m) {
   $('creator').hidden = m !== 'creator';
   $('hud').classList.toggle('on', m === 'world');
   $('prayer').classList.toggle('on', m === 'hall');
+  $('hutUI').classList.toggle('on', m === 'hut');
   $('labels').style.display = (m === 'world' || m === 'hall') ? '' : 'none';
   if (m !== 'world') { $('prompt').classList.remove('on'); $('map').classList.remove('on'); }
   if (m === 'welcome') {
@@ -352,6 +355,7 @@ const labelEls = {};
 const ICONS = {
   trishul: '<svg viewBox="0 0 32 32"><path d="M16 4v24M10 6c0 6 2 9 6 9s6-3 6-9M10 6l-1.5 2M22 6l1.5 2M16 4l-1.5 2.5M16 4l1.5 2.5M13 24h6"/></svg>',
   modak: '<svg viewBox="0 0 32 32"><path d="M16 4c-2 4-9 9-9 15a9 5 0 0 0 18 0c0-6-7-11-9-15z"/><path d="M16 4v18M12 9c-1 4-1 9 0 13M20 9c1 4 1 9 0 13"/></svg>',
+  lotus: '<svg viewBox="0 0 32 32"><path d="M16 7c-3 4-3 9 0 13 3-4 3-9 0-13zM16 20c-4-1-8-4-9.5-9 4.5 0 7.5 3 9.5 9zM16 20c4-1 8-4 9.5-9-4.5 0-7.5 3-9.5 9zM6 23c4 3 16 3 20 0"/></svg>',
   flute: '<svg viewBox="0 0 32 32"><path d="M5 25 25 7l2 2L7 27z"/><circle cx="12" cy="19.5" r=".8"/><circle cx="15" cy="16.8" r=".8"/><circle cx="18" cy="14.1" r=".8"/><path d="M24 4c2 0 4 2 4 4"/></svg>',
 };
 function buildLabels() {
@@ -360,6 +364,8 @@ function buildLabels() {
     const el = document.createElement('div'); el.className = 'wlabel'; el.innerHTML = `<i class="ico">${ICONS[T.icon]}</i><div><b>${T.short}</b><em>Temple</em><span></span></div>`;
     el.addEventListener('click', () => goTo(T.id)); root.appendChild(el); labelEls[T.id] = el;
   }
+  { const el = document.createElement('div'); el.className = 'wlabel'; el.innerHTML = `<i class="ico">${ICONS.lotus}</i><div><b>Meditation</b><em>hut</em><span>Breathwork · guided meditation</span></div>`;
+    el.addEventListener('click', () => goTo('hut')); root.appendChild(el); labelEls.hut = el; }
   labelEls.me = document.createElement('div'); labelEls.me.className = 'nlabel me'; root.appendChild(labelEls.me);
   labelEls.sims = [];
   updateLabels(true);
@@ -382,10 +388,12 @@ function project(p, el, yOff = 0) {
 function positionLabels() {
   if (app.mode === 'world') {
     for (const T of Object.values(TEMPLES)) { const d = T.entrance.distanceTo(me.avatar.root.position); project(T.labelPos, labelEls[T.id]); labelEls[T.id].style.opacity = d < 6 ? '0.35' : '1'; }
+    { const d = HUT.entrance.distanceTo(me.avatar.root.position); project(HUT.labelPos, labelEls.hut); labelEls.hut.style.opacity = d < 6 ? '0.35' : '1'; }
     const nm = me.config.name || 'You'; if (labelEls.me.dataset.n !== nm) { labelEls.me.dataset.n = nm; labelEls.me.innerHTML = `<i>${escapeHtml(nm[0].toUpperCase())}</i>${escapeHtml(nm)}`; } project(me.avatar.root.position, labelEls.me, 2.05); if ((cam.close || 0) > 0.55) labelEls.me.style.display = 'none';
     labelEls.sims.forEach(e => (e.style.display = 'none'));
   } else if (app.mode === 'hall') {
     for (const T of Object.values(TEMPLES)) labelEls[T.id].style.display = 'none';
+    labelEls.hut.style.display = 'none';
     project(me.avatar.root.position, labelEls.me, 2.0);
     if (app.camMode === 'prayer' || app.camMode === 'darshan' || app.camMode === 'aarti') labelEls.me.style.display = 'none';
     // show a quiet "simulated" tag over other devotees while choosing a place
@@ -396,15 +404,18 @@ function positionLabels() {
 }
 
 // ---------------------------------------------------------------- navigation
+const DEST = (id) => TEMPLES[id] || (id === 'hut' ? HUT : null);
 function goTo(id) {
   if (app.mode !== 'world') return;
+  const D = DEST(id); if (!D) return;
   audio.uiTap();
   input.auto = world.route(me.avatar.root.position, id).slice(1);
-  if (input.auto.length === 0 || me.avatar.root.position.distanceTo(TEMPLES[id].entrance) < 2) { input.auto = []; enterTemple(id); return; }
+  if (input.auto.length === 0 || me.avatar.root.position.distanceTo(D.entrance) < 2) { input.auto = []; if (id === 'hut') enterHut(); else enterTemple(id); return; }
   app.arriveShrine = id;
   $('map').classList.remove('on'); $('mapBtn').setAttribute('aria-pressed', 'false');
-  toast(`Walking to the ${TEMPLES[id].name}`, 2000);
+  toast(`Walking to the ${D.name.toLowerCase().startsWith('meditation') ? 'meditation hut' : D.name}`, 2000);
 }
+function nearHut() { return HUT.entrance.distanceTo(me.avatar.root.position) < 2.8; }
 function worldPranam() {
   if (app.mode !== 'world') return;
   input.auto = []; const av = me.avatar; av.setState('bow'); app.pranamUntil = app.time + 2.6;
@@ -427,10 +438,12 @@ function bindInput() {
       if (k === '+' || k === '=') zoom(-3); if (k === '-') zoom(3);
       if (k === 'm') toggleMap();
       if (k === 'p') worldPranam();
-      if (k === 'enter') { const T = nearShrine(); if (T) enterTemple(T.id); }
+      if (k === 'enter') { const T = nearShrine(); if (T) enterTemple(T.id); else if (nearHut()) enterHut(); }
     }
     if (app.mode === 'hall') { const map = { 1: 'namaste', 2: 'bell', 3: 'diya', 4: 'flowers', 5: 'incense', 6: 'abhishek' }; if (map[k]) act(map[k]); }
     if (k === 'escape') closeAllPanels();
+    if (app.mode === 'hut' && k === 'escape') { if (!$('doneCard').hidden) showHutPanel(); else if (hutState.session) endSession(); else leaveHut(); }
+    if (app.mode === 'hut' && k === ' ' && hutState.session) togglePause();
   });
   addEventListener('keyup', (e) => input.keys.delete(e.key.toLowerCase()));
   addEventListener('blur', () => input.keys.clear());
@@ -468,6 +481,7 @@ function tap(x, y) {
       const o = h.object;
       if (o.userData.bell) { o.userData.bell.strike(0.9); return; }
       if (o.userData.shrine) { goTo(o.userData.shrine); return; }
+      if (o.userData.hut) { goTo('hut'); return; }
       if (o.userData.ground) { const p = h.point.clone().setY(0); input.auto = [p]; app.arriveShrine = null; showTapMarker(p); return; }
     }
   } else if (app.mode === 'hall') {
@@ -530,13 +544,15 @@ function bindUI() {
   $('musicSeg').querySelectorAll('button').forEach(b => b.onclick = () => setMusicStyle(b.dataset.m));
   const hold = (id, fn) => { const b = $(id); let t; b.addEventListener('pointerdown', () => { fn(); t = setInterval(fn, 120); }); for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, () => clearInterval(t)); b.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') fn(); }); };
   hold('camLeft', () => (cam.tYaw += 0.12)); hold('camRight', () => (cam.tYaw -= 0.12)); hold('zoomIn', () => zoom(-1.5)); hold('zoomOut', () => zoom(1.5));
-  $('enterBtn').addEventListener('click', () => { const T = nearShrine(); if (T) enterTemple(T.id); });
+  $('enterBtn').addEventListener('click', () => { const T = nearShrine(); if (T) enterTemple(T.id); else if (nearHut()) enterHut(); });
+  bindHut();
   $('pranamBtn').addEventListener('click', worldPranam);
   $('closeBtn').addEventListener('click', () => { const near = cam.tDist < 6; if (!near) cam.farDist = cam.tDist; cam.tDist = near ? (cam.farDist || 27) : 3.2; if (!near) cam.tYaw = me.avatar.root.rotation.y + Math.PI; $('closeBtn').setAttribute('aria-pressed', String(!near)); });
   document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => goTo(b.dataset.go)));
   $('mapCanvas').addEventListener('click', (e) => {
     const r = e.target.getBoundingClientRect(); const x = (e.clientX - r.left) / r.width * 100 - 50, z = (e.clientY - r.top) / r.height * 100 - 50;
     for (const T of Object.values(TEMPLES)) if (Math.hypot(T.pos.x - x, T.pos.z - z) < 10) return goTo(T.id);
+    if (Math.hypot(HUT.pos.x - x, HUT.pos.z - z) < 7) return goTo('hut');
     input.auto = [world.resolve(new THREE.Vector3(x, 0, z), 0.4)]; app.arriveShrine = null;
   });
   // prayer
@@ -591,6 +607,7 @@ function onResize() {
   for (const o of [world?.flames, hall?.flames]) if (o) o.uniforms.uPx.value = Q.pr * innerHeight / 900;
   if (hall) { hall.smoke.uniforms.uPx.value = Q.pr * innerHeight / 900; hall.dust.material.uniforms.uPx.value = Q.pr * innerHeight / 900; }
   if (world) world.scenery.setPixelScale(Q.pr * innerHeight / 900);
+  if (world?.hutSmoke) world.hutSmoke.uniforms.uPx.value = Q.pr * innerHeight / 900;
 }
 
 // ---------------------------------------------------------------- map
@@ -608,9 +625,185 @@ function drawMap() {
     g.fillStyle = '#9e2a26'; g.beginPath(); g.arc(X(T.pos.x), Z(T.pos.z), 3 * s, 0, Math.PI * 2); g.fill();
     g.fillStyle = '#2a160f'; g.fillText(T.short, X(T.pos.x), Z(T.pos.z) + (T.rot === 0 ? -9 * s : 11 * s));
   }
+  { const hx = X(HUT.pos.x), hz = Z(HUT.pos.z); g.fillStyle = '#c99a4a'; g.beginPath(); for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2 + Math.PI / 8; g[i ? 'lineTo' : 'moveTo'](hx + Math.cos(a) * 4.4 * s, hz + Math.sin(a) * 4.4 * s); } g.closePath(); g.fill();
+    g.fillStyle = '#2a160f'; g.fillText('Meditation', hx, hz + 8 * s); }
   g.fillStyle = 'rgba(246,236,218,.55)'; for (const n of world.npcs) { const p = n.avatar.root.position; g.beginPath(); g.arc(X(p.x), Z(p.z), 4, 0, Math.PI * 2); g.fill(); }
   const p = me.avatar.root.position, a = me.avatar.root.rotation.y;
   g.save(); g.translate(X(p.x), Z(p.z)); g.rotate(-a + Math.PI); g.fillStyle = '#e98a1f'; g.beginPath(); g.moveTo(0, -14); g.lineTo(9, 9); g.lineTo(-9, 9); g.closePath(); g.fill(); g.restore();
+}
+
+// ---------------------------------------------------------------- meditation hut
+const guide = new Guide();
+const hutState = { view: 'vista', session: null, def: null, kind: null, tab: 'breathe', mins: {}, voiceOff: false, paused: false, wake: null, rec: null, ui: {} };
+const HUT_ZONE = { entrance: 0, courtyard: 0, corridor: 0, dome: 0.15, garden: 0.9, ganesha: 0, shiva: 0, krishna: 0 };
+const VIEW_NAMES = { vista: 'Looking out over the gardens', face: 'Facing your devotee', flame: 'Looking at the lamp' };
+function enterHut() {
+  if (app.mode !== 'world') return;
+  input.auto = []; app.arriveShrine = null; closeAllPanels(); startAudioOnce();
+  fadeThrough(() => {
+    setMode('hut');
+    const av = me.avatar; av.root.position.copy(HUT.seat.pos); av.root.rotation.y = HUT.seat.rotY; av.setState('meditate'); av.breath = null;
+    hutState.view = 'vista'; cam.hutSnap = true; if (playerRing) playerRing.visible = false;
+    showHutPanel();
+    if (audio.ctx) audio.applyZone(HUT_ZONE, 1.2);
+  });
+}
+function leaveHut() {
+  if (app.mode !== 'hut') return;
+  endSession(true);
+  fadeThrough(() => {
+    const av = me.avatar; av.setState('idle'); av.breath = null;
+    av.root.position.copy(HUT.entrance); av.root.rotation.y = HUT.rot;
+    if (playerRing) playerRing.visible = true;
+    $('doneCard').hidden = true;
+    setMode('world');
+    cam.tYaw = cam.yaw = HUT.rot + Math.PI - 0.7; cam.tDist = cam.dist = cam.eff = 10; cam.tPitch = cam.pitch = 0.3; snapCamera();
+  });
+}
+function showHutPanel() {
+  $('sessionUI').hidden = true; $('doneCard').hidden = true; $('hutPanel').hidden = false;
+  renderHutPanel();
+}
+function selectHutTab(tab) {
+  hutState.tab = tab;
+  for (const [id, t] of [['Breathe', 'breathe'], ['Meditate', 'meditate'], ['Sit', 'sit']]) { $('tab' + id).setAttribute('aria-selected', String(t === tab)); $('list' + id).hidden = t !== tab; }
+}
+function renderHutPanel() {
+  const card = (kind, d) => {
+    const opts = kind === 'meditation' ? [d.min] : d.minutes, chosen = hutState.mins[d.id] ?? (kind === 'meditation' ? d.min : d.def);
+    const pat = kind === 'breath' ? d.pattern.map(p => p[1]).join(' · ') + ' s' : kind === 'meditation' ? `${d.min} min · guided` : 'bells only';
+    const mins = kind === 'meditation' ? '' : `<span class="mins" role="group" aria-label="Minutes">${opts.map(m => `<button data-id="${d.id}" data-min="${m}" aria-pressed="${m === chosen}">${m} min</button>`).join('')}</span>`;
+    return `<div class="pcard"><div class="h"><b>${d.name}</b><i>${d.tag}</i><span class="pat">${pat}</span></div><p>${d.sub}</p>
+      <div class="go">${mins}<button class="btn small primary start" data-start="${kind}:${d.id}">Begin</button></div></div>`;
+  };
+  $('listBreathe').innerHTML = BREATHWORK.map(d => card('breath', d)).join('');
+  $('listMeditate').innerHTML = MEDITATIONS.map(d => card('meditation', d)).join('');
+  $('listSit').innerHTML = card('timer', TIMER);
+  for (const b of $('hutPanel').querySelectorAll('[data-min]')) b.onclick = () => { hutState.mins[b.dataset.id] = +b.dataset.min; renderHutPanel(); audio.uiTap(); };
+  for (const b of $('hutPanel').querySelectorAll('[data-start]')) b.onclick = () => { const [kind, id] = b.dataset.start.split(':'); startSession(kind, id); };
+  selectHutTab(hutState.tab);
+  $('voiceMode').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === settings.guideMode)));
+  $('bgMode').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.b === settings.practiceBg)));
+  $('tTones').setAttribute('aria-checked', String(settings.breathTones));
+  renderVoices();
+  const st = PracticeLog.summary();
+  $('practiceStats').textContent = st.total ? `Today ${st.today} min · this week ${st.week} min in ${st.weekSessions} session${st.weekSessions === 1 ? '' : 's'}${st.streak > 1 ? ` · ${st.streak}-day streak` : ''}` : 'Your practice is kept on this device only.';
+}
+function renderVoices() {
+  const sel = $('voicePick'), vs = guide.voices();
+  if (!guide.ok) { sel.innerHTML = '<option>Not available here</option>'; sel.disabled = true; $('voiceTest').disabled = true; $('voiceNote').textContent = 'This browser cannot speak, so captions and breath tones will guide you instead.'; return; }
+  const cur = settings.voiceURI && vs.some(v => v.voiceURI === settings.voiceURI) ? settings.voiceURI : vs[0]?.voiceURI;
+  const html = vs.length ? vs.slice(0, 24).map(v => `<option value="${escapeHtml(v.voiceURI)}"${v.voiceURI === cur ? ' selected' : ''}>${escapeHtml(v.name.replace(/^(Microsoft|Google)\s+/, ''))} · ${escapeHtml(v.lang)}</option>`).join('') : '<option>Default voice</option>';
+  if (sel.dataset.html !== html) { sel.innerHTML = html; sel.dataset.html = html; }
+  sel.disabled = !vs.length;
+  $('voiceNote').textContent = 'Voices come from your device. Ones marked Natural, Neural or Enhanced, or English (India), usually sound calmest.';
+}
+function startSession(kind, id) {
+  const def = kind === 'breath' ? BREATHWORK.find(d => d.id === id) : kind === 'meditation' ? MEDITATIONS.find(d => d.id === id) : TIMER;
+  if (!def) return;
+  startAudioOnce(); guide.unlock();
+  guide.voiceURI = settings.voiceURI || null; guide.volume = Math.max(0.25, settings.master / 100); guide.muted = settings.muted || hutState.voiceOff;
+  guide.onCaption = showCaption;
+  const minutes = hutState.mins[def.id] ?? (kind === 'meditation' ? def.min : def.def);
+  const recorded = audio.manifest?.guided?.[def.id] || null;
+  const S = new Session(kind, def, { minutes, voice: settings.guideMode, tones: settings.breathTones, audio, guide, recorded });
+  S.onEnd = finishSession;
+  Object.assign(hutState, { session: S, def, kind, paused: false, ui: {} });
+  const bg = settings.practiceBg === 'auto' ? (kind === 'breath' ? 'nature' : 'music') : settings.practiceBg;
+  audio.setSessionMix({ music: bg === 'music' ? 'meditation' : null, musicLevel: 0.28, ambience: bg === 'silence' ? 0.1 : bg === 'music' ? 0.45 : 0.8 });
+  if (recorded) { hutState.rec = new Audio(recorded); hutState.rec.play().catch(() => {}); }
+  $('hutPanel').hidden = true; $('doneCard').hidden = true; $('sessionUI').hidden = false;
+  $('sTitle').textContent = def.name; $('orb').classList.toggle('calm', kind !== 'breath'); $('orb').hidden = def.view === 'flame';
+  $('sPause').querySelector('span').textContent = 'Pause'; $('sCaption').textContent = ''; $('sCaption').classList.add('dim');
+  if (def.view) { hutState.view = def.view; }
+  requestWake();
+  S.start();
+}
+function togglePause() {
+  const S = hutState.session; if (!S) return;
+  hutState.paused = !hutState.paused;
+  if (hutState.paused) { S.pause(); hutState.rec?.pause(); } else { S.resume(); hutState.rec?.play().catch(() => {}); }
+  $('sPause').querySelector('span').textContent = hutState.paused ? 'Resume' : 'Pause';
+  $('sPause').querySelector('svg').innerHTML = hutState.paused ? '<path d="M8 5l11 7-11 7z"/>' : '<path d="M9 5v14M15 5v14"/>';
+  me.avatar.breath = null;
+}
+function endSession(silent = false) {
+  const S = hutState.session; if (!S) return;
+  S.stop(); hutState.rec?.pause(); hutState.rec = null;
+  if (S.elapsed > 60) PracticeLog.add({ kind: hutState.kind, id: hutState.def.id, minutes: S.elapsed / 60, partial: true });
+  hutState.session = null; me.avatar.breath = null; releaseWake();
+  audio.clearSessionMix();
+  if (hutState.view === 'flame') hutState.view = 'vista';
+  if (!silent) showHutPanel();
+}
+function finishSession() {
+  const S = hutState.session, def = hutState.def; if (!S) return;
+  PracticeLog.add({ kind: hutState.kind, id: def.id, minutes: S.total / 60 });
+  hutState.session = null; hutState.rec = null; me.avatar.breath = null; releaseWake();
+  setTimeout(() => { if (!hutState.session) audio.clearSessionMix(); }, 4000);   // let the last bowl ring out
+  if (hutState.view === 'flame') hutState.view = 'vista';
+  const st = PracticeLog.summary(), mins = Math.round(S.total / 60);
+  $('sessionUI').hidden = true; $('doneCard').hidden = false;
+  $('doneTitle').textContent = ['Well done', 'Beautifully done', 'Peace be with you'][Math.floor(Math.random() * 3)];
+  $('doneSub').textContent = `${mins} minute${mins === 1 ? '' : 's'} of ${def.name.toLowerCase()}${S.kind === 'breath' && S.cycles ? `, ${S.cycles} breaths` : ''}. Today: ${st.today} min${st.streak > 1 ? ` · ${st.streak}-day streak` : ''}.`;
+  hutState.again = [hutState.kind, def.id];
+}
+function showCaption(text) {
+  const c = $('sCaption'); c.textContent = text; c.classList.remove('dim');
+  clearTimeout(hutState.capT); hutState.capT = setTimeout(() => c.classList.add('dim'), Math.max(4500, text.split(' ').length * 520));
+}
+async function requestWake() { try { hutState.wake = await navigator.wakeLock?.request('screen'); } catch (e) {} }
+function releaseWake() { try { hutState.wake?.release(); } catch (e) {} hutState.wake = null; }
+const fmt = (sec) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
+function updateSessionUI() {
+  const S = hutState.session, u = hutState.ui; if (!S) return;
+  const st = S.state, orb = $('orb');
+  orb.style.setProperty('--f', (settings.reducedMotion ? 0.75 : st.fill).toFixed(3));
+  const label = S.kind === 'breath' ? (hutState.paused ? 'Paused' : st.label) : (hutState.paused ? 'Paused' : hutState.def.tag);
+  const count = S.kind === 'breath' ? (st.left ? String(st.left) : '') : fmt(S.remaining);
+  if (u.label !== label) { u.label = label; $('oPhase').textContent = label; }
+  if (u.count !== count) { u.count = count; $('oCount').textContent = count; }
+  const left = fmt(S.remaining) + ' left';
+  if (u.left !== left) { u.left = left; $('sTime').textContent = left; $('sBar').style.width = (100 * S.elapsed / S.total).toFixed(1) + '%'; }
+}
+function bindHut() {
+  $('hutLeave').onclick = leaveHut;
+  $('tabBreathe').onclick = () => selectHutTab('breathe'); $('tabMeditate').onclick = () => selectHutTab('meditate'); $('tabSit').onclick = () => selectHutTab('sit');
+  $('voiceMode').querySelectorAll('button').forEach(b => b.onclick = () => { settings.guideMode = b.dataset.v; persist(); renderHutPanel(); });
+  $('bgMode').querySelectorAll('button').forEach(b => b.onclick = () => { settings.practiceBg = b.dataset.b; persist(); renderHutPanel(); });
+  $('tTones').onclick = () => { settings.breathTones = !settings.breathTones; persist(); renderHutPanel(); };
+  $('voicePick').onchange = (e) => { settings.voiceURI = e.target.value; persist(); };
+  $('voiceTest').onclick = () => { guide.voiceURI = settings.voiceURI || null; guide.volume = Math.max(0.25, settings.master / 100); guide.muted = false; guide.cancel(); guide.say('Breathe in, slowly. And let it go.', { caption: false }); };
+  if (guide.ok && 'speechSynthesis' in window) speechSynthesis.addEventListener?.('voiceschanged', () => { if (app.mode === 'hut' && !$('hutPanel').hidden) renderVoices(); });
+  $('sPause').onclick = togglePause;
+  $('sEnd').onclick = () => endSession();
+  $('sVoice').onclick = () => { hutState.voiceOff = !hutState.voiceOff; guide.muted = hutState.voiceOff || settings.muted; if (hutState.voiceOff) guide.cancel(); $('sVoice').setAttribute('aria-pressed', String(hutState.voiceOff)); $('sVoice').setAttribute('aria-label', hutState.voiceOff ? 'Turn the voice back on' : 'Mute the voice'); toast(hutState.voiceOff ? 'Voice off; captions and tones continue' : 'Voice on', 2000); };
+  $('hutView').onclick = () => {
+    const order = ['vista', 'face'].concat(hutState.def?.view === 'flame' && hutState.session ? ['flame'] : []);
+    hutState.view = order[(order.indexOf(hutState.view) + 1) % order.length]; toast(VIEW_NAMES[hutState.view], 1600);
+  };
+  $('doneAgain').onclick = () => { const [k, id] = hutState.again || []; if (k) startSession(k, id); };
+  $('doneMore').onclick = showHutPanel;
+  $('doneLeave').onclick = leaveHut;
+}
+function updateHut(dt, t, ctx) {
+  const av = me.avatar, S = hutState.session;
+  if (S && !hutState.paused) { S.update(dt); const breathing = S.kind === 'breath' && S.state.phase !== 'intro' && S.state.phase !== 'close'; av.breath = breathing ? S.state.fill : null; av.mudra = breathing && hutState.def.id === 'nadi' ? 'nadi' : null; }
+  else if (!S) av.mudra = null;
+  if (S) updateSessionUI();
+  av.update(dt, t);
+  const V = HUT.views[hutState.view] || HUT.views.vista, drift = settings.reducedMotion ? 0 : Math.sin(t * 0.06) * 0.16;
+  const want = HUT.toWorld(V.pos[0] + drift, V.pos[1] + (settings.reducedMotion ? 0 : Math.sin(t * 0.045) * 0.04), V.pos[2]), look = HUT.toWorld(...V.look);
+  const k = cam.hutSnap ? 1 : 1 - Math.exp(-dt * 1.4); cam.hutSnap = false;
+  camera.position.lerp(want, k); cam.target.lerp(look, k); camera.lookAt(cam.target);
+  const fov = hutState.view === 'flame' ? 34 : hutState.view === 'face' ? 38 : 50; camera.fov += (fov - camera.fov) * k;
+  world.update(dt, t, av.root.position, ctx);
+  if (world.hutSmoke) world.hutSmoke.enabled = settings.incense;
+  if (audio.ctx) { if (Math.floor(t) !== app.hutTick) { app.hutTick = Math.floor(t); audio.applyZone(HUT_ZONE, 1); } audio.setListener(av.root.position.clone().setY(av.root.position.y + 0.95), HUT.toWorld(0, 0, 1).sub(HUT.pos).normalize()); }
+  camera.updateProjectionMatrix();
+  post.tilt.amount = 0; renderer.toneMappingExposure = world.tod.exposure;
+  post.finalMat.uniforms.uVignette.value = S ? 0.55 : 0.42; post.finalMat.uniforms.uWarm.value = 0.16 + world.evening * 0.2; post.bloom.strength = Q.bloom; post.bloom.threshold = 1.4;
+  post.render(world.scene, camera);
 }
 
 // ---------------------------------------------------------------- per-frame
@@ -629,6 +822,7 @@ function loop(now) {
     camera.updateProjectionMatrix(); post.tilt.amount = 0; post.bloom.strength = 0; post.finalMat.uniforms.uVignette.value = 0.5; post.render(preview.scene, camera); return;
   }
   if (app.mode === 'hall') { updateHall(dt, t, ctx); positionLabels(); return; }
+  if (app.mode === 'hut') { updateHut(dt, t, ctx); return; }
   updateWorld(dt, t, ctx);
   positionLabels();
 }
@@ -646,7 +840,7 @@ function updateWorld(dt, t, ctx) {
       const d = fw.multiplyScalar(f).add(rt.multiplyScalar(r)); const l = Math.min(1, d.length()); d.normalize().multiplyScalar(l); mx = d.x; mz = d.z;
     } else if (input.auto.length) {
       const tgt = input.auto[0]; const d = new THREE.Vector3(tgt.x - p.x, 0, tgt.z - p.z); const dist = d.length();
-      if (dist < 0.35) { input.auto.shift(); if (!input.auto.length && app.arriveShrine) { const id = app.arriveShrine; app.arriveShrine = null; const T = TEMPLES[id]; const dir = T.pos.clone().sub(p); av.root.rotation.y = Math.atan2(dir.x, dir.z); } }
+      if (dist < 0.35) { input.auto.shift(); if (!input.auto.length && app.arriveShrine) { const id = app.arriveShrine; app.arriveShrine = null; const T = DEST(id); const dir = T.pos.clone().sub(p); av.root.rotation.y = Math.atan2(dir.x, dir.z); } }
       else { d.normalize(); const sl = Math.min(1, dist / 0.8 + 0.3); mx = d.x * sl; mz = d.z * sl; }
     }
   }
@@ -674,6 +868,9 @@ function updateWorld(dt, t, ctx) {
       $('promptTitle').textContent = T.name; $('promptSub').textContent = `${hallLabel(h)} places taken · ${T.blurb}`;
       $('enterBtn').textContent = directory.occupancy(h) >= HALL_CAPACITY ? 'Enter (full)' : 'Enter prayer hall';
       $('prompt').classList.add('on');
+    } else if (nearHut() && $('fullSheet').hidden) {
+      $('promptTitle').textContent = 'Meditation hut'; $('promptSub').textContent = 'Dhyana Kutir · breathwork and short guided meditations';
+      $('enterBtn').textContent = 'Enter hut'; $('prompt').classList.add('on');
     } else $('prompt').classList.remove('on');
     if ($('map').classList.contains('on') && Math.floor(t * 10) % 3 === 0) drawMap();
   }
