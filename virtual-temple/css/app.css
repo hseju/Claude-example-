@@ -119,19 +119,20 @@ input[type=range] { width: 100%; accent-color: var(--saffron); }
 #todChip { gap: 6px; padding-left: 10px; }
 #todChip svg { width: 18px; height: 18px; stroke: var(--gold); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 #todChip .tag { font-size: 10px; }
-#todPop { position: fixed; right: max(12px, env(safe-area-inset-right)); top: calc(max(12px, env(safe-area-inset-top)) + 52px); width: min(340px, calc(100vw - 24px)); background: var(--glass-strong); border: 1px solid var(--line); border-radius: 16px; padding: 12px; z-index: 22; display: grid; gap: 6px; box-shadow: 0 16px 40px rgba(0,0,0,.4); }
-#todPop h3 { margin: 2px 4px 4px; font-size: 11.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--gold); font-weight: 600; }
-#todPop button { display: flex; gap: 10px; align-items: flex-start; text-align: left; background: rgba(255,255,255,.03); border: 1px solid var(--line); border-radius: 12px; padding: 9px 10px; }
-#todPop button[aria-pressed=true] { border-color: var(--gold); background: rgba(226,181,85,.14); }
+#todPop, #soundPop { position: fixed; right: max(12px, env(safe-area-inset-right)); top: calc(max(12px, env(safe-area-inset-top)) + 52px); width: min(340px, calc(100vw - 24px)); background: var(--glass-strong); border: 1px solid var(--line); border-radius: 16px; padding: 12px; z-index: 22; display: grid; gap: 6px; box-shadow: 0 16px 40px rgba(0,0,0,.4); }
+#todPop h3, #soundPop h3 { margin: 2px 4px 4px; font-size: 11.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--gold); font-weight: 600; }
+#todPop button, #soundPop button[data-m] { display: flex; gap: 10px; align-items: flex-start; text-align: left; background: rgba(255,255,255,.03); border: 1px solid var(--line); border-radius: 12px; padding: 9px 10px; }
+#todPop button[aria-pressed=true], #soundPop button[aria-pressed=true] { border-color: var(--gold); background: rgba(226,181,85,.14); }
 #todPop i { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: rgba(226,181,85,.12); }
 #todPop i svg { width: 18px; height: 18px; stroke: var(--gold); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-#todPop b { display: block; font-weight: 600; font-size: 14px; }
-#todPop small { display: block; color: var(--muted); font-size: 12px; line-height: 1.35; margin-top: 2px; }
+#todPop b, #soundPop b { display: block; font-weight: 600; font-size: 14px; }
+#todPop small, #soundPop small { display: block; color: var(--muted); font-size: 12px; line-height: 1.35; margin-top: 2px; }
 .seg.wide { display: flex; width: 100%; } .seg.wide button { flex: 1; padding: 8px 4px; }
 #aartiChip b { color: var(--gold); font-weight: 600; font-variant-numeric: tabular-nums; }
 
 /* world labels */
 #labels { position: fixed; inset: 0; pointer-events: none; z-index: 6; overflow: hidden; }
+#hud { z-index: 7; }   /* HUD chips and their pop-overs sit above the floating name tags */
 .wlabel { position: absolute; left: 0; top: 0; transform: translate(-50%, -100%); pointer-events: auto; background: linear-gradient(180deg, rgba(58,30,18,.92), rgba(34,18,12,.92)); border: 1.5px solid rgba(226,181,85,.75); border-radius: 999px; padding: 5px 16px 6px 6px; display: flex; align-items: center; gap: 8px; text-align: left; white-space: nowrap; cursor: pointer; box-shadow: 0 6px 18px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,220,150,.25); transition: opacity .3s; }
 .wlabel .ico { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: rgba(226,181,85,.14); border: 1px solid rgba(226,181,85,.5); }
 .wlabel .ico svg { width: 22px; height: 22px; stroke: var(--gold); fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
@@ -166,7 +167,7 @@ body.touch #prompt .btn { justify-content: center; }
   #presence { font-size: 11px; min-height: 30px; padding: 4px 10px; max-width: calc(100vw - 200px); white-space: normal; line-height: 1.25; }
   .tr { flex-wrap: wrap; justify-content: flex-end; max-width: 150px; }
   #todChip { order: 5; }
-  #todPop { top: calc(max(12px, env(safe-area-inset-top)) + 150px); }
+  #todPop, #soundPop { top: calc(max(12px, env(safe-area-inset-top)) + 150px); }
   #aartiChip { order: 4; }
   #prompt span { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .hallinfo { max-width: calc(100vw - 140px); }
@@ -220,3 +221,15 @@ body.ceremony #actions { opacity: .0; transform: translate(-50%, 20px); pointer-
 
 @media (prefers-reduced-motion: reduce) { * { transition-duration: .01ms !important; animation-duration: .01ms !important; } }
 body.reduced * { transition-duration: .01ms !important; animation: none !important; }
+
+/* sound panel: now playing card and the mute row */
+#soundPop { max-height: calc(100vh - 90px); overflow-y: auto; }
+#soundPop .np { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 12px; background: linear-gradient(135deg, rgba(226,181,85,.2), rgba(226,181,85,.06)); border: 1px solid rgba(226,181,85,.45); }
+#soundPop .np i { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-style: normal; color: var(--gold); background: rgba(226,181,85,.14); animation: npPulse 2.4s ease-in-out infinite; }
+#soundPop .np span { flex: 1; min-width: 0; }
+#soundPop .np b, #soundPop .np small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#soundPop .np button { flex: none; padding: 7px 12px; border-radius: 999px; border: 1px solid var(--gold); background: rgba(226,181,85,.18); font-weight: 600; font-size: 13px; }
+#soundPop .row { display: flex; align-items: center; justify-content: space-between; padding: 6px 4px 2px; font-size: 14px; }
+@keyframes npPulse { 50% { transform: scale(1.08); background: rgba(226,181,85,.26); } }
+body.reduced #soundPop .np i { animation: none; }
+#musicSeg { margin-top: 6px; }

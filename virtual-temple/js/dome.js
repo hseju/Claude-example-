@@ -179,7 +179,7 @@ export class PrayerHall {
     this.bell = new HangingBell(2.0, 1.2); this.bell.group.position.set(-2.7, 4.4, -4.2); this.bell.axis = 'z';
     const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 3.5, 6), brass); chain.position.y = 1.75; this.bell.group.add(chain);
     this.scene.add(this.bell.group);
-    this.bell.onStrike = (b) => this.audio.bell(b.group.getWorldPosition(new THREE.Vector3()), { size: 1.45, gain: 0.75, hall: 0.8 });
+    this.bell.onStrike = (b, e = 1) => this.audio.bell(b.group.getWorldPosition(new THREE.Vector3()), { size: 1.45, gain: 0.62 * (0.25 + 0.75 * e * e), hall: 0.6 });
     // sanctum light
     const sanct = new THREE.PointLight('#ffb766', 9, 9, 1.6); sanct.position.set(0, 2.6, -7.8);
     const fill = new THREE.SpotLight('#ffcf8a', 30, 16, 0.5, 0.6, 1.4); fill.position.set(0, 5.5, -2); fill.target.position.set(0, 1.4, -9.2);

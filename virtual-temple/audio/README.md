@@ -1,15 +1,21 @@
-# Recorded audio (optional)
+# Recorded audio
 
-Put licensed recordings here and list them in `manifest.json`, for example:
+`manifest.json` lists everything the soundscape plays:
 
 ```json
 {
-  "ambience.morning": "audio/dawn-birds.mp3",
-  "music.evening": "audio/sandhya-bhajan.mp3",
-  "aarti": "audio/aarti.mp3"
+  "ambience.morning": "audio/ambience-morning.mp3",
+  "aarti": "audio/aarti.mp3",
+  "playlists": {
+    "uplifting": [{ "file": "audio/music/dhaka.mp3", "title": "Dhaka", "artist": "Kevin MacLeod" }],
+    "meditation": [],
+    "flute": []
+  }
 }
 ```
 
-Keys: `ambience.morning|afternoon|evening|night`, `music.morning|afternoon|evening|night`, `aarti`.
-Each listed file replaces the matching synthesised layer; anything not listed stays synthesised.
-Keep each file's licence and attribution next to it.
+* `ambience.<morning|afternoon|evening|night>`: a seamless loop for that time of day, decoded only while it plays. Empty slots fall back to synthesised birds and insects.
+* `aarti`: played during an aarti, decoded on demand.
+* `playlists`: music stations. Tracks stream (they are not decoded into memory), play whole in shuffled order and crossfade. `uplifting` and `meditation` drive the Auto setting (uplifting by day, meditation at night); any other station id shows up in code as `audio.stations`.
+
+Add a track by dropping an MP3 into `audio/music/` and adding an entry to a playlist. Keep the licence and attribution in `CREDITS.md`.

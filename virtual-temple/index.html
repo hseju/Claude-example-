@@ -84,7 +84,7 @@
     <button class="pill" id="todChip" aria-haspopup="true" aria-expanded="false">Morning</button>
     <button class="pill" id="aartiChip" aria-label="Aarti schedule"><span>Aarti</span> <b id="aartiCountdown">--</b></button>
     <button class="icon-btn" id="mapBtn" aria-label="Temple map" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14"/></svg></button>
-    <button class="icon-btn" id="soundBtn" aria-label="Mute sound" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path class="wave" d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg></button>
+    <button class="icon-btn" id="soundBtn" aria-label="Sound and music" aria-pressed="false" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path class="wave" d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg></button>
     <button class="icon-btn" id="settingsBtn" aria-label="Settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
   </div>
   <div class="chipbar br">
@@ -98,6 +98,7 @@
     <button class="round-act" id="pranamBtn" aria-label="Pranam (P)"><svg viewBox="0 0 32 32"><path d="M16 4c-1.5 2-2.5 6-2.5 10v9l-3 4M16 4c1.5 2 2.5 6 2.5 10v9l3 4M13.5 18h5"/></svg>Pranam</button>
   </div>
   <div id="todPop" hidden role="dialog" aria-label="Time of day"></div>
+  <div id="soundPop" class="pop" hidden role="dialog" aria-label="Sound and music"></div>
   <div id="map" aria-label="Temple map">
     <canvas id="mapCanvas" width="400" height="400" aria-label="Map: tap a shrine to walk there"></canvas>
     <div class="dest">
@@ -161,7 +162,9 @@
   <div class="setrow"><span>Master</span><span id="vMasterV">80</span><input type="range" id="vMaster" min="0" max="100" value="80"></div>
   <div class="setrow"><span>Ambience</span><span id="vAmbienceV">70</span><input type="range" id="vAmbience" min="0" max="100" value="70"></div>
   <div class="setrow"><span>Bells &amp; effects</span><span id="vEffectsV">85</span><input type="range" id="vEffects" min="0" max="100" value="85"></div>
-  <div class="setrow"><span>Temple music</span><span id="vCeremonyV">80</span><input type="range" id="vCeremony" min="0" max="100" value="80"></div>
+  <div class="setrow"><span>Music</span><span id="vCeremonyV">80</span><input type="range" id="vCeremony" min="0" max="100" value="80"></div>
+  <div class="seg wide" id="musicSeg"><button data-m="auto">Auto</button><button data-m="uplifting">Uplifting</button><button data-m="meditation">Meditation</button><button data-m="flute">Flute</button><button data-m="off">Off</button></div>
+  <p class="note" id="nowPlaying">Starts when sound is on</p>
   <div class="setrow"><span>Mute everything</span><button class="toggle" id="tMute" role="switch" aria-checked="false" aria-label="Mute everything"></button></div>
   <h3>Graphics</h3>
   <div class="setrow"><span>Quality</span><span class="seg" id="qSeg"><button data-q="low">Low</button><button data-q="medium">Medium</button><button data-q="high">High</button></span></div>
@@ -173,12 +176,14 @@
   <h3>Controls</h3>
   <p class="note">Desktop: WASD or arrow keys to walk, click the ground to walk there, drag to turn the camera, scroll to zoom, Q/E to rotate, M for the map, Enter to go into a hall. In the hall, keys 1–6 perform the prayer actions.<br>Touch: joystick or tap to walk, drag to turn, pinch to zoom.</p>
   <h3>Audio credits</h3>
-  <p class="note">Flute music: solo flute alapanas in ragas Mayamalavagowla, Hemavathi and Kapi from a live Carnatic concert by
-    <a href="https://archive.org/details/jamendo-150288" target="_blank" rel="noopener">Music@NCBS</a> (CC BY-SA 3.0).
-    Night: <a href="https://archive.org/details/BowlsCrickets" target="_blank" rel="noopener">Crystal Bowls and Crickets</a> by Gordon Rosenberg (CC BY 3.0).
-    Birdsong: dawn over the valley, Munnar, by gerrit.kalsbeek (public domain); crickets: Pachmarhi by Nicolas Durand (CC BY-SA 3.0);
+  <p class="note">Music: Dhaka, Eastern Thought, Vadodora Chill Mix, Meditating Beat, Dream Culture, Bathed in the Light, Friday Morning, Healing, Numinous Shine, Clean Soul, Silver Blue Light, Sapphire Isle and Clear Waters by
+    Kevin MacLeod (<a href="https://incompetech.com" target="_blank" rel="noopener">incompetech.com</a>), CC BY 4.0;
+    Pura Vida by Randy Granger and Awake and Pulse by Oles Deyneka Handpan Music, CC BY-SA 3.0;
+    <a href="https://archive.org/details/BowlsCrickets" target="_blank" rel="noopener">Crystal Bowls and Crickets</a> by Gordon Rosenberg, CC BY 3.0;
+    flute alapanas from a Carnatic concert by <a href="https://archive.org/details/jamendo-150288" target="_blank" rel="noopener">Music@NCBS</a>, CC BY-SA 3.0.
+    Ambience: stream and birdsong, Puli, Taiwan, by Wu Tsan-Cheng (CC BY 3.0); crickets, Pachmarhi, by Nicolas Durand (CC BY-SA 3.0);
     aarti: Mahalakshmi Temple, Kolhapur, by François-Emmanuel Fodéré (CC BY-SA 3.0), via <a href="https://aporee.org" target="_blank" rel="noopener">Radio Aporee</a>.
-    All are edited into loops; edits of CC BY-SA sources are shared under CC BY-SA 3.0. Bells you ring, conch, footsteps and offerings are synthesised.</p>
+    Tracks are trimmed and level-matched; edits of CC BY-SA sources are shared under CC BY-SA 3.0. Full list: audio/CREDITS.md. Bells, conch, footsteps and offerings are synthesised.</p>
   <h3>About this prototype</h3>
   <p class="note">All other devotees are simulated. Real-time multiplayer and Google and Apple sign-in are not connected yet.</p>
 </aside>

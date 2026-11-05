@@ -55,7 +55,8 @@ export class HangingBell {
     const rel = this.cAngle - this.angle;
     if (Math.abs(rel) > 0.36) {
       this.cAngle = this.angle + Math.sign(rel) * 0.36; this.cVel = this.vel - (this.cVel - this.vel) * 0.4;
-      if (t - this._lastHit > 0.22 && Math.abs(this.vel) + Math.abs(this.cVel) > 0.6) { this._lastHit = t; this.onStrike && this.onStrike(this); }
+      const e = Math.abs(this.vel) + Math.abs(this.cVel);
+      if (t - this._lastHit > 0.38 && e > 0.9) { this._lastHit = t; this.onStrike && this.onStrike(this, Math.min(1, e / 5)); }
     }
     this.pivot.rotation[this.axis] = this.angle; this.clapperPivot.rotation[this.axis] = this.cAngle - this.angle;
   }

@@ -1,12 +1,36 @@
 {
-  "_readme": "Each slot points at a recording; an empty slot uses the built-in sound. Credits and licences: audio/CREDITS.md.",
+  "_readme": "Ambience slots loop for each time of day; playlists are the music stations (Auto plays uplifting by day, meditation at night). Credits and licences: audio/CREDITS.md.",
   "ambience.morning": "audio/ambience-morning.mp3",
   "ambience.afternoon": "audio/ambience-afternoon.mp3",
   "ambience.evening": "audio/ambience-evening.mp3",
   "ambience.night": "audio/ambience-night.mp3",
-  "music.morning": "audio/music-morning.mp3",
-  "music.afternoon": "audio/music-afternoon.mp3",
-  "music.evening": "audio/music-evening.mp3",
-  "music.night": "audio/music-night.mp3",
-  "aarti": "audio/aarti.mp3"
+  "aarti": "audio/aarti.mp3",
+  "playlists": {
+    "uplifting": [
+      { "file": "audio/music/dhaka.mp3", "title": "Dhaka", "artist": "Kevin MacLeod" },
+      { "file": "audio/music/eastern-thought.mp3", "title": "Eastern Thought", "artist": "Kevin MacLeod" },
+      { "file": "audio/music/vadodara-chill.mp3", "title": "Vadodora Chill Mix", "artist": "Kevin MacLeod" },
+      { "file": "audio/music/meditating-beat.mp3", "title": "Meditating Beat", "artist": "Kevin MacLeod" },
+      { "file": "audio/music/dream-culture.mp3", "title": "Dream Culture", "artist": "Kevin MacLeod" },
+      { "file": "audio/music/bathed-in-the-light.mp3", "title": "Bathed in the Light", "artist": "Kevin MacLeod" },
+      { "file": "audio/music/friday-morning.mp3", "title": "Friday Morning", "artist": "Kevin MacLeod" },
+      { "file": "audio/music/pura-vida.mp3", "title": "Pura Vida – This Is Pure Life", "artist": "Randy Granger" },
+      { "file": "audio/music/handpan-awake.mp3", "title": "Awake", "artist": "Oles Deyneka (handpan)" }
+    ],
+    "meditation": [
+      { "file": "audio/music/healing.mp3", "title": "Healing", "artist": "Kevin MacLeod" },
+      { "file": "audio/music/numinous-shine.mp3", "title": "Numinous Shine", "artist": "Kevin MacLeod" },
+      { "file": "audio/music/clean-soul.mp3", "title": "Clean Soul", "artist": "Kevin MacLeod" },
+      { "file": "audio/music/silver-blue-light.mp3", "title": "Silver Blue Light", "artist": "Kevin MacLeod" },
+      { "file": "audio/music/sapphire-isle.mp3", "title": "Sapphire Isle", "artist": "Kevin MacLeod" },
+      { "file": "audio/music/clear-waters.mp3", "title": "Clear Waters", "artist": "Kevin MacLeod" },
+      { "file": "audio/music/handpan-pulse.mp3", "title": "Pulse", "artist": "Oles Deyneka (handpan)" },
+      { "file": "audio/music/crystal-bowls.mp3", "title": "Crystal Bowls and Crickets", "artist": "Gordon Rosenberg" }
+    ],
+    "flute": [
+      { "file": "audio/music/flute-mayamalavagowla.mp3", "title": "Raga Mayamalavagowla (alapana)", "artist": "Music@NCBS, flute" },
+      { "file": "audio/music/flute-hemavathi.mp3", "title": "Raga Hemavathi (alapana)", "artist": "Music@NCBS, flute" },
+      { "file": "audio/music/flute-kapi.mp3", "title": "Raga Kapi (alapana)", "artist": "Music@NCBS, flute" }
+    ]
+  }
 }

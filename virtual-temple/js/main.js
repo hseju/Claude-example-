@@ -15,7 +15,7 @@ if (isTouch) document.body.classList.add('touch');
 // ---------------------------------------------------------------- settings & quality
 const profiles = new ProfileStore();
 const prefersReduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const settings = profiles.loadSettings({ quality: 'auto', tod: 'auto', incense: true, reducedMotion: prefersReduced, master: 80, ambience: 70, effects: 85, ceremony: 80, muted: false });
+const settings = profiles.loadSettings({ quality: 'auto', tod: 'auto', incense: true, reducedMotion: prefersReduced, master: 80, ambience: 70, effects: 85, ceremony: 80, muted: false, musicStyle: 'auto' });
 const dpr = window.devicePixelRatio || 1;
 function qualityPreset(q) {
   if (q === 'auto') q = (isTouch && Math.min(screen.width, screen.height) < 820) ? 'medium' : 'high';
@@ -72,7 +72,7 @@ async function boot() {
   sim.seed({ ganesha: 7, shiva: 12, krishna: 4 });
   sim.start();
   directory.on(onHallChange);
-  for (const b of world.bells) b.onStrike = (bell) => audio.bell(bell.worldPos, { size: bell.soundSize || 1, gain: 0.55, hall: 0.05, stone: 0.35 });
+  for (const b of world.bells) b.onStrike = (bell, e = 1) => audio.bell(bell.worldPos, { size: bell.soundSize || 1, gain: 0.42 * (0.25 + 0.75 * e * e), hall: 0.05, stone: 0.35 });
   $('simCount').textContent = world.npcs.length;
   buildLabels(); buildCreator(); bindUI(); applySettingsUI();
   onResize();
@@ -482,7 +482,7 @@ function showTapMarker(p) {
 }
 
 // ---------------------------------------------------------------- UI wiring
-function closeAllPanels() { for (const id of ['auth', 'schedule', 'settings', 'todPop']) $(id).hidden = true; $('map').classList.remove('on'); $('mapBtn').setAttribute('aria-pressed', 'false'); }
+function closeAllPanels() { for (const id of ['auth', 'schedule', 'settings', 'todPop', 'soundPop']) $(id).hidden = true; $('map').classList.remove('on'); $('mapBtn').setAttribute('aria-pressed', 'false'); }
 function toggleMap() { const on = !$('map').classList.contains('on'); $('map').classList.toggle('on', on); $('mapBtn').setAttribute('aria-pressed', String(on)); }
 let authMode = 'signin';
 function setAuthMode(m) { authMode = m; $('tabSignin').setAttribute('aria-selected', String(m === 'signin')); $('tabCreate').setAttribute('aria-selected', String(m === 'create')); $('authSubmit').textContent = m === 'signin' ? 'Sign in' : 'Create profile'; $('authPass').autocomplete = m === 'signin' ? 'current-password' : 'new-password'; $('authErr').textContent = ''; }
@@ -524,7 +524,10 @@ function bindUI() {
   $('profileChip').addEventListener('click', () => { renderAccount(); $('settings').hidden = false; });
   $('aartiChip').addEventListener('click', () => { renderSchedule(); $('schedTemple').value = nearestTemple(); $('schedule').hidden = false; });
   $('previewAarti').addEventListener('click', () => requestAarti($('schedTemple').value));
-  $('soundBtn').addEventListener('click', () => { settings.muted = !settings.muted; audio.setMuted(settings.muted); applySettingsUI(); persist(); });
+  $('soundBtn').addEventListener('click', () => { const on = $('soundPop').hidden; closeAllPanels(); $('soundPop').hidden = !on; $('soundBtn').setAttribute('aria-expanded', String(on)); renderSoundPop(); startAudioOnce(); });
+  audio.musicStyle = settings.musicStyle || 'auto';
+  audio.onTrack = () => { renderSoundPop(); renderNowPlaying(); };
+  $('musicSeg').querySelectorAll('button').forEach(b => b.onclick = () => setMusicStyle(b.dataset.m));
   const hold = (id, fn) => { const b = $(id); let t; b.addEventListener('pointerdown', () => { fn(); t = setInterval(fn, 120); }); for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, () => clearInterval(t)); b.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') fn(); }); };
   hold('camLeft', () => (cam.tYaw += 0.12)); hold('camRight', () => (cam.tYaw -= 0.12)); hold('zoomIn', () => zoom(-1.5)); hold('zoomOut', () => zoom(1.5));
   $('enterBtn').addEventListener('click', () => { const T = nearShrine(); if (T) enterTemple(T.id); });
@@ -559,7 +562,8 @@ function persist() { profiles.saveSettings(settings); }
 function applySettingsUI() {
   for (const k of ['Master', 'Ambience', 'Effects', 'Ceremony']) { const key = k.toLowerCase(); $('v' + k).value = settings[key]; $('v' + k + 'V').textContent = settings[key]; }
   $('tMute').setAttribute('aria-checked', String(settings.muted)); $('soundBtn').setAttribute('aria-pressed', String(settings.muted));
-  $('soundBtn').setAttribute('aria-label', settings.muted ? 'Unmute sound' : 'Mute sound');
+  $('soundBtn').setAttribute('aria-label', settings.muted ? 'Sound and music (muted)' : 'Sound and music');
+  $('musicSeg').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.m === settings.musicStyle)));
   $('soundBtn').querySelector('.wave').style.opacity = settings.muted ? '0.15' : '1';
   $('tIncense').setAttribute('aria-checked', String(settings.incense)); $('tMotion').setAttribute('aria-checked', String(settings.reducedMotion));
   $('qSeg').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.q === Q.level)));
@@ -761,11 +765,19 @@ function footsteps(av) {
 }
 // ---------------------------------------------------------------- time of day
 const TOD_INFO = {
-  morning: { label: 'Morning', icon: 'sunrise', sound: 'Dawn chorus: koel, bulbul and sparrows, cowbells, raga Bhairav on bansuri' },
-  afternoon: { label: 'Afternoon', icon: 'sun', sound: 'Warm and still: cicadas, crows and doves, raga Brindavani Sarang' },
-  evening: { label: 'Evening', icon: 'sunset', sound: 'Sandhya bells and conch, mynas and parakeets, sitar and tabla in raga Yaman' },
-  night: { label: 'Night', icon: 'moon', sound: 'Crickets, frogs by the ponds, an owl, a low drone and raga Malkauns' },
+  morning: { label: 'Morning', icon: 'sunrise', sound: 'Soft sunrise light, a mountain stream and a songbird' },
+  afternoon: { label: 'Afternoon', icon: 'sun', sound: 'Warm, still light over the stream and gardens' },
+  evening: { label: 'Evening', icon: 'sunset', sound: 'Golden dusk, lamps glowing, the stream still running' },
+  night: { label: 'Night', icon: 'moon', sound: 'Moonlight, fireflies and crickets; Auto music turns to meditation' },
 };
+// music styles offered in the sound panel; the stations themselves come from audio/manifest.json
+const MUSIC_STYLES = [
+  { id: 'auto', label: 'Auto', sub: 'Uplifting rhythms by day, meditation at night' },
+  { id: 'uplifting', label: 'Uplifting', sub: 'Feel-good grooves: tabla, sitar, handpan, warm beats' },
+  { id: 'meditation', label: 'Meditation', sub: 'Slow, airy and calm: pads, piano, handpan, singing bowls' },
+  { id: 'flute', label: 'Classical flute', sub: 'Solo Carnatic flute, unhurried raga' },
+  { id: 'off', label: 'Off', sub: 'Only nature sounds and bells' },
+];
 const TOD_ICONS = {
   sunrise: '<svg viewBox="0 0 24 24"><path d="M3 18h18M6 18a6 6 0 0 1 12 0M12 4v4M4.9 9.9l2 2M19.1 9.9l-2 2M8 22h8"/></svg>',
   sun: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
@@ -784,6 +796,28 @@ function setTOD(v) { settings.tod = v; persist(); applyTOD(); applySettingsUI();
 function updateTodChip(t = currentTOD()) {
   const i = TOD_INFO[t]; $('todChip').innerHTML = `${TOD_ICONS[i.icon]}<span>${i.label}</span>${settings.tod === 'auto' ? '<span class="tag">auto</span>' : ''}`;
   $('todChip').setAttribute('aria-label', `Time of day: ${i.label}${settings.tod === 'auto' ? ', following your local time' : ''}. Change`);
+}
+function setMusicStyle(id) {
+  settings.musicStyle = id; persist(); startAudioOnce(); audio.setMusicStyle(id); applySettingsUI(); renderSoundPop();
+  const st = MUSIC_STYLES.find(s => s.id === id); if (id === 'off') toast('Music off. Only nature sounds and bells.');
+  else if (!audio.nowPlaying) toast(`${st.label} music`);
+}
+const esc = (t) => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function renderNowPlaying() {
+  const np = audio.nowPlaying;
+  $('nowPlaying').innerHTML = np ? `<b>${esc(np.title)}</b> · ${esc(np.artist)}` : (settings.musicStyle === 'off' ? 'Music is off' : 'Starts when sound is on');
+}
+function renderSoundPop() {
+  const pop = $('soundPop'); if (pop.hidden) return;
+  const np = audio.nowPlaying, station = np && MUSIC_STYLES.find(s => s.id === np.station);
+  const opt = (s) => `<button data-m="${s.id}" aria-pressed="${settings.musicStyle === s.id}"><span><b>${s.label}</b><small>${s.sub}</small></span></button>`;
+  pop.innerHTML = `<h3>Music</h3>` +
+    (np ? `<div class="np"><i aria-hidden="true">♪</i><span><b>${esc(np.title)}</b><small>${esc(np.artist)} · ${station ? station.label : ''}</small></span><button id="npNext" aria-label="Next track">Next</button></div>` : '') +
+    MUSIC_STYLES.map(opt).join('') +
+    `<div class="row"><span>Mute everything</span><button class="toggle" id="popMute" role="switch" aria-checked="${settings.muted}" aria-label="Mute everything"></button></div>`;
+  pop.querySelectorAll('[data-m]').forEach(b => b.onclick = () => setMusicStyle(b.dataset.m));
+  const nx = pop.querySelector('#npNext'); if (nx) nx.onclick = () => audio.skipTrack();
+  pop.querySelector('#popMute').onclick = () => { settings.muted = !settings.muted; audio.setMuted(settings.muted); applySettingsUI(); persist(); renderSoundPop(); };
 }
 function renderTodPop() {
   const now = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });

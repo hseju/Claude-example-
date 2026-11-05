@@ -1,9 +1,9 @@
 // Temple soundscape, built with the Web Audio API.
 //
-// The mood is meant to be calm. Recorded loops listed in audio/manifest.json carry it:
-//   * Music: solo bamboo-flute alapanas by day (Mayamalavagowla at dawn, Hemavathi in the
-//     afternoon, Kapi at dusk) and crystal singing bowls with crickets at night.
-//   * Ambience: a soft bed of birdsong by day and crickets at night, quieter than the music.
+// Recorded audio listed in audio/manifest.json carries the mood:
+//   * Music: stations of whole tracks that stream, shuffle and crossfade. Uplifting (feel-good
+//     grooves) by day and Meditation at night when set to Auto; Classical flute on request.
+//   * Ambience: a quiet mountain stream with a songbird by day and crickets at night.
 //   * Aarti: a recorded temple ceremony, only while an aarti is running.
 // Synthesised in the browser: bells you ring, a rare far-off temple bell, the conch during aarti,
 // footsteps on stone, offerings, wind, fountain and distant waterfalls, the hall chant, and a
@@ -74,7 +74,14 @@ export class TempleAudio {
     this.layers = {};
     this._timers = [];
     this.ceremony = null;
-    this.library = {};       // recorded beds: { 'ambience.morning': AudioBuffer, ... }
+    this.library = {};       // decoded loops, loaded only when needed: { 'ambience.morning': AudioBuffer, aarti: AudioBuffer }
+    this._loading = {};
+    this.manifest = null;     // audio/manifest.json
+    this.playlists = {};      // station id -> [{ file, title, artist }]
+    this.musicStyle = 'auto'; // 'auto' | a station id | 'off'
+    this.nowPlaying = null;   // { title, artist, station }
+    this.onTrack = null;      // called when a new track starts
+    this._queues = {};
     this.synthMelody = false; // raga phrases on synthesised bansuri/sitar; off now that recordings carry the music
   }
 
@@ -385,7 +392,7 @@ export class TempleAudio {
     const every = (fn, delay) => { const tick = () => { if (!this.ctx) return; let next = 4; try { next = fn(); } catch (e) { console.warn(e); } this._timers.push(setTimeout(tick, Math.max(0.2, next) * 1000)); }; this._timers.push(setTimeout(tick, delay * 1000)); };
     const M = () => TOD_MIX[this.tod];
     const outside = () => 1 - this.zone.dome;
-    every(() => { const m = M(); if (!this.library['ambience.' + this.tod] && outside() > 0.2 && Math.random() < m.birds) { const k = this._pick(m.species); this._call(k); if (k === 'peacock') return 6; }
+    every(() => { const m = M(); if (!this._hasRec('ambience.' + this.tod) && outside() > 0.2 && Math.random() < m.birds) { const k = this._pick(m.species); this._call(k); if (k === 'peacock') return 6; }
       return m.birdRate[0] + Math.random() * (m.birdRate[1] - m.birdRate[0]); }, 1);
     every(() => { const b = M().bells; if (!b || this.ceremony) return 30; if (outside() > 0.5) this._distantBell(); return b[0] + Math.random() * (b[1] - b[0]); }, 25);
     every(() => { const m = M(); if (m.cow && Math.random() < m.cow) this._call('cow', { x: -38 + Math.random() * 10, y: 1, z: -30 + Math.random() * 60 }); return 14 + Math.random() * 18; }, 9);
@@ -395,7 +402,7 @@ export class TempleAudio {
 
   _phrase() {
     const m = TOD_MIX[this.tod], ctx = this.ctx; this._nextPhrase = 6 + Math.random() * 6;
-    if (!this.synthMelody || this.library['music.' + this.tod] || this.ceremony || m.music === 0) return;
+    if (!this.synthMelody || this._musicOn() || this.ceremony || m.music === 0) return;
     const raga = RAGAS[this.tod];
     const t0 = ctx.currentTime + 0.1;
     const beat = (m.instrument === 'sitar' ? 0.42 : 0.55) * (0.85 + Math.random() * 0.3);
@@ -416,62 +423,146 @@ export class TempleAudio {
     const changed = tod !== this.tod; this.tod = tod;
     if (!this.ctx) return;
     this.applyZone(this.zone, 2.5);
-    if (changed) this._applyLibrary();
+    if (changed) { this._applyAmbience(); this.playStation(); }
   }
 
   applyZone(z, tc = 0.9) {
     this.zone = z;
     if (!this.ctx || !this.layers.wind) return;
-    const L = this.layers, m = TOD_MIX[this.tod], out = 1 - z.dome, rec = !!this.library['ambience.' + this.tod];
+    const L = this.layers, m = TOD_MIX[this.tod], out = 1 - z.dome, rec = this._hasRec('ambience.' + this.tod);
     const set = (g, v) => this._ramp(g.gain, v, tc);
     set(this.outdoor, 0.4 + out * 0.6);
     this._ramp(this.outdoorLP.frequency, 700 + out * 17000, tc);
-    set(L.wind, 0.06 * m.wind * (0.4 + z.entrance + z.garden * 0.6));
-    set(L.fountain, 0.15 * (0.2 + z.courtyard) * (this.tod === 'night' ? 0.6 : 1));
-    set(L.falls, 0.03 + 0.03 * z.garden);
+    set(L.wind, 0.035 * m.wind * (0.4 + z.entrance + z.garden * 0.6));
+    set(L.fountain, 0.05 * z.courtyard * (this.tod === 'night' ? 0.6 : 1));   // a soft trickle, only close to the fountain
+    set(L.falls, 0.012 + 0.015 * z.garden);
     set(L.birds, rec ? 0 : 1.6 * (0.45 + z.entrance * 0.5 + z.garden * 0.6));
     set(L.cicadas, rec ? 0 : 0.05 * m.insects);
     set(L.crickets, rec ? 0 : 0.7 * m.crickets);
     set(L.night, 0.4); set(L.cows, 0); set(L.bells, 0.35);
-    set(L.recorded, 0.7);   // recorded birds or crickets: a soft bed under the music
+    set(L.recorded, 0.6);   // recorded stream and birds, or crickets: a soft bed under the music
     // music: a quiet bed in the courtyard, fuller by the shrines and inside the halls
-    const recMusic = !!this.library['music.' + this.tod], music = recMusic ? 0 : m.music;
+    const recMusic = this._musicOn(), music = recMusic ? 0 : m.music;
     const near = Math.max(z.corridor, z.dome);
     // without a recording the music is just a soft tanpura drone, mostly heard by the shrines
     set(L.tanpura, music * (0.04 + near * 0.3) * (this.ceremony ? 0.3 : 1));
-    if (this._libMusic) this._ramp(this._libMusic.gain, (0.42 + near * 0.3) * (this.ceremony ? 0.08 : 1), tc);   // the flute leads, everywhere
+    if (this._musicIn) this._ramp(this._musicIn.gain, (0.6 + near * 0.2) * (this.ceremony ? 0.05 : 1), tc);   // the music leads, everywhere
     set(L.melody, music * (0.3 + near * 0.3 + z.krishna * 0.25) * (this.ceremony ? 0 : 1));
     set(L.tabla, music * m.tabla * (0.25 + near * 0.3));
-    set(L.chant, m.chant * (recMusic ? 0.05 : 0.3) * z.dome);
-    set(L.shivaDrone, 0.5 * z.shiva * (0.2 + z.dome));
+    set(L.chant, recMusic ? 0 : m.chant * 0.3 * z.dome);
+    set(L.shivaDrone, (recMusic ? 0.15 : 0.5) * z.shiva * (0.2 + z.dome));
     this._ramp(this.hallReturn.gain, 0.12 + z.dome * 0.7, tc);
     this._ramp(this.stoneReturn.gain, 0.15 + z.corridor * 0.55, tc);
   }
 
-  // ---------------------------------------------------------------- optional recorded library
-  // Put licensed files in an `audio/` folder next to index.html with a manifest such as:
-  //   { "ambience.morning": "audio/dawn-birds.mp3", "music.evening": "audio/sandhya-bhajan.mp3", "aarti": "audio/aarti.mp3" }
-  // Keys: ambience.<morning|afternoon|evening|night>, music.<same>, aarti. Missing files fall back to synthesis.
+  // ---------------------------------------------------------------- recorded library and music
+  // audio/manifest.json lists the recorded loops and the music stations:
+  //   { "ambience.morning": "audio/x.mp3", ..., "aarti": "audio/aarti.mp3",
+  //     "playlists": { "uplifting": [{ "file": "audio/music/a.mp3", "title": "A", "artist": "B" }], ... } }
+  // Ambience and aarti are decoded only when needed (one time of day at a time) so memory stays low;
+  // music streams through two <audio> elements that crossfade from one track to the next.
   async loadLibrary(url = 'audio/manifest.json') {
-    let manifest;
-    try { const r = await fetch(url, { cache: 'no-cache' }); if (!r.ok) return; manifest = await r.json(); } catch (e) { return; }
-    for (const [key, file] of Object.entries(manifest)) {
-      if (!file || key.startsWith('_')) continue;
-      try { const r = await fetch(file); const data = await r.arrayBuffer(); this.library[key] = await this.ctx.decodeAudioData(data); } catch (e) { console.warn('Audio file could not be loaded:', file); }
-    }
-    this._applyLibrary(); this.applyZone(this.zone, 1);
+    let m;
+    try { const r = await fetch(url, { cache: 'no-cache' }); if (!r.ok) return; m = await r.json(); } catch (e) { return; }
+    this.manifest = m;
+    this.playlists = {};
+    for (const [id, list] of Object.entries(m.playlists || {})) if (Array.isArray(list) && list.length) this.playlists[id] = list.filter(t => t && t.file);
+    this._applyAmbience();
+    this.playStation(true);
+    this.applyZone(this.zone, 1);
+    setTimeout(() => this._loadBuffer('aarti'), 20000);   // ready well before the first aarti
   }
-  _applyLibrary() {
-    for (const s of this._libSources || []) { try { s.gain.gain.setTargetAtTime(0, this.ctx.currentTime, 1); s.src.stop(this.ctx.currentTime + 4); } catch (e) {} }
-    this._libSources = [];
-    this._libMusic = null;
-    for (const [kind, dest] of [['ambience', this.layers.recorded], ['music', this.buses.music]]) {
-      const buf = this.library[`${kind}.${this.tod}`]; if (!buf) continue;
-      const src = this.ctx.createBufferSource(); src.buffer = buf; src.loop = true;
-      src.loopStart = Math.min(0.06, buf.duration / 4); src.loopEnd = Math.max(src.loopStart + 1, buf.duration - 0.06);   // step over encoder padding so the loop is seamless
-      const g = this.ctx.createGain(); g.gain.value = 0; g.gain.setTargetAtTime(kind === 'music' ? 0.35 : 1.0, this.ctx.currentTime, 1.5);
-      src.connect(g).connect(dest); if (kind === 'music') { this._send(g, { hall: 0.25 }); this._libMusic = g; } src.start(0, Math.random() * buf.duration * 0.5); this._libSources.push({ src, gain: g });
+  _hasRec(key) { return !!(this.manifest && this.manifest[key]); }
+  _loadBuffer(key) {
+    if (this.library[key]) return Promise.resolve(this.library[key]);
+    const file = this.manifest && this.manifest[key]; if (!file || !this.ctx) return Promise.resolve(null);
+    if (!this._loading[key]) this._loading[key] = fetch(file).then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+      .then(d => this.ctx.decodeAudioData(d)).then(buf => (this.library[key] = buf))
+      .catch(() => { console.warn('Audio file could not be loaded:', file); delete this._loading[key]; return null; });
+    return this._loading[key];
+  }
+  async _applyAmbience() {
+    if (!this.ctx) return;
+    const tod = this.tod, key = 'ambience.' + tod;
+    const buf = await this._loadBuffer(key);
+    if (tod !== this.tod || !buf || (this._amb && this._amb.key === key)) return;
+    const now = this.ctx.currentTime;
+    if (this._amb) { const old = this._amb; try { old.gain.gain.setTargetAtTime(0, now, 1.2); old.src.stop(now + 6); } catch (e) {} }
+    const src = this.ctx.createBufferSource(); src.buffer = buf; src.loop = true;
+    src.loopStart = Math.min(0.06, buf.duration / 4); src.loopEnd = Math.max(src.loopStart + 1, buf.duration - 0.06);   // step over encoder padding so the loop is seamless
+    const g = this.ctx.createGain(); g.gain.value = 0; g.gain.setTargetAtTime(1, now, 1.5);
+    src.connect(g).connect(this.layers.recorded); src.start(0, Math.random() * buf.duration * 0.5);
+    this._amb = { key, src, gain: g };
+    // keep only the loop that is playing, so a phone does not hold every time of day in memory
+    for (const k of Object.keys(this.library)) if (k.startsWith('ambience.') && k !== key) { delete this.library[k]; delete this._loading[k]; }
+  }
+
+  // music stations: 'auto' plays uplifting music by day and meditation music at night
+  get stations() { return Object.keys(this.playlists); }
+  _station() {
+    const s = this.musicStyle;
+    if (s === 'off') return null;
+    if (s === 'auto' || !this.playlists[s]) return this.tod === 'night' && this.playlists.meditation ? 'meditation' : (this.playlists.uplifting ? 'uplifting' : this.stations[0] || null);
+    return s;
+  }
+  _musicOn() { return !!this._station() && !this.muted; }
+  setMusicStyle(style) { this.musicStyle = style; if (this.ctx) { this.playStation(); this.applyZone(this.zone, 1); } }
+  skipTrack() { if (this._curStation) this._advance(); }
+  _ensureDecks() {
+    if (this._decks || !this.ctx) return !!this._decks;
+    try {
+      this._musicIn = this.ctx.createGain(); this._musicIn.gain.value = 0.6; this._musicIn.connect(this.buses.music); this._send(this._musicIn, { hall: 0.08 });
+      this._decks = [0, 1].map(() => {
+        const el = new Audio(); el.preload = 'auto'; el.loop = false;
+        const g = this.ctx.createGain(); g.gain.value = 0; this.ctx.createMediaElementSource(el).connect(g).connect(this._musicIn);
+        const d = { el, g, track: null };
+        el.addEventListener('ended', () => { if (this._cur === d) this._advance(); });
+        el.addEventListener('error', () => { if (this._cur === d && ++this._errors < 6) setTimeout(() => { if (this._cur === d) this._advance(); }, 800); });
+        return d;
+      });
+      this._errors = 0;
+      this._timers.push(setInterval(() => {   // start the next track a few seconds early so the two overlap
+        const d = this._cur; if (!d || d.el.paused || !isFinite(d.el.duration)) return;
+        if (d.el.duration - d.el.currentTime < 5) this._advance();
+      }, 400));
+    } catch (e) { console.warn('Music player unavailable', e); this._decks = null; }
+    return !!this._decks;
+  }
+  playStation(force = false) {
+    if (!this.ctx) return;
+    const st = this._station();
+    if (!st) { this._cur = null; this._curStation = null; this._fadeMusic(); this.nowPlaying = null; this.onTrack && this.onTrack(null); return; }
+    if (!force && st === this._curStation && this._cur) return;
+    if (!this._ensureDecks()) return;
+    this._curStation = st; this._advance();
+  }
+  _nextTrack(st) {
+    const list = this.playlists[st]; if (!list || !list.length) return null;
+    let q = this._queues[st];
+    if (!q || !q.length) {
+      q = this._queues[st] = list.map((_, i) => i);
+      for (let i = q.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [q[i], q[j]] = [q[j], q[i]]; }
+      if (q.length > 1 && list[q[q.length - 1]] === this._lastTrack) [q[0], q[q.length - 1]] = [q[q.length - 1], q[0]];   // never the same track twice in a row
     }
+    return list[q.pop()];
+  }
+  _fadeMusic(except) {
+    const now = this.ctx.currentTime;
+    for (const d of this._decks || []) if (d !== except) {
+      d.g.gain.cancelScheduledValues(now); d.g.gain.setValueAtTime(d.g.gain.value, now); d.g.gain.linearRampToValueAtTime(0, now + 4);
+      setTimeout(() => { if (this._cur !== d) d.el.pause(); }, 4500);
+    }
+  }
+  _advance() {
+    const st = this._curStation, tr = st && this._nextTrack(st); if (!tr || !this._decks) return;
+    const now = this.ctx.currentTime, deck = this._decks.find(d => d !== this._cur) || this._decks[0];
+    this._fadeMusic(deck);
+    deck.track = tr; deck.el.src = tr.file;
+    deck.g.gain.cancelScheduledValues(now); deck.g.gain.setValueAtTime(0, now); deck.g.gain.linearRampToValueAtTime(1, now + 3);
+    const p = deck.el.play(); if (p && p.then) p.then(() => { this._errors = 0; }).catch(() => {});
+    this._cur = deck; this._lastTrack = tr;
+    this.nowPlaying = { title: tr.title, artist: tr.artist, station: st };
+    this.onTrack && this.onTrack(this.nowPlaying);
   }
 
   // ---------------------------------------------------------------- one-shots
@@ -520,8 +611,8 @@ export class TempleAudio {
   footstep(intensity = 1) {
     if (!this.ctx) return;
     const ctx = this.ctx, t = ctx.currentTime;
-    const s = this._noiseSource(); const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 700 + Math.random() * 400; f.Q.value = 1.2;
-    const g = ctx.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.09 * intensity, t + 0.008); g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+    const s = this._noiseSource(); const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 380 + Math.random() * 160; f.Q.value = 0.7;   // bare feet on stone: a soft pad
+    const g = ctx.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.035 * intensity, t + 0.012); g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
     s.connect(f).connect(g).connect(this.buses.effects); s.start(t); s.stop(t + 0.15);
     const z = this.zone; this._send(g, { stone: 0.3 + z.corridor * 1.2, hall: z.dome * 0.8 });
   }
@@ -566,6 +657,7 @@ export class TempleAudio {
     bus.gain.setValueAtTime(1, t0 + duration - 9); bus.gain.linearRampToValueAtTime(0, t0 + duration - 5);
     this.ceremony = { bus, nodes: [], t0 };
     this.applyZone(this.zone, 1.5);
+    if (!this.library.aarti) this._loadBuffer('aarti');
     if (this.library.aarti) {
       const src = ctx.createBufferSource(); src.buffer = this.library.aarti; src.connect(bus); src.start(Math.max(ctx.currentTime, t0), Math.max(0, offset)); this.ceremony.nodes.push(src);
     } else {

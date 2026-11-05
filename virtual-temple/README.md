@@ -31,7 +31,7 @@ Opening `index.html` straight from disk (`file://`) does not work, because brows
 | Aarti: schedule with countdown, preview on demand, warming altar light, conch, hand bells, drone and melody, panch-pradip lamp circled by a simulated pujari, synchronised gestures, wide camera, closing bell and bow | Working, simulated |
 | Backdrop: forested mountain ranges with snow peaks behind, three large waterfalls with spray, plunge pools and a river, drifting clouds and valley mist, flocks of egrets, crows, parakeets and pigeons, butterflies; fireflies, stars and moon at night | Working |
 | Time of day: Morning, Afternoon, Evening, Night, or Auto (follows the device's local time). Sky, sun or moon, light, lamps, wildlife and sound all change and blend over a few seconds | Working |
-| Peaceful soundscape: solo bamboo-flute alapanas for the time of day (raga Mayamalavagowla at dawn, Hemavathi in the afternoon, Kapi at dusk) and crystal singing bowls with crickets at night, over a soft bed of birdsong or crickets; a rare, far-off temple bell; soft fountain and waterfall; outdoor sound muffles inside the halls, where the flute carries a little more | Working, recorded (licensed) |
+| Music and sound: three music stations from the speaker button: **Uplifting** (feel-good grooves with tabla, sitar, handpan and warm beats), **Meditation** (calm pads, piano, handpan, singing bowls) and **Classical flute** (solo Carnatic alapanas), or **Auto** (uplifting by day, meditation at night). Tracks stream, shuffle and crossfade; now playing and Next in the panel. Under it a quiet mountain stream with a songbird by day and crickets at night; soft bare-foot steps; bells that ring once and settle; outdoor sound muffles inside the halls | Working, recorded (licensed) |
 | Settings: master, ambience, bells & effects and temple music volumes, mute, quality tiers, time of day, incense on/off, reduced motion | Working, saved per browser |
 | Guest mode, local email profiles that save the avatar | Working (device only) |
 | Google / Apple sign-in | Not connected (see below) |
@@ -40,23 +40,11 @@ Opening `index.html` straight from disk (`file://`) does not work, because brows
 ## Honest limits
 
 * **Every other devotee is simulated.** The HUD says "Multiplayer offline · N simulated devotees", hall occupancy notes how many are simulated, and their name tags read "simulated" while you choose a spot.
-* **Audio: recorded, and kept calm.** The music for every time of day, the ambience and the aarti are real recordings under CC BY-SA, CC BY or public domain terms (see `audio/CREDITS.md`). They are trimmed, filtered and looped, with the flute mixed above the birds. Bells you ring, the conch, footsteps, offerings and the hall chant are synthesised, and so is the fallback for any empty manifest slot.
+* **Audio: recorded and licensed.** Music, ambience and the aarti are real recordings under CC BY, CC BY-SA or public domain terms (see `audio/CREDITS.md`). Music streams from two `<audio>` elements that crossfade; ambience and aarti loops are decoded only while needed, so a phone never holds the whole library in memory. Bells you ring, the conch, footsteps, offerings and the hall chant are synthesised, as is the fallback for any empty manifest slot.
 
 ### Using recorded audio
 
-Drop licensed files into `virtual-temple/audio/` and point the matching slot in `audio/manifest.json` at them (empty slots use the built-in sound). For example:
-
-```json
-{
-  "ambience.morning": "audio/dawn-birds.mp3",
-  "ambience.night": "audio/night-crickets.mp3",
-  "music.morning": "audio/bhairav-bansuri.mp3",
-  "music.evening": "audio/sandhya-bhajan.mp3",
-  "aarti": "audio/aarti.mp3"
-}
-```
-
-Keys are `ambience.<morning|afternoon|evening|night>`, `music.<same>` and `aarti`. Each file loops while its time of day is active and replaces the matching synthesised layer; bells, conch, footsteps and offerings stay synthesised. Anything missing falls back to synthesis. Use MP3 or AAC for Safari support, and keep the licence and attribution for each file next to it.
+Everything is listed in `audio/manifest.json`: an ambience loop per time of day, the aarti, and `playlists` (the music stations). Add a track by putting an MP3 in `audio/music/` and an entry `{ "file", "title", "artist" }` in a playlist; see `audio/README.md`. Use MP3 or AAC for Safari support, and keep the licence and attribution for each file in `audio/CREDITS.md`.
 * **Deity representations are deliberately restrained.** The Shiva shrine has a lingam on its pitha with tripundra, bilva and a dhara-patra; Ganesha is a sindoor-coated svayambhu form with inlaid eyes, silver mukut and modak, as seen in many historic shrines; Krishna is a shyam-stone murti in yellow pitambar with mukut, peacock feather, flute and vaijayanti mala. A production version should replace these with sculpted, reviewed models.
 
 ## Architecture
@@ -73,7 +61,7 @@ js/architecture.js  shared pieces: pillars, bells (pendulum + clapper), diyas, l
 js/avatar.js        rigged devotees: body, face, garments, jewellery, props, and their poses (walk, namaste, bow, offer, ring, aarti)
 js/fx.js            GPU flames, incense smoke, petals, dust motes, fountain droplets, wind sway
 js/postfx.js        tilt-shift (miniature look) and colour grade
-js/audio.js         Web Audio graph, zones and time-of-day mixes, tanpura/bansuri/sitar/tabla, birds and insects, shared aarti track, optional recorded library
+js/audio.js         Web Audio graph, zones and time-of-day mixes, music stations (streamed, shuffled, crossfaded), recorded ambience and aarti, synthesised bells and effects
 js/presence.js      hall capacity rules and the local simulation
 js/profile.js       auth providers, profiles and settings storage
 ```
