@@ -242,3 +242,28 @@ export function tripundra() {
   ctx.fillStyle = '#b3121b'; ctx.beginPath(); ctx.arc(W * 0.25, H * 0.43, 7, 0, Math.PI * 2); ctx.fill();
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; cache.set(id, t); return t;
 }
+
+export function rangoli(seed = 1) {
+  const id = 'rangoli' + seed; if (cache.has(id)) return cache.get(id);
+  const S = 512, c = canvas(S), ctx = c.getContext('2d'), r = rand(seed * 97);
+  const pal = [['#d6246e', '#f29a17', '#ffd23f', '#ffffff', '#2f8f5b', '#2a5db0'], ['#e8442e', '#ffcc33', '#ffffff', '#8e3fb0', '#f06a8c', '#1f8a8a']][seed % 2];
+  ctx.translate(S / 2, S / 2);
+  const ring = (rad, n, len, wid, col, rot) => { ctx.fillStyle = col; for (let i = 0; i < n; i++) { ctx.save(); ctx.rotate(rot + i * Math.PI * 2 / n); ctx.beginPath(); ctx.moveTo(0, -rad); ctx.quadraticCurveTo(wid, -rad - len * 0.5, 0, -rad - len); ctx.quadraticCurveTo(-wid, -rad - len * 0.5, 0, -rad); ctx.fill(); ctx.restore(); } };
+  ctx.fillStyle = pal[3]; ctx.beginPath(); ctx.arc(0, 0, 250, 0, Math.PI * 2); ctx.globalAlpha = 0.25; ctx.fill(); ctx.globalAlpha = 1;
+  ring(170, 24, 70, 18, pal[0], 0); ring(150, 24, 60, 14, pal[1], Math.PI / 24);
+  ring(110, 16, 50, 16, pal[2], 0); ring(80, 12, 40, 14, pal[4], Math.PI / 12);
+  ring(40, 8, 40, 14, pal[5], 0);
+  ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 4; for (const rr of [245, 168, 108]) { ctx.beginPath(); ctx.arc(0, 0, rr, 0, Math.PI * 2); ctx.stroke(); }
+  for (let i = 0; i < 48; i++) { const a = i / 48 * Math.PI * 2; ctx.fillStyle = pal[i % 2 ? 1 : 0]; ctx.beginPath(); ctx.arc(Math.cos(a) * 232, Math.sin(a) * 232, 8, 0, Math.PI * 2); ctx.fill(); }
+  ctx.fillStyle = pal[1]; ctx.beginPath(); ctx.arc(0, 0, 30, 0, Math.PI * 2); ctx.fill();
+  void r;
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = maxAniso; cache.set(id, t); return t;
+}
+
+export function waterfall() {
+  const id = 'waterfall'; if (cache.has(id)) return cache.get(id);
+  const W = 64, H = 256, c = canvas(W, H), ctx = c.getContext('2d'), r = rand(5);
+  ctx.fillStyle = 'rgba(200,225,235,0.55)'; ctx.fillRect(0, 0, W, H);
+  for (let i = 0; i < 90; i++) { ctx.fillStyle = `rgba(255,255,255,${0.3 + r() * 0.6})`; ctx.fillRect(r() * W, r() * H, 1 + r() * 2, 20 + r() * 60); }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; cache.set(id, t); return t;
+}

@@ -139,3 +139,36 @@ export function shikhara(baseSize, height, mat, accentMat, tiers = 12) {
   g.userData.top = top + 1.6;
   return g;
 }
+
+// Ivory and gold palette used by the shrines (matches the courtyard reference).
+export const ivory = new THREE.MeshStandardMaterial({ color: '#f3ead9', roughness: 0.55 });
+export const paleGold = new THREE.MeshStandardMaterial({ color: '#d9a548', metalness: 0.75, roughness: 0.32 });
+
+// Chhatri: an open domed pavilion on four pillars with cusped arches and a kalasha finial.
+export function chhatri(s = 1, stone = ivory, trim = paleGold) {
+  const g = new THREE.Group();
+  const add = (geo, m, x, y, z) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = true; o.receiveShadow = true; g.add(o); return o; };
+  add(new THREE.BoxGeometry(3.0 * s, 0.35 * s, 3.0 * s), stone, 0, 0.175 * s, 0);
+  add(new THREE.BoxGeometry(3.1 * s, 0.08 * s, 3.1 * s), trim, 0, 0.36 * s, 0);
+  const pg = pillarGeometry(2.0 * s, 0.11 * s);
+  for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const p = new THREE.Mesh(pg, stone); p.position.set(x * 1.12 * s, 0.4 * s, z * 1.12 * s); p.castShadow = true; g.add(p); }
+  for (let i = 0; i < 4; i++) {
+    const a = new THREE.Mesh(new THREE.TorusGeometry(0.95 * s, 0.07 * s, 6, 18, Math.PI), trim);
+    const ang = i * Math.PI / 2; a.position.set(Math.sin(ang) * 1.12 * s, 1.45 * s, Math.cos(ang) * 1.12 * s); a.rotation.y = ang; g.add(a);
+  }
+  add(new THREE.BoxGeometry(2.75 * s, 0.28 * s, 2.75 * s), stone, 0, 2.54 * s, 0);
+  const eave = add(new THREE.CylinderGeometry(1.75 * s, 2.15 * s, 0.14 * s, 4, 1), stone, 0, 2.74 * s, 0); eave.rotation.y = Math.PI / 4;
+  add(new THREE.CylinderGeometry(1.0 * s, 1.05 * s, 0.22 * s, 20), trim, 0, 2.9 * s, 0);
+  const dome = new THREE.LatheGeometry([[0, 0], [1.0, 0], [1.08, 0.22], [1.02, 0.55], [0.8, 0.9], [0.45, 1.15], [0.14, 1.32], [0, 1.36]].map(([x, y]) => new THREE.Vector2(x * s, y * s)), 24);
+  add(dome, stone, 0, 3.0 * s, 0);
+  const k = kalasha(0.55 * s); k.position.y = 4.32 * s; g.add(k);
+  g.userData.top = 4.9 * s; g.userData.radius = 1.6 * s;
+  return g;
+}
+
+export function balusterGeometry(h = 0.75) {
+  return lathe([[0, 0], [0.09, 0], [0.09, 0.06], [0.05, 0.1], [0.085, h * 0.35], [0.1, h * 0.5], [0.05, h * 0.75], [0.04, h * 0.82], [0.08, h * 0.88], [0.08, h], [0, h]], 8);
+}
+export function lampPostGeometry(h = 1.25) {
+  return lathe([[0, 0], [0.32, 0], [0.32, 0.12], [0.24, 0.18], [0.24, 0.3], [0.14, 0.38], [0.12, h * 0.7], [0.18, h * 0.76], [0.13, h * 0.82], [0.22, h * 0.92], [0.26, h], [0, h]], 8);
+}

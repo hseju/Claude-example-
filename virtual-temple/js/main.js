@@ -15,14 +15,14 @@ if (isTouch) document.body.classList.add('touch');
 // ---------------------------------------------------------------- settings & quality
 const profiles = new ProfileStore();
 const prefersReduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const settings = profiles.loadSettings({ quality: 'auto', evening: 0.45, incense: true, reducedMotion: prefersReduced, master: 80, ambience: 70, effects: 85, ceremony: 80, muted: false });
+const settings = profiles.loadSettings({ quality: 'auto', evening: 0.5, incense: true, reducedMotion: prefersReduced, master: 80, ambience: 70, effects: 85, ceremony: 80, muted: false });
 const dpr = window.devicePixelRatio || 1;
 function qualityPreset(q) {
   if (q === 'auto') q = (isTouch && Math.min(screen.width, screen.height) < 820) ? 'medium' : 'high';
   return {
-    low: { level: 'low', pr: Math.min(dpr, 1), shadows: 0, post: false, npcs: 8, tilt: 0 },
-    medium: { level: 'medium', pr: Math.min(dpr, isTouch ? 1.3 : 1.5), shadows: 1024, post: true, npcs: 14, tilt: 1.5 },
-    high: { level: 'high', pr: Math.min(dpr, 2), shadows: 2048, post: true, npcs: 20, tilt: 2.0 },
+    low: { level: 'low', pr: Math.min(dpr, 1), shadows: 0, post: false, npcs: 10, tilt: 0, bloom: 0 },
+    medium: { level: 'medium', pr: Math.min(dpr, isTouch ? 1.3 : 1.5), shadows: 1024, post: true, npcs: 18, tilt: 1.5, bloom: 0.5 },
+    high: { level: 'high', pr: Math.min(dpr, 2), shadows: 2048, post: true, npcs: 28, tilt: 2.0, bloom: 0.6 },
   }[q];
 }
 const Q = qualityPreset(settings.quality);
@@ -49,10 +49,10 @@ const audio = new TempleAudio();
 audio.levels = { master: settings.master / 100, ambience: settings.ambience / 100, effects: settings.effects / 100, ceremony: settings.ceremony / 100 };
 audio.muted = settings.muted;
 
-let world, hall, directory, sim;
+let world, hall, directory, sim, playerRing;
 const app = { mode: 'loading', hallState: null, currentHall: null, templeId: null, camMode: 'world', time: 0 };
 const me = { id: null, config: defaultConfig(), avatar: null };
-const cam = { yaw: 0, pitch: 0.88, dist: 30, tYaw: 0, tPitch: 0.88, tDist: 30, pos: new THREE.Vector3(), target: new THREE.Vector3(), fov: 32 };
+const cam = { yaw: 0, pitch: 0.5, dist: 30, tYaw: 0, tPitch: 0.5, tDist: 30, eff: 30, pos: new THREE.Vector3(), target: new THREE.Vector3(), fov: 32 };
 const input = { keys: new Set(), joy: new THREE.Vector2(), auto: [], pointers: new Map(), drag: false };
 
 // ---------------------------------------------------------------- boot
@@ -80,6 +80,9 @@ async function boot() {
   me.avatar = new Avatar(me.config, { shadows: Q.level !== 'low' });
   me.avatar.root.position.set(0, 0, 46.5); me.avatar.root.rotation.y = Math.PI;
   world.scene.add(me.avatar.root);
+  playerRing = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.68, 48), new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffc861').multiplyScalar(2.2), transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending }));
+  playerRing.rotation.x = -Math.PI / 2; world.scene.add(playerRing);
+  if (/[?&]debug\b/.test(location.search)) window.__vt = { app, me, world, hall, directory, cam, input, settings }; // local testing hook
   setMode('welcome');
   $('loading').style.opacity = '0'; setTimeout(() => $('loading').remove(), 900);
   last = performance.now(); requestAnimationFrame(loop);
@@ -339,13 +342,18 @@ function endAarti(abort) {
 
 // ---------------------------------------------------------------- labels
 const labelEls = {};
+const ICONS = {
+  trishul: '<svg viewBox="0 0 32 32"><path d="M16 4v24M10 6c0 6 2 9 6 9s6-3 6-9M10 6l-1.5 2M22 6l1.5 2M16 4l-1.5 2.5M16 4l1.5 2.5M13 24h6"/></svg>',
+  modak: '<svg viewBox="0 0 32 32"><path d="M16 4c-2 4-9 9-9 15a9 5 0 0 0 18 0c0-6-7-11-9-15z"/><path d="M16 4v18M12 9c-1 4-1 9 0 13M20 9c1 4 1 9 0 13"/></svg>',
+  flute: '<svg viewBox="0 0 32 32"><path d="M5 25 25 7l2 2L7 27z"/><circle cx="12" cy="19.5" r=".8"/><circle cx="15" cy="16.8" r=".8"/><circle cx="18" cy="14.1" r=".8"/><path d="M24 4c2 0 4 2 4 4"/></svg>',
+};
 function buildLabels() {
   const root = $('labels');
   for (const T of Object.values(TEMPLES)) {
-    const el = document.createElement('div'); el.className = 'wlabel'; el.innerHTML = `<b>${T.name}</b><span></span>`;
+    const el = document.createElement('div'); el.className = 'wlabel'; el.innerHTML = `<i class="ico">${ICONS[T.icon]}</i><div><b>${T.short}</b><em>Temple</em><span></span></div>`;
     el.addEventListener('click', () => goTo(T.id)); root.appendChild(el); labelEls[T.id] = el;
   }
-  labelEls.me = document.createElement('div'); labelEls.me.className = 'nlabel'; root.appendChild(labelEls.me);
+  labelEls.me = document.createElement('div'); labelEls.me.className = 'nlabel me'; root.appendChild(labelEls.me);
   labelEls.sims = [];
   updateLabels(true);
 }
@@ -367,11 +375,11 @@ function project(p, el, yOff = 0) {
 function positionLabels() {
   if (app.mode === 'world') {
     for (const T of Object.values(TEMPLES)) { const d = T.entrance.distanceTo(me.avatar.root.position); project(T.labelPos, labelEls[T.id]); labelEls[T.id].style.opacity = d < 6 ? '0.35' : '1'; }
-    labelEls.me.textContent = me.config.name || 'You'; project(me.avatar.root.position, labelEls.me, 2.05);
+    const nm = me.config.name || 'You'; if (labelEls.me.dataset.n !== nm) { labelEls.me.dataset.n = nm; labelEls.me.innerHTML = `<i>${escapeHtml(nm[0].toUpperCase())}</i>${escapeHtml(nm)}`; } project(me.avatar.root.position, labelEls.me, 2.05);
     labelEls.sims.forEach(e => (e.style.display = 'none'));
   } else if (app.mode === 'hall') {
     for (const T of Object.values(TEMPLES)) labelEls[T.id].style.display = 'none';
-    labelEls.me.textContent = me.config.name || 'You'; project(me.avatar.root.position, labelEls.me, 2.0);
+    project(me.avatar.root.position, labelEls.me, 2.0);
     if (app.camMode === 'prayer' || app.camMode === 'darshan' || app.camMode === 'aarti') labelEls.me.style.display = 'none';
     // show a quiet "simulated" tag over other devotees while choosing a place
     const occ = [...hall.occupants.values()];
@@ -390,6 +398,12 @@ function goTo(id) {
   $('map').classList.remove('on'); $('mapBtn').setAttribute('aria-pressed', 'false');
   toast(`Walking to the ${TEMPLES[id].name}`, 2000);
 }
+function worldPranam() {
+  if (app.mode !== 'world') return;
+  input.auto = []; const av = me.avatar; av.setState('bow'); app.pranamUntil = app.time + 2.6;
+  const T = nearShrine() || Object.values(TEMPLES).sort((a, b) => a.pos.distanceTo(av.root.position) - b.pos.distanceTo(av.root.position))[0];
+  const d = T.pos.clone().sub(av.root.position); av.root.rotation.y = Math.atan2(d.x, d.z);
+}
 function nearShrine() {
   for (const T of Object.values(TEMPLES)) if (T.entrance.distanceTo(me.avatar.root.position) < 3.4) return T;
   return null;
@@ -405,6 +419,7 @@ function bindInput() {
       if (k === 'q') cam.tYaw += 0.4; if (k === 'e') cam.tYaw -= 0.4;
       if (k === '+' || k === '=') zoom(-3); if (k === '-') zoom(3);
       if (k === 'm') toggleMap();
+      if (k === 'p') worldPranam();
       if (k === 'enter') { const T = nearShrine(); if (T) enterTemple(T.id); }
     }
     if (app.mode === 'hall') { const map = { 1: 'namaste', 2: 'bell', 3: 'diya', 4: 'flowers', 5: 'incense', 6: 'abhishek' }; if (map[k]) act(map[k]); }
@@ -418,7 +433,7 @@ function bindInput() {
     const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
     if (Math.hypot(e.clientX - p.sx, e.clientY - p.sy) > 8) input.drag = true;
     if (input.pointers.size === 2) { const d = pinchDist(); if (input.pinch) zoom((input.pinch - d) * 0.06); input.pinch = d; return; }
-    if (input.drag && (app.mode === 'world' || app.mode === 'welcome')) { cam.tYaw -= dx * 0.006; cam.tPitch = THREE.MathUtils.clamp(cam.tPitch + dy * 0.004, 0.45, 1.25); }
+    if (input.drag && (app.mode === 'world' || app.mode === 'welcome')) { cam.tYaw -= dx * 0.006; cam.tPitch = THREE.MathUtils.clamp(cam.tPitch + dy * 0.004, 0.32, 1.25); }
     if (input.drag && app.mode === 'creator' && preview.avatar) preview.avatar.root.rotation.y += dx * 0.012;
   });
   const up = (e) => {
@@ -437,7 +452,7 @@ function bindInput() {
 }
 function pinchDist() { const a = [...input.pointers.values()]; return a.length < 2 ? 0 : Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y); }
 function zoom(d) { cam.tDist = THREE.MathUtils.clamp(cam.tDist + d, 9, 44); }
-const ray = new THREE.Raycaster();
+const ray = new THREE.Raycaster(), occRay = new THREE.Raycaster();
 function tap(x, y) {
   ray.setFromCamera(new THREE.Vector2(x / innerWidth * 2 - 1, -(y / innerHeight) * 2 + 1), camera);
   if (app.mode === 'world') {
@@ -506,6 +521,7 @@ function bindUI() {
   const hold = (id, fn) => { const b = $(id); let t; b.addEventListener('pointerdown', () => { fn(); t = setInterval(fn, 120); }); for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, () => clearInterval(t)); b.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') fn(); }); };
   hold('camLeft', () => (cam.tYaw += 0.12)); hold('camRight', () => (cam.tYaw -= 0.12)); hold('zoomIn', () => zoom(-1.5)); hold('zoomOut', () => zoom(1.5));
   $('enterBtn').addEventListener('click', () => { const T = nearShrine(); if (T) enterTemple(T.id); });
+  $('pranamBtn').addEventListener('click', worldPranam);
   document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => goTo(b.dataset.go)));
   $('mapCanvas').addEventListener('click', (e) => {
     const r = e.target.getBoundingClientRect(); const x = (e.clientX - r.left) / r.width * 100 - 50, z = (e.clientY - r.top) / r.height * 100 - 50;
@@ -595,7 +611,7 @@ function loop(now) {
     const narrow = innerWidth < 720;
     camera.fov = 30;
     if (narrow) { camera.position.set(0, 1.4, 8); camera.lookAt(0, -0.2, 0); } else { camera.position.set(0.95, 1.25, 4.4); camera.lookAt(0.95, 0.92, 0); }
-    camera.updateProjectionMatrix(); post.tilt.amount = 0; post.finalMat.uniforms.uVignette.value = 0.5; post.render(preview.scene, camera); return;
+    camera.updateProjectionMatrix(); post.tilt.amount = 0; post.bloom.strength = 0; post.finalMat.uniforms.uVignette.value = 0.5; post.render(preview.scene, camera); return;
   }
   if (app.mode === 'hall') { updateHall(dt, t, ctx); positionLabels(); return; }
   updateWorld(dt, t, ctx);
@@ -632,6 +648,7 @@ function updateWorld(dt, t, ctx) {
     // stuck on an obstacle while auto-walking: drop the waypoint
     if (input.auto.length && moved < 0.3) { input.stuck = (input.stuck || 0) + dt; if (input.stuck > 0.6) { input.auto.shift(); input.stuck = 0; } } else input.stuck = 0;
   } else if (av.state === 'walk') av.setState('idle');
+  if (av.state === 'bow' && app.time > (app.pranamUntil || 0)) av.setState('namaste');
   av.update(dt, t);
   footsteps(av);
   // gate bells chime as you pass beneath them
@@ -662,20 +679,39 @@ function updateWorld(dt, t, ctx) {
   const lerp = 1 - Math.exp(-dt * (settings.reducedMotion ? 14 : 6));
   if (app.mode === 'welcome' || app.mode === 'loading') {
     const a = settings.reducedMotion ? 0.6 : 0.6 + t * 0.04;
-    cam.pos.set(Math.sin(a) * 58, 30, Math.cos(a) * 58 + 4); cam.target.set(0, 2, -4); camera.fov = 34;
+    cam.pos.set(Math.sin(a) * 56, 21, Math.cos(a) * 56 + 4); cam.target.set(0, 3, -6); camera.fov = 40;
     camera.position.lerp(cam.pos, 1 - Math.exp(-dt * 2)); camera.lookAt(cam.target);
     world.update(dt, t, new THREE.Vector3(0, 0, 0), ctx);
   } else {
     cam.yaw += (cam.tYaw - cam.yaw) * lerp; cam.pitch += (cam.tPitch - cam.pitch) * lerp; cam.dist += (cam.tDist - cam.dist) * lerp;
     const focus = p.clone().add(new THREE.Vector3(0, 0.9, 0));
     cam.target.lerp(focus, 1 - Math.exp(-dt * 8));
-    camera.position.set(cam.target.x + Math.sin(cam.yaw) * Math.cos(cam.pitch) * cam.dist, cam.target.y + Math.sin(cam.pitch) * cam.dist, cam.target.z + Math.cos(cam.yaw) * Math.cos(cam.pitch) * cam.dist);
-    camera.lookAt(cam.target); camera.fov = 32;
+    // portrait screens get a little more distance; temples and the gateway pull the camera in rather than hide you
+    let want = cam.dist * (camera.aspect < 1 ? 1 + (1 - camera.aspect) * 0.6 : 1);
+    // inside the walls, keep the camera inside too, so the gateway never fills the foreground
+    const cz = Math.cos(cam.yaw) * Math.cos(cam.pitch);
+    if (p.z < 39.5 && cz > 0.05) want = Math.max(9, Math.min(want, (38.5 - cam.target.z) / cz));
+    const dirAt = (pitch, out) => out.set(Math.sin(cam.yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(cam.yaw) * Math.cos(pitch));
+    // first try lifting the camera over the obstacle, then pull it closer as a last resort
+    let pitch = cam.pitch, allowed = want;
+    for (let i = 0; i < 6; i++) {
+      const pt = Math.min(1.3, cam.pitch + i * 0.12); occRay.set(cam.target, dirAt(pt, tmp)); occRay.far = want;
+      const hit = world.occluders.length ? occRay.intersectObjects(world.occluders, true)[0] : null;
+      if (!hit) { pitch = pt; allowed = want; break; }
+      if (i === 5) { pitch = pt; allowed = Math.max(5, hit.distance - 1); }
+    }
+    cam.effPitch = cam.effPitch ?? cam.pitch;
+    cam.effPitch += (pitch - cam.effPitch) * (1 - Math.exp(-dt * (pitch > cam.effPitch ? 6 : 1.5)));
+    cam.eff += (allowed - cam.eff) * (allowed < cam.eff ? 1 - Math.exp(-dt * 10) : 1 - Math.exp(-dt * 2));
+    const dir = dirAt(cam.effPitch, tmp);
+    camera.position.copy(cam.target).addScaledVector(dir, cam.eff);
+    camera.lookAt(cam.target); camera.fov = 42;
     world.update(dt, t, p, ctx);
+    if (playerRing) { playerRing.position.set(p.x, 0.06, p.z); const k = settings.reducedMotion ? 1 : 1 + Math.sin(t * 2.4) * 0.06; playerRing.scale.set(k, k, k); }
   }
   camera.updateProjectionMatrix();
-  post.tilt.amount = app.mode === 'welcome' ? Q.tilt * 0.6 : Q.tilt * 0.8; post.tilt.focus = 0.5; post.tilt.band = app.mode === 'welcome' ? 0.14 : 0.17;
-  post.finalMat.uniforms.uVignette.value = 0.34; post.finalMat.uniforms.uWarm.value = 0.15 + world.evening * 0.25;
+  post.tilt.amount = app.mode === 'welcome' ? Q.tilt * 0.45 : Q.tilt * 0.55; post.tilt.focus = 0.47; post.tilt.band = app.mode === 'welcome' ? 0.22 : 0.24;
+  post.finalMat.uniforms.uVignette.value = 0.34; post.finalMat.uniforms.uWarm.value = 0.12 + world.evening * 0.2; post.bloom.strength = Q.bloom; post.bloom.threshold = 1.5;
   post.render(world.scene, camera);
 }
 
@@ -699,6 +735,7 @@ function updateHall(dt, t, ctx) {
   if (audio.ctx) audio.setListener(camera.position, tmp.copy(cam.target).sub(camera.position).normalize());
   post.tilt.amount = app.camMode === 'select' ? 0.6 : 0.5; post.tilt.band = app.camMode === 'select' ? 0.3 : 0.34; post.tilt.focus = 0.5;
   if (!Q.post) post.tilt.amount = 0;
+  post.bloom.strength = Q.bloom * 1.2; post.bloom.threshold = 1.2;
   post.finalMat.uniforms.uVignette.value = app.aarti ? 0.6 : 0.42; post.finalMat.uniforms.uWarm.value = app.aarti ? 0.45 : 0.25;
   post.render(hall.scene, camera);
 }

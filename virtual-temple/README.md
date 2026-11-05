@@ -20,7 +20,7 @@ Opening `index.html` straight from disk (`file://`) does not work, because brows
 
 | Area | Status |
 | --- | --- |
-| Miniature campus: gateway with swinging brass bells, courtyard fountain, lotus ponds and kunds, gardens, three temples with shikharas and domed mandapas, diyas, bunting, birds | Working |
+| Miniature campus at golden hour: ivory-and-gold temples with shikharas, domed mandapas and rooftop chhatris; gateway with swinging brass bells; courtyard fountain, lotus ponds and kunds with pavilions; carved balustrades, lamp posts and rangoli; flowering trees, a brass Nandi, peacocks, hills and a waterfall; diyas, bunting, birds; tilt-shift and bloom | Working |
 | Avatar creator: name, presentation, attire (kurta, dhoti, saree, salwar kameez), colour, skin tone, hair | Working |
 | Movement: WASD/arrows, click or tap to walk, on-screen joystick on touch screens, drag to orbit, wheel/pinch zoom, map with shrine destinations, collisions | Working |
 | Simulated devotees walking between shrines and pausing in namaste | Working, labelled as simulated |
