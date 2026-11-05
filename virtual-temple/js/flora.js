@@ -63,34 +63,59 @@ const LEAF_KINDS = {
   jacaranda: { greens: ['#4b7a33', '#5b8a3a'], leaves: 60, len: [10, 16], wid: [3, 5], bloom: ['#8f6ad6', '#a07fe0', '#7a58c4', '#b394ec'], blooms: 80 },
 };
 function leafTexture(kind) {
-  const K = LEAF_KINDS[kind], S = 256, c = cv(S), x = c.getContext('2d');
-  for (let i = 0; i < K.leaves; i++) {
-    const r = Math.sqrt(rnd()) * 112, a = rnd() * Math.PI * 2; x.save(); x.translate(S / 2 + Math.cos(a) * r, S / 2 + Math.sin(a) * r);
+  const K = LEAF_KINDS[kind], S = 512, c = cv(S), x = c.getContext('2d');
+  x.scale(2, 2);
+  for (let i = 0; i < K.leaves * 1.6; i++) {
+    const r = Math.sqrt(rnd()) * 112, a = rnd() * Math.PI * 2; x.save(); x.translate(128 + Math.cos(a) * r, 128 + Math.sin(a) * r);
     x.rotate(K.droop ? Math.PI + (rnd() - 0.5) * 0.6 : rnd() * Math.PI * 2);
     const len = K.len[0] + rnd() * (K.len[1] - K.len[0]), wid = K.wid[0] + rnd() * (K.wid[1] - K.wid[0]);
+    // twig the leaf hangs from
+    x.strokeStyle = 'rgba(70,52,30,0.6)'; x.lineWidth = 0.8; x.beginPath(); x.moveTo(0, 4); x.lineTo(0, 0); x.stroke();
     const col = new THREE.Color(pick(K.greens)).offsetHSL(0, 0, (rnd() - 0.5) * 0.06);
     const g = x.createLinearGradient(0, 0, 0, -len); g.addColorStop(0, '#' + col.clone().offsetHSL(0, 0, -0.06).getHexString()); g.addColorStop(1, '#' + col.clone().offsetHSL(0, 0.05, 0.06).getHexString());
     x.fillStyle = g; leafShape(x, len, wid); x.fill();
-    x.strokeStyle = 'rgba(220,240,180,0.35)'; x.lineWidth = 1; x.beginPath(); x.moveTo(0, 0); x.lineTo(0, -len * 0.9); x.stroke();
+    x.strokeStyle = 'rgba(220,240,180,0.35)'; x.lineWidth = 0.7; x.beginPath(); x.moveTo(0, 0); x.lineTo(0, -len * 0.9); x.stroke();
+    x.strokeStyle = 'rgba(200,230,160,0.18)'; x.lineWidth = 0.4;
+    for (let v = 0.2; v < 0.85; v += 0.13) { x.beginPath(); x.moveTo(0, -len * v); x.lineTo(wid * 0.7, -len * (v + 0.1)); x.moveTo(0, -len * v); x.lineTo(-wid * 0.7, -len * (v + 0.1)); x.stroke(); }
+    // a soft edge highlight where light catches the leaf
+    x.strokeStyle = 'rgba(255,255,220,0.12)'; x.lineWidth = 0.6; leafShape(x, len, wid); x.stroke();
     x.restore();
   }
-  if (K.bloom) for (let i = 0; i < K.blooms; i++) {
-    const r = Math.sqrt(rnd()) * 105, a = rnd() * Math.PI * 2, cx = S / 2 + Math.cos(a) * r, cy = S / 2 + Math.sin(a) * r, col = pick(K.bloom);
+  if (K.bloom) for (let i = 0; i < K.blooms * 1.5; i++) {
+    const r = Math.sqrt(rnd()) * 105, a = rnd() * Math.PI * 2, cx = 128 + Math.cos(a) * r, cy = 128 + Math.sin(a) * r, col = pick(K.bloom);
     for (let k = 0; k < 4 + Math.floor(rnd() * 4); k++) { const pa = rnd() * Math.PI * 2, d = 3 + rnd() * 6; x.fillStyle = col; x.beginPath(); x.ellipse(cx + Math.cos(pa) * d, cy + Math.sin(pa) * d, 4 + rnd() * 3, 3 + rnd() * 2, pa, 0, Math.PI * 2); x.fill(); }
     x.fillStyle = 'rgba(255,240,200,0.8)'; x.beginPath(); x.arc(cx, cy, 1.2, 0, Math.PI * 2); x.fill();
   }
   return tex(c);
 }
+// a height-like canvas turned into a tangent-space normal map
+export function normalFromCanvas(c, strength = 2.5) {
+  const w = c.width, h = c.height, src = c.getContext('2d').getImageData(0, 0, w, h).data, out = cv(w, h), o = out.getContext('2d'), img = o.createImageData(w, h);
+  const L = (x, y) => { x = (x + w) % w; y = (y + h) % h; const i = (y * w + x) * 4; return (src[i] + src[i + 1] + src[i + 2]) / 765; };
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const dx = (L(x + 1, y) - L(x - 1, y)) * strength, dy = (L(x, y + 1) - L(x, y - 1)) * strength, l = Math.hypot(dx, dy, 1), i = (y * w + x) * 4;
+    img.data[i] = (-dx / l * 0.5 + 0.5) * 255; img.data[i + 1] = (dy / l * 0.5 + 0.5) * 255; img.data[i + 2] = (1 / l * 0.5 + 0.5) * 255; img.data[i + 3] = 255;
+  }
+  o.putImageData(img, 0, 0); const t = new THREE.CanvasTexture(out); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+}
 function barkTexture() {
-  const c = cv(64, 256), x = c.getContext('2d'); x.fillStyle = '#5a4434'; x.fillRect(0, 0, 64, 256);
-  for (let i = 0; i < 70; i++) { x.fillStyle = `rgba(${rnd() < 0.5 ? '30,22,16' : '120,100,80'},${0.2 + rnd() * 0.3})`; x.fillRect(rnd() * 64, rnd() * 256, 1 + rnd() * 3, 20 + rnd() * 80); }
-  const t = tex(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+  const W = 128, H = 512, c = cv(W, H), x = c.getContext('2d');
+  x.fillStyle = '#5c4636'; x.fillRect(0, 0, W, H);
+  // bark plates separated by deep fissures, with lichen and a few knots
+  for (let i = 0; i < 46; i++) { const px = rnd() * W, py = rnd() * H, pw = 8 + rnd() * 16, ph = 30 + rnd() * 70; x.fillStyle = `rgba(${130 + rnd() * 30},${105 + rnd() * 25},${80 + rnd() * 20},0.55)`; x.fillRect(px, py, pw, ph); if (py + ph > H) x.fillRect(px, py - H, pw, ph); }
+  x.strokeStyle = 'rgba(25,18,12,0.85)';
+  for (let i = 0; i < 26; i++) { let px = rnd() * W; x.lineWidth = 1 + rnd() * 2.5; x.beginPath(); x.moveTo(px, 0); for (let y = 0; y <= H; y += 16) { px += (rnd() - 0.5) * 6; x.lineTo(px, y); } x.stroke(); }
+  for (let i = 0; i < 5; i++) { const kx = rnd() * W, ky = rnd() * H; x.fillStyle = 'rgba(30,22,15,0.8)'; x.beginPath(); x.ellipse(kx, ky, 5, 9, 0, 0, Math.PI * 2); x.fill(); x.strokeStyle = 'rgba(140,115,90,0.6)'; x.lineWidth = 2; x.beginPath(); x.ellipse(kx, ky, 8, 13, 0, 0, Math.PI * 2); x.stroke(); }
+  for (let i = 0; i < 40; i++) { x.fillStyle = `rgba(${150 + rnd() * 40},${160 + rnd() * 30},${110},0.25)`; x.beginPath(); x.arc(rnd() * W, rnd() * H, 2 + rnd() * 5, 0, Math.PI * 2); x.fill(); }
+  const t = tex(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.normal = normalFromCanvas(c, 4); return t;
 }
 function palmBarkTexture() {
-  const c = cv(64, 128), x = c.getContext('2d'); x.fillStyle = '#7a6650'; x.fillRect(0, 0, 64, 128);
-  for (let y = 0; y < 128; y += 16) { x.fillStyle = 'rgba(40,30,22,0.55)'; x.fillRect(0, y, 64, 3); x.fillStyle = 'rgba(160,140,110,0.4)'; x.fillRect(0, y + 3, 64, 2); }
-  for (let i = 0; i < 60; i++) { x.fillStyle = 'rgba(60,48,36,0.3)'; x.fillRect(rnd() * 64, rnd() * 128, 2, 6); }
-  const t = tex(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+  const c = cv(128, 256), x = c.getContext('2d'); x.fillStyle = '#7a6650'; x.fillRect(0, 0, 128, 256);
+  for (let y = 0; y < 256; y += 18) {
+    const g = x.createLinearGradient(0, y, 0, y + 18); g.addColorStop(0, '#4a3a2a'); g.addColorStop(0.2, '#9a8466'); g.addColorStop(0.8, '#7a6650'); g.addColorStop(1, '#5a4a38'); x.fillStyle = g; x.fillRect(0, y, 128, 18);
+    for (let k = 0; k < 10; k++) { x.fillStyle = 'rgba(40,30,20,0.4)'; x.fillRect(rnd() * 128, y + 4 + rnd() * 10, 1 + rnd() * 2, 4 + rnd() * 6); }
+  }
+  const t = tex(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.normal = normalFromCanvas(c, 5); return t;
 }
 function frondTexture() {
   const W = 128, H = 512, c = cv(W, H), x = c.getContext('2d');
@@ -133,7 +158,8 @@ function foliageMaterial(map, windTime, { amp = 0.08, freq = 1.4, vertexColors =
       transformed.x += sin(uWindTime * ${freq.toFixed(2)} + wph + position.y * 0.7) * ${amp.toFixed(3)} * wk;
       transformed.z += cos(uWindTime * ${(freq * 0.8).toFixed(2)} + wph * 1.3 + position.x) * ${(amp * 0.7).toFixed(3)} * wk;`);
     // keep the outward canopy normals on both faces so leaves never go black from behind
-    sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\n normal = normalize( vNormal );');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\n normal = normalize( vNormal );')
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance += diffuseColor.rgb * 0.07;');
   };
   m.customProgramCacheKey = () => `foliage${amp}${freq}${vertexColors}`;
   return m;
@@ -153,25 +179,37 @@ export class Flora {
   addLotusPond(x, z, r, y, flowers, rect) { this.ponds.push({ x, z, r, y, flowers, rect }); }
   addUrli(x, z) { this.urlis.push({ x, z }); }
   addGrass(points) { this.grass.push(...points); }
+  addChabutra(x, z) { (this.chabutras = this.chabutras || []).push({ x, z }); }
+  addFallen(x, z, r, colors, n) { (this.fallen = this.fallen || []).push({ x, z, r, colors, n }); }
+  addKoi(x, z, r, y, n, rect) { (this.koiPonds = this.koiPonds || []).push({ x, z, r, y, n, rect }); }
 
   // -------- trees
   _broadleaf(o) {
     const wood = [], leaves = [];
     let p = new V(0, 0, 0); const pts = [p];
     for (let i = 1; i <= 3; i++) { p = p.clone().add(new V((rnd() - 0.5) * o.lean, o.h * o.forkAt / 3, (rnd() - 0.5) * o.lean)); pts.push(p); }
-    for (let i = 0; i < 3; i++) wood.push(seg(pts[i], pts[i + 1], o.trunk * (1.15 - i * 0.18), o.trunk * (1 - (i + 1) * 0.18), 8));
+    for (let i = 0; i < 3; i++) wood.push(seg(pts[i], pts[i + 1], o.trunk * (1.15 - i * 0.18), o.trunk * (1 - (i + 1) * 0.18), 10));
+    // flared base and surface roots
+    const flare = new THREE.CylinderGeometry(o.trunk * 1.12, o.trunk * 2.1, 0.55, 10, 1, true); flare.translate(0, 0.27, 0); wood.push(flare);
+    for (let r = 0; r < 5; r++) { const a = r / 5 * Math.PI * 2 + rnd() * 0.5; wood.push(seg(new V(0, 0.2, 0), new V(Math.cos(a) * o.trunk * 5, -0.02, Math.sin(a) * o.trunk * 5), o.trunk * 0.45, o.trunk * 0.08, 6)); }
     const fork = pts[3], centre = new V(fork.x, o.h * o.crown, fork.z), clusters = [];
     for (let c = 0; c < o.clusters; c++) {
       const a = c / o.clusters * Math.PI * 2 + rnd() * 0.5, r = o.spread * (0.5 + rnd() * 0.45), y = centre.y + (rnd() - 0.4) * o.h * 0.2;
       const cc = new V(centre.x + Math.cos(a) * r, y, centre.z + Math.sin(a) * r);
       const mid = fork.clone().lerp(cc, 0.5).add(new V(0, o.h * 0.06, 0));
-      wood.push(seg(fork, mid, o.trunk * 0.5, o.trunk * 0.32), seg(mid, cc, o.trunk * 0.32, o.trunk * 0.1));
+      wood.push(seg(fork, mid, o.trunk * 0.5, o.trunk * 0.32, 8), seg(mid, cc, o.trunk * 0.32, o.trunk * 0.12, 7));
       clusters.push(cc);
+      // secondary branches carry their own leaf clusters
+      for (let k = 0; k < 2; k++) {
+        const sub = cc.clone().add(new V((rnd() - 0.5) * o.spread * 0.7, (rnd() - 0.2) * o.h * 0.12, (rnd() - 0.5) * o.spread * 0.7));
+        const from = mid.clone().lerp(cc, 0.4 + rnd() * 0.4);
+        wood.push(seg(from, sub, o.trunk * 0.14, o.trunk * 0.04, 5)); clusters.push(sub);
+      }
     }
     clusters.push(centre.clone().add(new V(0, o.h * 0.14, 0)));
-    for (const cc of clusters) for (let k = 0; k < o.cards; k++) {
-      const d = new V(rnd() - 0.5, (rnd() - 0.5) * 0.7, rnd() - 0.5).normalize().multiplyScalar(o.spread * 0.42 * Math.cbrt(rnd()));
-      leaves.push(card(o.card * (0.8 + rnd() * 0.4), cc.clone().add(d), centre));
+    for (const cc of clusters) for (let k = 0; k < Math.ceil(o.cards * 0.6); k++) {
+      const d = new V(rnd() - 0.5, (rnd() - 0.5) * 0.7, rnd() - 0.5).normalize().multiplyScalar(o.spread * 0.34 * Math.cbrt(rnd()));
+      leaves.push(card(o.card * (0.7 + rnd() * 0.35), cc.clone().add(d), centre));
     }
     return { wood: merge(wood), leaves: merge(leaves) };
   }
@@ -203,8 +241,8 @@ export class Flora {
   }
 
   _buildTrees() {
-    const S = this.scene, bark = barkTexture(), barkM = new THREE.MeshStandardMaterial({ map: bark, roughness: 0.95 });
-    const palmBarkM = new THREE.MeshStandardMaterial({ map: palmBarkTexture(), roughness: 0.95 });
+    const S = this.scene, bark = barkTexture(), barkM = new THREE.MeshStandardMaterial({ map: bark, normalMap: bark.normal, normalScale: new THREE.Vector2(1.2, 1.2), roughness: 0.95 });
+    const pbt = palmBarkTexture(), palmBarkM = new THREE.MeshStandardMaterial({ map: pbt, normalMap: pbt.normal, roughness: 0.95 });
     const specs = {
       neem: { type: 'broad', h: 6.5, forkAt: 0.45, crown: 0.72, spread: 3.4, clusters: 8, cards: 9, card: 2.0, trunk: 0.28, lean: 0.5 },
       bougainvillea: { type: 'broad', h: 4.6, forkAt: 0.35, crown: 0.7, spread: 2.6, clusters: 7, cards: 9, card: 1.6, trunk: 0.18, lean: 0.6 },
@@ -241,26 +279,65 @@ export class Flora {
     return merge(cards);
   }
   _flowerGeos() {
-    // marigold: ruffled pompom
-    const mg = new THREE.IcosahedronGeometry(0.075, 2), mp = mg.attributes.position, v = new V();
-    for (let i = 0; i < mp.count; i++) { v.fromBufferAttribute(mp, i); const k = 1 + Math.sin(v.x * 140) * Math.sin(v.y * 130) * Math.sin(v.z * 150) * 0.22; v.multiplyScalar(k); v.y *= 0.72; mp.setXYZ(i, v.x, v.y, v.z); }
-    mg.computeVertexNormals(); paint(mg, '#ffffff');
-    // hibiscus: five flared petals and a stamen
+    const colorize = (g, fn) => { const p = g.attributes.position, a = new Float32Array(p.count * 3), c = new THREE.Color(); for (let k = 0; k < p.count; k++) { fn(c, p.getX(k), p.getY(k), p.getZ(k)); a.set([c.r, c.g, c.b], k * 3); } g.setAttribute('color', new THREE.BufferAttribute(a, 3)); return g; };
+    // marigold: ~90 ruffled petals packed over a dome; vertex shade darkens toward the heart, hue comes from the instance
+    const mparts = [], n = 90, R0 = 0.07;
+    for (let k = 0; k < n; k++) {
+      const y = 1 - (k / (n - 1)) * 0.85, r = Math.sqrt(1 - y * y), a = k * 2.39996, dir = new V(Math.cos(a) * r, y, Math.sin(a) * r);
+      const pg = new THREE.PlaneGeometry(0.034, 0.03, 2, 1), pp = pg.attributes.position;
+      for (let q = 0; q < pp.count; q++) pp.setZ(q, Math.sin(pp.getX(q) * 180 + k) * 0.003);
+      pg.lookAt(dir); pg.translate(dir.x * R0 * 0.85, dir.y * R0 * 0.62, dir.z * R0 * 0.85);
+      mparts.push(colorize(pg, (c) => c.setScalar(0.62 + 0.38 * (1 - y) + (rnd() - 0.5) * 0.08)));
+    }
+    const calyx = new THREE.SphereGeometry(0.035, 8, 6, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2); calyx.translate(0, 0.005, 0); mparts.push(paint(calyx, '#3d6a2a'));
+    const marigold = merge(mparts);
+    // hibiscus: five broad veined petals, cupped and ruffled, with the long staminal column
     const hib = [];
-    for (let i = 0; i < 5; i++) { const p = new THREE.CircleGeometry(0.075, 10); p.scale(1, 0.85, 1); p.translate(0, 0.07, 0); p.rotateX(-1.05); p.rotateY(i / 5 * Math.PI * 2); hib.push(paint(p, '#d81f26')); }
-    const st = new THREE.CylinderGeometry(0.006, 0.006, 0.12, 4); st.translate(0, 0.06, 0); st.rotateX(-0.4); hib.push(paint(st, '#ffd23f'));
-    // jasmine: small white star
-    const js = new THREE.Shape(); for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2, r = i % 2 ? 0.018 : 0.05; i ? js.lineTo(Math.cos(a) * r, Math.sin(a) * r) : js.moveTo(Math.cos(a) * r, Math.sin(a) * r); }
-    const jg = new THREE.ShapeGeometry(js); jg.rotateX(-Math.PI / 2); paint(jg, '#ffffff');
-    return { marigold: mg, hibiscus: merge(hib), jasmine: jg };
+    for (let i = 0; i < 5; i++) {
+      const g = new THREE.PlaneGeometry(0.1, 0.12, 6, 8), p = g.attributes.position;
+      for (let k = 0; k < p.count; k++) {
+        const u = p.getX(k) / 0.1, v = p.getY(k) / 0.12 + 0.5, w = Math.pow(Math.sin(Math.PI * Math.min(1, v * 1.05)), 0.55);
+        p.setXYZ(k, u * 0.1 * w * (0.4 + v * 0.75), v * 0.12, -u * u * 0.05 + v * v * 0.03 + Math.sin(u * 22 + i) * 0.004 * v);
+      }
+      g.rotateX(-0.95); g.rotateY(i / 5 * Math.PI * 2 + 0.2);
+      colorize(g, (c, x, y, z) => { const d = Math.hypot(x, y, z) / 0.12; c.set(d < 0.22 ? '#5a0610' : d < 0.3 ? '#9a0d18' : '#d8141f').lerp(new THREE.Color('#ff5a4f'), Math.max(0, d - 0.75) * 1.2); });
+      hib.push(g);
+    }
+    const col = new THREE.CylinderGeometry(0.004, 0.005, 0.13, 5); col.translate(0, 0.065, 0); col.rotateX(-0.35); hib.push(paint(col, '#f4d2c4'));
+    for (let i = 0; i < 7; i++) { const s = new THREE.SphereGeometry(0.0065, 5, 4); s.translate(Math.cos(i) * 0.008, 0.095 + i * 0.004, Math.sin(i) * 0.008 + 0.03); s.rotateX(-0.35); hib.push(paint(s, '#ffd23f')); }
+    for (let i = 0; i < 5; i++) { const s = new THREE.SphereGeometry(0.006, 5, 4); s.translate(Math.cos(i * 1.26) * 0.01, 0.132, Math.sin(i * 1.26) * 0.01 + 0.045); s.rotateX(-0.35); hib.push(paint(s, '#b3121b')); }
+    for (const a of [0.7, 3.6]) { const l = new THREE.CircleGeometry(0.06, 10); l.scale(0.6, 1.2, 1); l.translate(0, 0.05, 0); l.rotateX(-1.3); l.rotateY(a); l.translate(0, -0.02, 0); hib.push(paint(l, '#2f5a22')); }
+    const hibiscus = merge(hib);
+    // jasmine: a six-petal pinwheel with buds and a pair of leaves
+    const js = [];
+    for (let i = 0; i < 6; i++) { const g = new THREE.CircleGeometry(0.022, 8); g.scale(0.55, 1, 1); g.translate(0, 0.022, 0); g.rotateZ(0.25); g.rotateX(-1.35); g.rotateY(i / 6 * Math.PI * 2); js.push(paint(g, '#fffdf4')); }
+    const tube = new THREE.CylinderGeometry(0.003, 0.004, 0.03, 4); tube.translate(0, -0.012, 0); js.push(paint(tube, '#e9efe0'));
+    for (const [bx, bz] of [[0.035, 0.01], [-0.02, 0.03]]) { const b = new THREE.SphereGeometry(0.008, 6, 5); b.scale(1, 2.2, 1); b.translate(bx, 0.01, bz); js.push(paint(b, '#f6f2ea')); }
+    for (const a of [1.2, 4.2]) { const l = new THREE.CircleGeometry(0.03, 8); l.scale(0.5, 1, 1); l.translate(0, 0.03, 0); l.rotateX(-1.2); l.rotateY(a); l.translate(0, -0.015, 0); js.push(paint(l, '#3c6a2c')); }
+    return { marigold, hibiscus: hibiscus, jasmine: merge(js) };
+  }
+  _bedTextures() {
+    // carved curb: lotus-petal relief between mouldings; soil: mulch with fallen petals
+    const c = cv(512, 64), x = c.getContext('2d'); x.fillStyle = '#e9dcc4'; x.fillRect(0, 0, 512, 64);
+    x.fillStyle = '#cdbb9c'; x.fillRect(0, 0, 512, 8); x.fillRect(0, 56, 512, 8);
+    for (let i = 0; i < 16; i++) { const cx = i * 32 + 16; x.fillStyle = '#b9a685'; x.beginPath(); x.moveTo(cx, 50); x.quadraticCurveTo(cx + 14, 30, cx, 12); x.quadraticCurveTo(cx - 14, 30, cx, 50); x.fill(); x.fillStyle = '#f2e7d2'; x.beginPath(); x.moveTo(cx, 46); x.quadraticCurveTo(cx + 8, 30, cx, 18); x.quadraticCurveTo(cx - 8, 30, cx, 46); x.fill(); }
+    const curb = tex(c); curb.wrapS = THREE.RepeatWrapping; curb.normal = normalFromCanvas(c, 3);
+    const m = cv(256), y = m.getContext('2d'); y.fillStyle = '#3f2c1d'; y.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 1600; i++) { y.fillStyle = pick(['#2a1c12', '#5a4230', '#4a3424', '#6b5038']); y.fillRect(rnd() * 256, rnd() * 256, 1 + rnd() * 4, 1 + rnd() * 2); }
+    for (let i = 0; i < 70; i++) { y.fillStyle = pick(['#f29a17', '#e8442e', '#ffd23f', '#ffffff']); y.beginPath(); y.ellipse(rnd() * 256, rnd() * 256, 2 + rnd() * 2, 1 + rnd(), rnd() * 3, 0, Math.PI * 2); y.fill(); }
+    const soil = tex(m); soil.wrapS = soil.wrapT = THREE.RepeatWrapping;
+    return { curb, soil };
   }
   _buildBeds() {
     if (!this.beds.length && !this.hedges.length) return;
     const S = this.scene, m = new THREE.Matrix4(), q = new THREE.Quaternion(), c = new THREE.Color();
     // curbs and soil
-    const curbGeo = merge([new THREE.CylinderGeometry(1, 1.04, 0.3, 28, 1, true).translate(0, 0.15, 0), new THREE.RingGeometry(0.93, 1.07, 28).rotateX(-Math.PI / 2).translate(0, 0.3, 0)]);
-    const curbs = new THREE.InstancedMesh(curbGeo, new THREE.MeshStandardMaterial({ color: '#e8dcc6', roughness: 0.7 }), this.beds.length);
-    const soil = new THREE.InstancedMesh(new THREE.CircleGeometry(0.95, 24).rotateX(-Math.PI / 2).translate(0, 0.24, 0), new THREE.MeshStandardMaterial({ color: '#4a3524', roughness: 1 }), this.beds.length);
+    const BT = this._bedTextures(); BT.curb.repeat.set(3, 1);
+    const wall = new THREE.CylinderGeometry(1, 1.04, 0.3, 40, 1, true).translate(0, 0.15, 0);
+    const coping = new THREE.TorusGeometry(1.0, 0.05, 6, 40).rotateX(Math.PI / 2).translate(0, 0.3, 0);
+    const curbGeo = merge([wall, coping, new THREE.RingGeometry(0.93, 1.0, 40).rotateX(-Math.PI / 2).translate(0, 0.3, 0)]);
+    const curbs = new THREE.InstancedMesh(curbGeo, new THREE.MeshStandardMaterial({ map: BT.curb, normalMap: BT.curb.normal, roughness: 0.7 }), this.beds.length);
+    const soil = new THREE.InstancedMesh(new THREE.CircleGeometry(0.95, 24).rotateX(-Math.PI / 2).translate(0, 0.24, 0), new THREE.MeshStandardMaterial({ map: BT.soil, roughness: 1 }), this.beds.length);
     this.beds.forEach((b, i) => { m.compose(new V(b.x, 0, b.z), q.identity(), new V(b.r, 1, b.r)); curbs.setMatrixAt(i, m); soil.setMatrixAt(i, m); });
     curbs.receiveShadow = soil.receiveShadow = true; curbs.castShadow = true; S.add(curbs, soil);
     // shrubs
@@ -275,11 +352,11 @@ export class Flora {
     const G = this._flowerGeos(), fm = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, side: THREE.DoubleSide });
     const lists = { marigold: [], hibiscus: [], jasmine: [] }, cols = { marigold: [] };
     for (const b of this.beds) {
-      const n = Math.round(26 * b.r * b.r + 8);
+      const n = Math.round(40 * b.r * b.r + 10);
       for (let k = 0; k < n; k++) {
         const kind = pick(b.palette), a = rnd() * Math.PI * 2, r = Math.sqrt(rnd()) * b.r * 0.78, y = 0.22 + (0.18 + 0.5 * (1 - (r / b.r) * 0.6)) * b.r * 0.9 + 0.04;
         lists[kind].push({ p: new V(b.x + Math.cos(a) * r, y, b.z + Math.sin(a) * r), tilt: (r / b.r) * 0.8, a, s: 0.85 + rnd() * 0.4 });
-        if (kind === 'marigold') cols.marigold.push(pick(['#f29a17', '#f6b21c', '#ffcc33', '#ea7a12']));
+        if (kind === 'marigold') cols.marigold.push(pick(['#f2900f', '#f6ad1a', '#ffc21f', '#e8720c', '#ffb000']));
       }
     }
     const e = new THREE.Euler();
@@ -345,19 +422,29 @@ export class Flora {
     const water = new THREE.MeshStandardMaterial({ color: '#2f6f72', roughness: 0.1, metalness: 0.3 });
     const petalGeo = new THREE.CircleGeometry(0.035, 6); petalGeo.rotateX(-Math.PI / 2);
     const petals = new THREE.InstancedMesh(petalGeo, new THREE.MeshStandardMaterial({ roughness: 0.6 }), this.urlis.length * 60);
+    // engraved band of lotus and vine on the brass
+    const ec = cv(512, 64), ex = ec.getContext('2d'); ex.fillStyle = '#d4a14a'; ex.fillRect(0, 0, 512, 64);
+    ex.strokeStyle = '#7a5418'; ex.lineWidth = 2; ex.strokeRect(-2, 6, 516, 52); ex.strokeRect(-2, 12, 516, 40);
+    for (let i = 0; i < 12; i++) { const cx = i * 42.6 + 21; ex.beginPath(); for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; ex.moveTo(cx, 32); ex.quadraticCurveTo(cx + Math.cos(a + 0.4) * 12, 32 + Math.sin(a + 0.4) * 12, cx + Math.cos(a) * 15, 32 + Math.sin(a) * 15); } ex.stroke(); ex.beginPath(); ex.moveTo(cx + 15, 32); ex.bezierCurveTo(cx + 22, 18, cx + 28, 46, cx + 36, 32); ex.stroke(); }
+    const et = tex(ec); et.wrapS = THREE.RepeatWrapping; et.repeat.set(3, 1);
+    const engraved = new THREE.MeshStandardMaterial({ map: et, normalMap: normalFromCanvas(ec, 3), metalness: 0.9, roughness: 0.3, color: '#ffffff' });
+    const marigoldGeo = this._flowerGeos().marigold, heads = new THREE.InstancedMesh(marigoldGeo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, side: THREE.DoubleSide }), this.urlis.length * 22);
+    const lotus = new THREE.InstancedMesh(this._lotusGeo(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5, side: THREE.DoubleSide }), this.urlis.length); let h = 0;
     const m = new THREE.Matrix4(), c = new THREE.Color(); let k = 0;
     for (const u of this.urlis) {
       const p = new THREE.Mesh(ped, stone); p.position.set(u.x, 0, u.z); p.castShadow = true; S.add(p);
-      const b = new THREE.Mesh(bowl, brass); b.position.set(u.x, 0.5, u.z); b.castShadow = true; S.add(b);
+      const b = new THREE.Mesh(bowl, engraved); b.position.set(u.x, 0.5, u.z); b.castShadow = true; S.add(b);
+      for (let i = 0; i < 22; i++) { const a = i / 22 * Math.PI * 2; m.compose(new V(u.x + Math.cos(a) * 0.62, 0.73, u.z + Math.sin(a) * 0.62), new THREE.Quaternion(), new V(1.3, 1.3, 1.3)); heads.setMatrixAt(h, m); heads.setColorAt(h++, c.set(i % 2 ? '#f2900f' : '#ffc21f')); }
+      m.compose(new V(u.x, 0.72, u.z), new THREE.Quaternion(), new V(1.6, 1.6, 1.6)); lotus.setMatrixAt(this.urlis.indexOf(u), m);
       const w = new THREE.Mesh(new THREE.CircleGeometry(0.8, 28), water); w.rotation.x = -Math.PI / 2; w.position.set(u.x, 0.73, u.z); S.add(w);
       for (let i = 0; i < 60; i++) {
-        const ring = i < 36, a = ring ? i / 36 * Math.PI * 2 : rnd() * Math.PI * 2, r = ring ? 0.66 : Math.sqrt(rnd()) * 0.45;
+        const ring = i < 36, a = ring ? i / 36 * Math.PI * 2 : rnd() * Math.PI * 2, r = ring ? 0.45 + rnd() * 0.08 : 0.15 + Math.sqrt(rnd()) * 0.3;
         m.makeTranslation(u.x + Math.cos(a) * r, 0.735 + rnd() * 0.004, u.z + Math.sin(a) * r); petals.setMatrixAt(k, m);
         petals.setColorAt(k++, c.set(ring ? (i % 2 ? '#f29a17' : '#ffd23f') : pick(['#e8442e', '#f06a8c', '#ffffff', '#d21f7a'])));
       }
       for (let i = 0; i < 3; i++) { const a = i / 3 * Math.PI * 2 + 0.4; addFlame(new V(u.x + Math.cos(a) * 0.32, 0.74, u.z + Math.sin(a) * 0.32)); }
     }
-    S.add(petals);
+    S.add(petals, heads, lotus);
   }
 
   // -------- grass tufts across the lawns
@@ -370,5 +457,84 @@ export class Flora {
     im.receiveShadow = true; this.scene.add(im);
   }
 
-  build(addFlame) { this._buildTrees(); this._buildBeds(); this._buildPonds(); this._buildUrlis(addFlame); this._buildGrass(); }
+  // -------- the raised stone platform (chabutra) around a sacred neem, with threads and offerings
+  _buildChabutras(addFlame) {
+    if (!this.chabutras) return;
+    const S = this.scene, BT = this._bedTextures(); BT.curb.repeat.set(6, 1);
+    const side = new THREE.MeshStandardMaterial({ map: BT.curb, normalMap: BT.curb.normal, roughness: 0.7 });
+    const top = new THREE.MeshStandardMaterial({ color: '#efe5d2', roughness: 0.55 });
+    const ochre = new THREE.MeshStandardMaterial({ color: '#c0461f', roughness: 0.8 });
+    const threadM = ['#c4161c', '#f2b318', '#f6f0e4'].map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.9 }));
+    for (const ch of this.chabutras) {
+      const g = new THREE.Group(); g.position.set(ch.x, 0, ch.z); S.add(g);
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(2.25, 2.35, 0.32, 8, 1, true), side); base.position.y = 0.16; g.add(base);
+      const tier = new THREE.Mesh(new THREE.CylinderGeometry(1.9, 1.95, 0.28, 8, 1, true), side); tier.position.y = 0.46; g.add(tier);
+      for (const [r, y] of [[2.28, 0.32], [1.93, 0.6]]) { const t = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.04, 8), top); t.position.y = y; t.receiveShadow = true; g.add(t); }
+      const band = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.16, 16, 1, true), ochre); band.position.y = 0.7; g.add(band);
+      for (let i = 0; i < 9; i++) { const t = new THREE.Mesh(new THREE.TorusGeometry(0.36 + (i % 3) * 0.005, 0.012, 5, 24), threadM[i % 3]); t.position.y = 1.0 + i * 0.035; t.rotation.set(Math.PI / 2 + (rnd() - 0.5) * 0.12, 0, (rnd() - 0.5) * 0.12); g.add(t); }
+      // offerings: a diya, a brass lota and a few marigolds
+      addFlame(new V(ch.x + 1.2, 0.62, ch.z + 0.9)); addFlame(new V(ch.x - 1.25, 0.62, ch.z + 0.8));
+      const lota = new THREE.Mesh(new THREE.LatheGeometry([[0, 0], [0.08, 0], [0.11, 0.06], [0.1, 0.12], [0.05, 0.16], [0.07, 0.19], [0, 0.19]].map(([a, b]) => new THREE.Vector2(a, b)), 16), brass); lota.position.set(ch.x + 0.9, 0.62, ch.z - 1.1); S.add(lota);
+      base.castShadow = tier.castShadow = true;
+    }
+  }
+  _buildFallen() {
+    if (!this.fallen) return;
+    const total = this.fallen.reduce((s, f) => s + f.n, 0), g = new THREE.CircleGeometry(0.05, 6); g.scale(1, 0.6, 1); g.rotateX(-Math.PI / 2);
+    const im = new THREE.InstancedMesh(g, new THREE.MeshStandardMaterial({ roughness: 0.8, side: THREE.DoubleSide }), total);
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), c = new THREE.Color(); let k = 0;
+    for (const f of this.fallen) for (let i = 0; i < f.n; i++) { const a = rnd() * Math.PI * 2, r = Math.sqrt(rnd()) * f.r, s = 0.7 + rnd() * 0.8; m.compose(new V(f.x + Math.cos(a) * r, 0.015 + rnd() * 0.01, f.z + Math.sin(a) * r), q.setFromAxisAngle(new V(0, 1, 0), rnd() * 6), new V(s, 1, s)); im.setMatrixAt(k, m); im.setColorAt(k++, c.set(pick(f.colors))); }
+    im.receiveShadow = true; this.scene.add(im);
+  }
+  // -------- koi under the lotus pads, and dragonflies over the water
+  _buildKoi() {
+    if (!this.koiPonds) return;
+    const body = new THREE.SphereGeometry(0.05, 12, 8); body.scale(0.75, 0.55, 2.6);
+    const bp = body.attributes.position, colors = new Float32Array(bp.count * 3), c = new THREE.Color();
+    for (let k = 0; k < bp.count; k++) { const x = bp.getX(k), y = bp.getY(k), z = bp.getZ(k); const patch = Math.sin(z * 60 + x * 20) + Math.sin(z * 31 - 1.3) > 0.4; c.set(y < -0.01 ? '#f4efe6' : patch ? '#ffffff' : '#e8541c'); if (Math.sin(z * 90 + x * 140) > 0.93 && y > 0) c.set('#151515'); colors.set([c.r, c.g, c.b], k * 3); }
+    body.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    const tail = new THREE.BufferGeometry(); tail.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, -0.12, 0.05, 0.01, -0.21, -0.05, 0.01, -0.21], 3)); tail.computeVertexNormals(); paint(tail, '#ff8a4c');
+    const fins = []; for (const s of [-1, 1]) { const f = new THREE.BufferGeometry(); f.setAttribute('position', new THREE.Float32BufferAttribute([s * 0.03, -0.01, 0.05, s * 0.07, -0.02, 0.0, s * 0.03, -0.01, 0.0], 3)); f.computeVertexNormals(); fins.push(paint(f, '#ffd8c0')); }
+    const geo = merge([body, tail, ...fins]);
+    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.35, side: THREE.DoubleSide });
+    this.uTime = this.uTime || { value: 0 };
+    mat.onBeforeCompile = (sh) => { sh.uniforms.uTime = this.uTime; sh.vertexShader = 'uniform float uTime;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+      float ph = instanceMatrix[3].x * 7.0 + instanceMatrix[3].z * 3.0; float tw = smoothstep(0.02, -0.2, position.z);
+      transformed.x += sin(uTime * 7.0 + ph + position.z * 18.0) * 0.03 * tw;`); };
+    const fish = []; for (const P of this.koiPonds) for (let i = 0; i < P.n; i++) fish.push({ P, ph: rnd() * 6.28, sp: (0.12 + rnd() * 0.12) * (rnd() < 0.5 ? 1 : -1), rr: 0.4 + rnd() * 0.5, wob: rnd() * 6, s: 0.8 + rnd() * 0.6 });
+    this.koi = new THREE.InstancedMesh(geo, mat, fish.length); this.koi.frustumCulled = false; this.fish = fish;
+    const tint = ['#ffffff', '#ffe0b0', '#fff2e8', '#ffd060']; fish.forEach((f, i) => this.koi.setColorAt(i, c.set(pick(tint))));
+    this.scene.add(this.koi);
+    // dragonflies
+    const dbody = new THREE.CylinderGeometry(0.006, 0.004, 0.09, 5); dbody.rotateX(Math.PI / 2); paint(dbody, '#1f6fd0');
+    const wings = []; for (const s of [-1, 1]) for (const z of [0.012, -0.008]) { const w = new THREE.PlaneGeometry(0.075, 0.016); w.rotateX(-Math.PI / 2); w.translate(s * 0.042, 0.004, z); wings.push(paint(w, '#dff0ff')); }
+    const dm = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.3, metalness: 0.3, transparent: true, opacity: 0.85, side: THREE.DoubleSide });
+    this.dflies = []; for (const P of this.koiPonds) for (let i = 0; i < 2; i++) this.dflies.push({ P, pos: new V(P.x, P.y + 0.6, P.z), tgt: new V(P.x, P.y + 0.6, P.z), next: 0 });
+    this.dragon = new THREE.InstancedMesh(merge([dbody, ...wings]), dm, this.dflies.length); this.dragon.frustumCulled = false; this.scene.add(this.dragon);
+  }
+  update(dt, t, daylight = 1) {
+    if (this.uTime) this.uTime.value = t;
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), p = new V(), sc = new V();
+    if (this.koi) {
+      this.fish.forEach((f, i) => {
+        const P = f.P, a = f.ph + t * f.sp, w = Math.sin(t * 0.5 + f.wob) * 0.15;
+        if (P.rect) p.set(P.x + Math.cos(a) * P.rect[0] * 0.38 * f.rr, P.y - 0.1, P.z + Math.sin(a * 0.7) * P.rect[1] * 0.4 * f.rr);
+        else p.set(P.x + Math.cos(a) * P.r * f.rr * (1 + w), P.y - 0.07, P.z + Math.sin(a) * P.r * f.rr * (1 + w));
+        const dx = P.rect ? -Math.sin(a) * P.rect[0] * 0.38 * f.sp : -Math.sin(a) * f.sp, dz = P.rect ? Math.cos(a * 0.7) * 0.7 * P.rect[1] * 0.4 * f.sp : Math.cos(a) * f.sp;
+        e.set(0, Math.atan2(dx, dz), 0); q.setFromEuler(e); sc.setScalar(f.s); m.compose(p, q, sc); this.koi.setMatrixAt(i, m);
+      });
+      this.koi.instanceMatrix.needsUpdate = true;
+    }
+    if (this.dragon) {
+      this.dragon.visible = daylight > 0.3;
+      this.dflies.forEach((d, i) => {
+        if (t > d.next) { const P = d.P, a = rnd() * 6.28, r = (P.rect ? Math.min(P.rect[0], P.rect[1]) * 0.5 : P.r) * rnd(); d.tgt.set(P.x + Math.cos(a) * r, P.y + 0.25 + rnd() * 0.9, P.z + Math.sin(a) * r); d.next = t + 0.6 + rnd() * 2.2; }
+        const prev = d.pos.clone(); d.pos.lerp(d.tgt, 1 - Math.exp(-dt * 4)); const v = d.pos.clone().sub(prev);
+        e.set(0, Math.atan2(v.x, v.z), 0); q.setFromEuler(e); p.copy(d.pos); p.y += Math.sin(t * 30 + i) * 0.004; m.compose(p, q, sc.setScalar(1.4)); this.dragon.setMatrixAt(i, m);
+      });
+      this.dragon.instanceMatrix.needsUpdate = true;
+    }
+  }
+
+  build(addFlame) { this._buildTrees(); this._buildBeds(); this._buildPonds(); this._buildUrlis(addFlame); this._buildGrass(); this._buildChabutras(addFlame); this._buildFallen(); this._buildKoi(); }
 }

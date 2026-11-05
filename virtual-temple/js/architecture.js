@@ -171,6 +171,14 @@ export function chhatri(s = 1, stone = ivory, trim = paleGold) {
   }
   const petal = new THREE.SphereGeometry(0.16 * s, 10, 6); petal.scale(0.6, 1, 0.3); petal.translate(0, 0.12 * s, 0);
   for (let i = 0; i < 18; i++) { const a = i / 18 * Math.PI * 2, pm = new THREE.Mesh(petal, stone); pm.position.set(Math.cos(a) * 1.03 * s, 3.0 * s, Math.sin(a) * 1.03 * s); pm.rotation.y = -a + Math.PI / 2; pm.rotateX(0.35); g.add(pm); }
+  // carved brackets under the eave, a small brass bell and entry steps
+  for (let i = 0; i < 4; i++) for (const o of [-1, 1]) {
+    const ang = i * Math.PI / 2, base = new THREE.Vector3(o * 1.12 * s, 2.2 * s, 1.12 * s), tip = new THREE.Vector3(o * 1.12 * s, 2.62 * s, 1.55 * s), ctrl = new THREE.Vector3(o * 1.12 * s, 2.55 * s, 1.15 * s);
+    const br = new THREE.Mesh(new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(base, ctrl, tip), 8, 0.04 * s, 5), stone); br.rotation.y = ang; br.position.set(0, 0, 0); g.add(br);
+  }
+  const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.008 * s, 0.008 * s, 0.6 * s, 4), trim); chain.position.y = 2.1 * s; g.add(chain);
+  const bell = new THREE.Mesh(bellGeometry(0.75 * s), brass); bell.position.y = 1.8 * s; g.add(bell);
+  for (let k = 0; k < 2; k++) add(new THREE.BoxGeometry(1.2 * s, 0.12 * s, 0.3 * s), stone, 0, (0.06 + k * 0.12) * s, (1.65 - k * 0.12) * s);
   const crown = new THREE.LatheGeometry([[0.05, 0], [0.32, 0.05], [0.36, 0.1], [0.2, 0.16], [0.08, 0.2]].map(([r, y]) => new THREE.Vector2(r * s, y * s)), 16);
   add(crown, trim, 0, 4.3 * s, 0);
   const k = kalasha(0.55 * s); k.position.y = 4.48 * s; g.add(k);

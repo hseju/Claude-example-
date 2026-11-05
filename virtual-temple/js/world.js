@@ -4,7 +4,7 @@ import { brass, gold, clay, darkStone, pillarGeometry, HangingBell, diyaGeometry
 import { FlameField, fountainJets, windify } from './fx.js';
 import { Avatar, randomConfig } from './avatar.js';
 import { Scenery } from './scenery.js';
-import { Flora } from './flora.js';
+import { Flora, normalFromCanvas } from './flora.js';
 
 export const TEMPLES = {
   ganesha: { id: 'ganesha', name: 'Ganesha Temple', short: 'Ganesha', pos: new THREE.Vector3(-31, 0, 0), rot: Math.PI / 2, entrance: new THREE.Vector3(-19.5, 0, 0), stone: '#f1e4cf', accent: '#b8442a', icon: 'modak', flag: '#e8731c', blurb: 'Remover of obstacles. Flower offerings and aarti.' },
@@ -193,9 +193,17 @@ export class World {
     const m4 = new THREE.Matrix4(); for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; m4.makeRotationX(-Math.PI / 2); m4.setPosition(Math.cos(a) * 3.6, 0.045, Math.sin(a) * 3.6); petals.setMatrixAt(i, m4); } S.add(petals);
     // fountain
     const stone = stoneMat('#e3cfae', [3, 0.4], { blocks: false });
-    const basin = new THREE.Mesh(new THREE.CylinderGeometry(2.7, 2.85, 0.6, 32, 1, true), stone); basin.position.y = 0.3; basin.castShadow = basin.receiveShadow = true; S.add(basin);
+    const pc = document.createElement('canvas'); pc.width = 512; pc.height = 64; const px = pc.getContext('2d');
+    px.fillStyle = '#e6d4b3'; px.fillRect(0, 0, 512, 64); px.fillStyle = '#c9b48f'; px.fillRect(0, 0, 512, 6); px.fillRect(0, 58, 512, 6);
+    for (let i = 0; i < 8; i++) { const x0 = i * 64; px.strokeStyle = '#a8916c'; px.lineWidth = 3; px.strokeRect(x0 + 5, 10, 54, 44);
+      px.fillStyle = '#b8a37f'; for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; px.beginPath(); px.ellipse(x0 + 32 + Math.cos(a) * 9, 32 + Math.sin(a) * 9, 7, 3.5, a, 0, Math.PI * 2); px.fill(); }
+      px.fillStyle = '#f3e8d4'; px.beginPath(); px.arc(x0 + 32, 32, 5, 0, Math.PI * 2); px.fill(); }
+    const panel = new THREE.CanvasTexture(pc); panel.colorSpace = THREE.SRGBColorSpace; panel.wrapS = THREE.RepeatWrapping; panel.repeat.set(3, 1);
+    const carved = new THREE.MeshStandardMaterial({ map: panel, normalMap: normalFromCanvas(pc, 3), roughness: 0.75 });
+    const basin = new THREE.Mesh(new THREE.CylinderGeometry(2.7, 2.85, 0.6, 48, 1, true), carved); basin.position.y = 0.3; basin.castShadow = basin.receiveShadow = true; S.add(basin);
     const lip = new THREE.Mesh(new THREE.TorusGeometry(2.75, 0.14, 8, 40), stone); lip.rotation.x = Math.PI / 2; lip.position.y = 0.6; S.add(lip);
     this.water = new THREE.MeshStandardMaterial({ color: '#3d7d7a', roughness: 0.22, metalness: 0.2, normalMap: TX.waterNormal(), normalScale: new THREE.Vector2(0.35, 0.35), transparent: true, opacity: 0.92 });
+    this.pondWater = this.water.clone(); this.pondWater.opacity = 0.66; this.pondWater.roughness = 0.38; this.pondWater.color.set('#2c6a62');
     const w = new THREE.Mesh(new THREE.CircleGeometry(2.7, 40), this.water); w.rotation.x = -Math.PI / 2; w.position.y = 0.5; S.add(w);
     const ped = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.6, 1.3, 16), stone); ped.position.y = 0.95; S.add(ped);
     const bowl = new THREE.Mesh(new THREE.SphereGeometry(1.0, 24, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), stone); bowl.position.y = 1.75; bowl.scale.y = 0.45; S.add(bowl);
@@ -215,6 +223,7 @@ export class World {
         const curve = new THREE.QuadraticBezierCurve3(c0, new THREE.Vector3(Math.cos(a) * 1.7, 2.05, Math.sin(a) * 1.7), c2);
         S.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 16, 0.03, 6), sm));
         for (let k = 0; k < 2; k++) { const r = new THREE.Mesh(new THREE.RingGeometry(0.06, 0.1, 24), rm.clone()); r.rotation.x = -Math.PI / 2; r.position.set(c2.x, 0.51, c2.z); S.add(r); ripples.push({ r, ph: k * 0.6 + i * 0.13 }); }
+        if (this.quality.level !== 'low') { const sp = fountainJets(40, new THREE.Vector3(c2.x, 0.5, c2.z), { height: 0.16, radius: 0.28 }); S.add(sp); this.updaters.push((dt, t) => { sp.material.uniforms.uTime.value = t * 1.6; }); }
       }
       const jet = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.05, 0.75, 8, 1, true), sm); jet.position.y = 2.6; S.add(jet);
       // stone lotus petals crowning the upper bowl
@@ -227,7 +236,8 @@ export class World {
     for (const [sx, sz] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) {
       const x = sx * 4.6, z = sz * 4.6;
       const rim = new THREE.Mesh(new THREE.TorusGeometry(1.6, 0.16, 8, 32), stone); rim.rotation.x = Math.PI / 2; rim.position.set(x, 0.2, z); rim.castShadow = true; S.add(rim);
-      const wtr = new THREE.Mesh(new THREE.CircleGeometry(1.6, 28), this.water); wtr.rotation.x = -Math.PI / 2; wtr.position.set(x, 0.14, z); S.add(wtr);
+      const wtr = new THREE.Mesh(new THREE.CircleGeometry(1.6, 28), this.pondWater); wtr.rotation.x = -Math.PI / 2; wtr.position.set(x, 0.14, z); S.add(wtr);
+      const bed = new THREE.Mesh(new THREE.CircleGeometry(1.6, 28), new THREE.MeshStandardMaterial({ color: '#2a3226', roughness: 1 })); bed.rotation.x = -Math.PI / 2; bed.position.set(x, 0.035, z); S.add(bed);
       this._lotuses(x, z, 1.25, 4, 0.14);
       this.colliders.circles.push({ x, z, r: 1.85 });
     }
@@ -236,7 +246,7 @@ export class World {
   }
   _nearAxis(a) { const d = (x) => Math.abs(Math.atan2(Math.sin(a - x), Math.cos(a - x))); return [0, Math.PI / 2, Math.PI, -Math.PI / 2].some(x => d(x) < 0.2); }
 
-  _lotuses(cx, cz, r, n, y, rect) { this.flora.addLotusPond(cx, cz, r, y, n, rect); }
+  _lotuses(cx, cz, r, n, y, rect) { this.flora.addLotusPond(cx, cz, r, y, n, rect); this.flora.addKoi(cx, cz, r * 0.85, y, rect ? 7 : 3, rect); }
 
   _urlis() {
     // brass urli bowls of water with floating flowers and diyas, set around the fountain
@@ -266,8 +276,8 @@ export class World {
       for (const [px, pz, bw, bd] of [[x, z - d / 2, w + 0.6, 0.5], [x, z + d / 2, w + 0.6, 0.5], [x - w / 2, z, 0.5, d], [x + w / 2, z, 0.5, d]]) {
         const b = new THREE.Mesh(new THREE.BoxGeometry(bw, 0.45, bd), stone); b.position.set(px, 0.22, pz); b.castShadow = b.receiveShadow = true; this.scene.add(b);
       }
-      const step = new THREE.Mesh(new THREE.BoxGeometry(w - 0.4, 0.1, d - 0.4), new THREE.MeshStandardMaterial({ color: '#7c6a4f', roughness: 0.9 })); step.position.set(x, 0.05, z); this.scene.add(step);
-      const wtr = new THREE.Mesh(new THREE.PlaneGeometry(w - 0.5, d - 0.5), this.water); wtr.rotation.x = -Math.PI / 2; wtr.position.set(x, 0.3, z); this.scene.add(wtr);
+      const step = new THREE.Mesh(new THREE.BoxGeometry(w - 0.4, 0.1, d - 0.4), new THREE.MeshStandardMaterial({ color: '#3c4232', roughness: 0.9 })); step.position.set(x, 0.05, z); this.scene.add(step);
+      const wtr = new THREE.Mesh(new THREE.PlaneGeometry(w - 0.5, d - 0.5), this.pondWater); wtr.rotation.x = -Math.PI / 2; wtr.position.set(x, 0.3, z); this.scene.add(wtr);
       this._lotuses(x, z, 2.4, 10, 0.3, [w - 1.2, d - 1.2]);
       this.colliders.boxes.push({ minX: x - w / 2 - 0.3, maxX: x + w / 2 + 0.3, minZ: z - d / 2 - 0.3, maxZ: z + d / 2 + 0.3 });
       for (let k = 0; k < 5; k++) this._diya(new THREE.Vector3(x - sx * (w / 2 + 0.05), 0.46, z - d / 2 + 1 + k * 2.2));
@@ -495,7 +505,16 @@ export class World {
         : (r < 0.38 ? 'neem' : r < 0.55 ? 'ashoka' : r < 0.7 ? 'gulmohar' : r < 0.85 ? 'bougainvillea' : r < 0.93 ? 'jacaranda' : 'palm');
       spots.push([x, z, kind]);
     }
-    for (const [x, z, kind] of spots) { const s = 0.85 + Math.random() * 0.35; this.flora.addTree(kind, x, z, s); this.colliders.circles.push({ x, z, r: kind === 'palm' ? 0.4 : 0.45 * s + 0.15 }); }
+    const FALL = { bougainvillea: [['#d21f7a', '#e0438f', '#b8186a'], 70], gulmohar: [['#e2391c', '#f2541f', '#ff7a2e', '#c92a14'], 80], jacaranda: [['#8f6ad6', '#a07fe0', '#b394ec'], 70], neem: [['#c9b45a', '#a89a48', '#8a7a38'], 18] };
+    let platforms = 0;
+    for (const [x, z, kind] of spots) {
+      const s = 0.85 + Math.random() * 0.35;
+      // a few old neem trees stand on a raised stone platform, tied with sacred threads
+      const platform = kind === 'neem' && platforms < 3 && keepClear(x, z, 2.4);
+      this.flora.addTree(kind, x, z, s); this.colliders.circles.push({ x, z, r: platform ? 2.45 : kind === 'palm' ? 0.4 : 0.45 * s + 0.15 });
+      if (platform) { platforms++; this.flora.addChabutra(x, z); }
+      if (FALL[kind]) this.flora.addFallen(x, z, 3.2 * s, FALL[kind][0], FALL[kind][1]);
+    }
     // outside the walls: palms and shade trees for depth
     for (let i = 0; i < 70; i++) { const a = Math.random() * Math.PI * 2, r = 54 + Math.random() * 36; const x = Math.cos(a) * r, z = Math.sin(a) * r; if (Math.abs(x) < 8 && z > 40) continue; this.flora.addTree(Math.random() < 0.4 ? 'palm' : Math.random() < 0.7 ? 'neem' : 'ashoka', x, z, 0.9 + Math.random() * 0.4); }
     // raised flower beds (marigold, hibiscus, jasmine); bougainvillea hedges line the approach
@@ -527,6 +546,17 @@ export class World {
     list.forEach((p, i) => { m.compose(p, q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.random() * 6), new THREE.Vector3(1.4, 1.4, 1.4)); im.setMatrixAt(i, m); });
     this.scene.add(im);
     this.diyaPositions = list.map(p => p.clone().add(new THREE.Vector3(0, 0.15, 0)));
+    // every lamp keeps a warm pool of light on the ground around it, all the time
+    const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d');
+    const g = x.createRadialGradient(64, 64, 0, 64, 64, 64); g.addColorStop(0, 'rgba(255,190,110,0.8)'); g.addColorStop(0.2, 'rgba(255,160,80,0.38)'); g.addColorStop(0.55, 'rgba(255,130,50,0.1)'); g.addColorStop(1, 'rgba(255,120,40,0)');
+    x.fillStyle = g; x.fillRect(0, 0, 128, 128);
+    const gt = new THREE.CanvasTexture(c); gt.colorSpace = THREE.SRGBColorSpace;
+    this.glowMat = new THREE.MeshBasicMaterial({ map: gt, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -4 });
+    const plane = new THREE.PlaneGeometry(1, 1); plane.rotateX(-Math.PI / 2);
+    const pools = new THREE.InstancedMesh(plane, this.glowMat, list.length);
+    const pm = new THREE.Matrix4();
+    list.forEach((p, i) => { const high = p.y > 0.6, floor = high ? 0.06 : p.y + 0.01, s = high ? 2.8 : 1.7; pm.compose(new THREE.Vector3(p.x, floor, p.z), new THREE.Quaternion(), new THREE.Vector3(s, 1, s)); pools.setMatrixAt(i, pm); });
+    pools.renderOrder = 1; this.scene.add(pools);
   }
 
   _bunting() {
@@ -601,6 +631,7 @@ export class World {
   update(dt, t, focus, ctx) {
     if (this.todTarget && this.tod) this._blendTOD(ctx.reducedMotion ? 1 : 1 - Math.exp(-dt * 0.9));
     this.scenery.update(dt, t, focus, this.tod, ctx.reducedMotion ? 0.35 : 1);
+    this.flora.update(dt, t * (ctx.reducedMotion ? 0.5 : 1), 1 - this.tod.night);
     this.windTime.value = t * (ctx.reducedMotion ? 0.3 : 1);
     this.flames.update(t);
         if (this.water.normalMap) { this.water.normalMap.offset.x = t * 0.012; this.water.normalMap.offset.y = t * 0.008; }
@@ -609,8 +640,19 @@ export class World {
     this.sky.position.copy(focus).setY(0);
     // nearest diyas get the real point lights
     if (this.diyaPositions) {
-      const near = this.diyaPositions.map((p, i) => [p.distanceToSquared(focus), i]).sort((a, b) => a[0] - b[0]).slice(0, this.pointPool.length);
-      near.forEach(([d, i], k) => { const L = this.pointPool[k]; L.position.copy(this.diyaPositions[i]); L.intensity = this.lampIntensity * (0.85 + Math.sin(t * 9 + i) * 0.08 + Math.sin(t * 15.7 + i * 2) * 0.05); });
+      // a few real lights follow you around, fading between lamps so nothing ever pops on or off
+      if (!this._lightT || t - this._lightT > 0.25) { this._lightT = t; this._want = this.diyaPositions.map((p, i) => [p.distanceToSquared(focus), i]).sort((a, b) => a[0] - b[0]).slice(0, this.pointPool.length).map(e => e[1]); }
+      const want = this._want;
+      for (const L of this.pointPool) { const u = L.userData; if (u.idx != null && !want.includes(u.idx)) u.out = true; }
+      const free = want.filter(i => !this.pointPool.some(L => L.userData.idx === i && !L.userData.out));
+      for (const L of this.pointPool) {
+        const u = L.userData; u.lvl = u.lvl || 0;
+        if (u.out) { u.lvl -= dt * 2.5; if (u.lvl <= 0) { u.lvl = 0; u.idx = null; u.out = false; } }
+        else if (u.idx == null && free.length) { u.idx = free.shift(); L.position.copy(this.diyaPositions[u.idx]); }
+        else if (u.idx != null) u.lvl = Math.min(1, u.lvl + dt * 1.5);
+        L.intensity = u.idx == null ? 0 : this.lampIntensity * u.lvl * (0.85 + Math.sin(t * 9 + u.idx) * 0.08 + Math.sin(t * 15.7 + u.idx * 2) * 0.05);
+      }
+      if (this.glowMat) this.glowMat.opacity = Math.min(0.75, 0.1 + this.lampIntensity * 0.1) * (0.94 + Math.sin(t * 11) * 0.03 + Math.sin(t * 17.3) * 0.03);
     }
     for (const b of this.bells) b.update(dt, t);
     for (const u of this.updaters) u(dt, t);
