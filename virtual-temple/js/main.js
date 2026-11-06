@@ -457,7 +457,7 @@ function bindInput() {
     const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
     if (Math.hypot(e.clientX - p.sx, e.clientY - p.sy) > 8) input.drag = true;
     if (input.pointers.size === 2) { const d = pinchDist(); if (input.pinch) zoom((input.pinch - d) * 0.06); input.pinch = d; return; }
-    if (input.drag && (app.mode === 'world' || app.mode === 'welcome')) { cam.tYaw -= dx * 0.006; cam.tPitch = THREE.MathUtils.clamp(cam.tPitch + dy * 0.004, 0.1, 1.25); }
+    if (input.drag && (app.mode === 'world' || app.mode === 'welcome')) { cam.tYaw -= dx * 0.006; cam.tPitch = THREE.MathUtils.clamp(cam.tPitch + dy * 0.004, -0.6, 1.35); }   // drag up to look up at the sky, down to look down on the ground
     if (input.drag && app.mode === 'creator' && preview.avatar) preview.avatar.root.rotation.y += dx * 0.012;
   });
   const up = (e) => {
@@ -552,7 +552,7 @@ function bindUI() {
   bindHut();
   $('pranamBtn').addEventListener('click', worldPranam);
   $('closeBtn').setAttribute('aria-pressed', 'true');
-  $('closeBtn').addEventListener('click', () => { const near = cam.tDist < 6; if (!near) cam.farDist = cam.tDist; cam.tDist = near ? (cam.farDist || 27) : 2.9; if (!near) cam.tYaw = me.avatar.root.rotation.y + Math.PI; $('closeBtn').setAttribute('aria-pressed', String(!near)); });
+  $('closeBtn').addEventListener('click', () => { const near = cam.tDist < 6; if (!near) cam.farDist = cam.tDist; cam.tDist = near ? (cam.farDist || 27) : CLOSE_DIST; cam.tPitch = near ? 0.32 : 0.2; if (!near) cam.tYaw = me.avatar.root.rotation.y + Math.PI; $('closeBtn').setAttribute('aria-pressed', String(!near)); });
   document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => goTo(b.dataset.go)));
   $('mapCanvas').addEventListener('click', (e) => {
     const r = e.target.getBoundingClientRect(); const x = (e.clientX - r.left) / r.width * 100 - 50, z = (e.clientY - r.top) / r.height * 100 - 50;
@@ -1033,7 +1033,7 @@ function updateWorld(dt, t, ctx) {
     if (p.z < 39.5 && cz > 0.05) want = Math.max(Math.min(9, want), Math.min(want, (38.5 - cam.target.z) / cz));
     const dirAt = (pitch, out) => out.set(Math.sin(cam.yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(cam.yaw) * Math.cos(pitch));
     // first try lifting the camera over the obstacle, then pull it closer as a last resort
-    const basePitch = cam.pitch + (0.14 - cam.pitch) * cam.close;
+    const basePitch = cam.pitch;   // your own tilt, close up or far away
     let pitch = basePitch, allowed = want;
     for (let i = 0; i < 6; i++) {
       const pt = Math.min(1.3, basePitch + i * 0.12); occRay.set(cam.target, dirAt(pt, tmp)); occRay.far = want;
@@ -1045,7 +1045,9 @@ function updateWorld(dt, t, ctx) {
     cam.effPitch += (pitch - cam.effPitch) * (1 - Math.exp(-dt * (pitch > cam.effPitch ? 6 : 1.5)));
     cam.eff += (allowed - cam.eff) * (allowed < cam.eff ? 1 - Math.exp(-dt * 10) : 1 - Math.exp(-dt * 2));
     const dir = dirAt(cam.effPitch, tmp);
-    camera.position.copy(cam.target).addScaledVector(dir, cam.eff);
+    // looking up, the camera sinks behind your devotee; it comes in closer rather than dip under the ground
+    const above = cam.effPitch < 0 ? Math.max(0.6, (cam.target.y - 0.35) / -Math.sin(cam.effPitch)) : Infinity;
+    camera.position.copy(cam.target).addScaledVector(dir, Math.min(cam.eff, above));
     camera.lookAt(cam.target); camera.fov = 52 - cam.close * 8;
     world.update(dt, t, p, ctx);
     if (playerRing) { playerRing.position.set(p.x, 0.06, p.z); const k = settings.reducedMotion ? 1 : 1 + Math.sin(t * 2.4) * 0.06; playerRing.scale.set(k, k, k); playerRing.material.opacity = 0.85 * Math.max(0, 1 - cam.close * 1.4); }   // the ring helps from afar; close up it would only clutter the scene

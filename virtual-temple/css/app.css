@@ -152,7 +152,10 @@ input[type=range] { width: 100%; accent-color: var(--saffron); }
 #joy { position: fixed; left: max(18px, env(safe-area-inset-left)); bottom: max(22px, env(safe-area-inset-bottom)); width: 116px; height: 116px; border-radius: 50%; background: radial-gradient(circle, rgba(70,36,20,.55), rgba(34,18,12,.7)); border: 2px solid rgba(226,181,85,.7); box-shadow: 0 6px 20px rgba(0,0,0,.35), inset 0 0 12px rgba(226,181,85,.2); z-index: 9; display: none; touch-action: none; }
 #joy .chev { position: absolute; inset: 0; width: 100%; height: 100%; stroke: var(--gold); fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; opacity: .8; pointer-events: none; }
 #joy .knob { position: absolute; left: 50%; top: 50%; width: 48px; height: 48px; margin: -24px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #fff3d4, #e2b555 70%, #b98a32); box-shadow: 0 4px 14px rgba(0,0,0,.4); }
-body.touch #joy { display: block; }
+body.touch #joy { display: block; left: auto; right: max(18px, env(safe-area-inset-right)); }
+/* on phones the joystick sits under the right thumb, so the camera controls and Pranam move to the left */
+body.touch .br { right: auto; left: max(12px, env(safe-area-inset-left)); align-items: flex-start; }
+body.touch .br .cam { gap: 4px; }
 
 /* proximity prompt */
 #prompt { position: fixed; left: 50%; bottom: max(18px, env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 12; display: none; align-items: center; gap: 14px; background: var(--glass-strong); border: 1px solid var(--line); border-radius: 16px; padding: 12px 12px 12px 16px; width: min(460px, calc(100vw - 32px)); box-sizing: border-box; }
@@ -160,7 +163,7 @@ body.touch #joy { display: block; }
 #prompt .t { flex: 1; min-width: 0; }
 #prompt b { font-family: var(--display); font-weight: 400; font-size: 18px; display: block; }
 #prompt span { font-size: 12.5px; color: var(--muted); }
-body.touch #prompt { left: auto; right: max(12px, env(safe-area-inset-right)); transform: none; width: min(300px, calc(100vw - 172px)); bottom: max(76px, calc(env(safe-area-inset-bottom) + 76px)); flex-direction: column; align-items: stretch; gap: 10px; }
+body.touch #prompt { left: max(12px, env(safe-area-inset-left)); right: auto; transform: none; width: min(300px, calc(100vw - 172px)); bottom: max(76px, calc(env(safe-area-inset-bottom) + 76px)); flex-direction: column; align-items: stretch; gap: 10px; }
 body.touch #prompt .btn { justify-content: center; }
 @media (max-width: 640px) {
   .tl { flex-direction: column; align-items: flex-start; }
@@ -344,3 +347,47 @@ body.reduced #soundPop .np i { animation: none; }
   #sCaption { bottom: calc(max(12px, env(safe-area-inset-bottom)) + 164px); }
   #sPhase b { font-size: 19px; } #sPhase span { font-size: 21px; }
 }
+
+/* ---------------------------------------------------------------- pop-up menus: an Indian festive skin
+   Deep kumkum maroon with a fine gold block-print booti, double gold rules, curling corner ornaments, a lotus crest over a
+   scalloped toran edge, a small diamond at the foot, and ornamental section headings. Drawn as background layers so the
+   ornament stays put while long panels scroll; layout and behaviour are unchanged. */
+:root {
+  --orn-corner-tl: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='44' height='44' viewBox='0 0 44 44'%3E%3Cg transform='rotate(0 22 22)'%3E%3Cg fill='none' stroke='%23e2b555' stroke-width='1.3' stroke-linecap='round'%3E%3Cpath d='M2 30 V8 Q2 2 8 2 H30'/%3E%3Cpath d='M7 22 V12 Q7 7 12 7 H22'/%3E%3Cpath d='M11 11 C17 11 21 15 21 21 C15 21 11 17 11 11 Z' fill='%23e2b555' fill-opacity='.28'/%3E%3Cpath d='M21 21 C24 24 28 25 31 24'/%3E%3Cpath d='M21 21 C24 24 25 28 24 31'/%3E%3Ccircle cx='34' cy='2' r='1.5' fill='%23e2b555' stroke='none'/%3E%3Ccircle cx='39' cy='2' r='1' fill='%23e2b555' stroke='none'/%3E%3Ccircle cx='2' cy='34' r='1.5' fill='%23e2b555' stroke='none'/%3E%3Ccircle cx='2' cy='39' r='1' fill='%23e2b555' stroke='none'/%3E%3Ccircle cx='26' cy='26' r='1.3' fill='%23e2b555' stroke='none'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E"); --orn-corner-tr: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='44' height='44' viewBox='0 0 44 44'%3E%3Cg transform='rotate(90 22 22)'%3E%3Cg fill='none' stroke='%23e2b555' stroke-width='1.3' stroke-linecap='round'%3E%3Cpath d='M2 30 V8 Q2 2 8 2 H30'/%3E%3Cpath d='M7 22 V12 Q7 7 12 7 H22'/%3E%3Cpath d='M11 11 C17 11 21 15 21 21 C15 21 11 17 11 11 Z' fill='%23e2b555' fill-opacity='.28'/%3E%3Cpath d='M21 21 C24 24 28 25 31 24'/%3E%3Cpath d='M21 21 C24 24 25 28 24 31'/%3E%3Ccircle cx='34' cy='2' r='1.5' fill='%23e2b555' stroke='none'/%3E%3Ccircle cx='39' cy='2' r='1' fill='%23e2b555' stroke='none'/%3E%3Ccircle cx='2' cy='34' r='1.5' fill='%23e2b555' stroke='none'/%3E%3Ccircle cx='2' cy='39' r='1' fill='%23e2b555' stroke='none'/%3E%3Ccircle cx='26' cy='26' r='1.3' fill='%23e2b555' stroke='none'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E"); --orn-corner-bl: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='44' height='44' viewBox='0 0 44 44'%3E%3Cg transform='rotate(270 22 22)'%3E%3Cg fill='none' stroke='%23e2b555' stroke-width='1.3' stroke-linecap='round'%3E%3Cpath d='M2 30 V8 Q2 2 8 2 H30'/%3E%3Cpath d='M7 22 V12 Q7 7 12 7 H22'/%3E%3Cpath d='M11 11 C17 11 21 15 21 21 C15 21 11 17 11 11 Z' fill='%23e2b555' fill-opacity='.28'/%3E%3Cpath d='M21 21 C24 24 28 25 31 24'/%3E%3Cpath d='M21 21 C24 24 25 28 24 31'/%3E%3Ccircle cx='34' cy='2' r='1.5' fill='%23e2b555' stroke='none'/%3E%3Ccircle cx='39' cy='2' r='1' fill='%23e2b555' stroke='none'/%3E%3Ccircle cx='2' cy='34' r='1.5' fill='%23e2b555' stroke='none'/%3E%3Ccircle cx='2' cy='39' r='1' fill='%23e2b555' stroke='none'/%3E%3Ccircle cx='26' cy='26' r='1.3' fill='%23e2b555' stroke='none'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E"); --orn-corner-br: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='44' height='44' viewBox='0 0 44 44'%3E%3Cg transform='rotate(180 22 22)'%3E%3Cg fill='none' stroke='%23e2b555' stroke-width='1.3' stroke-linecap='round'%3E%3Cpath d='M2 30 V8 Q2 2 8 2 H30'/%3E%3Cpath d='M7 22 V12 Q7 7 12 7 H22'/%3E%3Cpath d='M11 11 C17 11 21 15 21 21 C15 21 11 17 11 11 Z' fill='%23e2b555' fill-opacity='.28'/%3E%3Cpath d='M21 21 C24 24 28 25 31 24'/%3E%3Cpath d='M21 21 C24 24 25 28 24 31'/%3E%3Ccircle cx='34' cy='2' r='1.5' fill='%23e2b555' stroke='none'/%3E%3Ccircle cx='39' cy='2' r='1' fill='%23e2b555' stroke='none'/%3E%3Ccircle cx='2' cy='34' r='1.5' fill='%23e2b555' stroke='none'/%3E%3Ccircle cx='2' cy='39' r='1' fill='%23e2b555' stroke='none'/%3E%3Ccircle cx='26' cy='26' r='1.3' fill='%23e2b555' stroke='none'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  --orn-crest: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='132' height='22' viewBox='0 0 132 22'%3E%3Cg fill='none' stroke='%23e2b555' stroke-width='1.2' stroke-linecap='round'%3E%3Cpath d='M6 13 H46'/%3E%3Cpath d='M86 13 H126'/%3E%3Cpath d='M14 16 H44'/%3E%3Cpath d='M88 16 H118'/%3E%3Cpath d='M66 2 C60 8 60 14 66 18 C72 14 72 8 66 2 Z' fill='%23e2b555' fill-opacity='.55'/%3E%3Cpath d='M66 18 C58 17 53 12 52 7 C58 8 63 12 66 18 Z'/%3E%3Cpath d='M66 18 C74 17 79 12 80 7 C74 8 69 12 66 18 Z'/%3E%3Cpath d='M66 18 C61 19 56 18 50 15'/%3E%3Cpath d='M66 18 C71 19 76 18 82 15'/%3E%3Ccircle cx='48' cy='13' r='1.6' fill='%23e2b555' stroke='none'/%3E%3Ccircle cx='84' cy='13' r='1.6' fill='%23e2b555' stroke='none'/%3E%3Ccircle cx='4' cy='13' r='1.2' fill='%23e2b555' stroke='none'/%3E%3Ccircle cx='128' cy='13' r='1.2' fill='%23e2b555' stroke='none'/%3E%3C/g%3E%3C/svg%3E"); --orn-foot: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='14' viewBox='0 0 100 14'%3E%3Cg fill='none' stroke='%23e2b555' stroke-width='1.1' stroke-linecap='round'%3E%3Cpath d='M6 7 H40'/%3E%3Cpath d='M60 7 H94'/%3E%3Cpath d='M50 2 L55 7 L50 12 L45 7 Z' fill='%23e2b555' fill-opacity='.5'/%3E%3Ccircle cx='42' cy='7' r='1.2' fill='%23e2b555' stroke='none'/%3E%3Ccircle cx='58' cy='7' r='1.2' fill='%23e2b555' stroke='none'/%3E%3C/g%3E%3C/svg%3E"); --orn-scallop: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='9' viewBox='0 0 18 9'%3E%3Cpath d='M0 1 Q9 9 18 1' fill='none' stroke='%23e2b555' stroke-opacity='.55' stroke-width='1'/%3E%3Ccircle cx='9' cy='6.6' r='1' fill='%23e2b555' fill-opacity='.7'/%3E%3C/svg%3E"); --orn-booti: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='30' viewBox='0 0 30 30'%3E%3Cg fill='%23e2b555' fill-opacity='.075'%3E%3Cellipse cx='15' cy='11.2' rx='1.5' ry='2.8'/%3E%3Cellipse cx='15' cy='18.8' rx='1.5' ry='2.8'/%3E%3Cellipse cx='11.2' cy='15' rx='2.8' ry='1.5'/%3E%3Cellipse cx='18.8' cy='15' rx='2.8' ry='1.5'/%3E%3Ccircle cx='15' cy='15' r='1.1'/%3E%3Ccircle cx='0' cy='0' r='1.1'/%3E%3Ccircle cx='30' cy='0' r='1.1'/%3E%3Ccircle cx='0' cy='30' r='1.1'/%3E%3Ccircle cx='30' cy='30' r='1.1'/%3E%3C/g%3E%3C/svg%3E"); --orn-lotus: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='12' viewBox='0 0 16 12'%3E%3Cg fill='none' stroke='%23e2b555' stroke-width='1.1' stroke-linejoin='round'%3E%3Cpath d='M8 1 C6 4 6 7 8 10 C10 7 10 4 8 1 Z' fill='%23e2b555' fill-opacity='.45'/%3E%3Cpath d='M8 10 C4.5 9.5 2.5 7 2 4.5 C4.5 5 7 7 8 10 Z'/%3E%3Cpath d='M8 10 C11.5 9.5 13.5 7 14 4.5 C11.5 5 9 7 8 10 Z'/%3E%3Cpath d='M1 11 H15'/%3E%3C/g%3E%3C/svg%3E");
+  --orn-ground: linear-gradient(180deg, rgba(64, 22, 28, 0.97), rgba(38, 12, 18, 0.97));
+  --orn-title: 'Yatra One', 'Marcellus', Georgia, serif;
+}
+.sheet, .side, #creator .panel, #hutPanel, #todPop, #soundPop, #sPop, #map, #prompt {
+  --orn: 44px;
+  border: 1.5px solid #c99a46;
+  background-color: rgb(40, 13, 19);
+  background-image: var(--orn-corner-tl), var(--orn-corner-tr), var(--orn-corner-bl), var(--orn-corner-br), var(--orn-crest), var(--orn-foot), var(--orn-scallop), var(--orn-booti), var(--orn-ground);
+  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, repeat-x, repeat, no-repeat;
+  background-size: var(--orn) var(--orn), var(--orn) var(--orn), var(--orn) var(--orn), var(--orn) var(--orn), 132px 22px, 100px 14px, 18px 9px, 30px 30px, 100% 100%;
+  background-position: left 6px top 6px, right 6px top 6px, left 6px bottom 6px, right 6px bottom 6px, center top 6px, center bottom 6px, left top 2px, 0 0, 0 0;
+  box-shadow: inset 0 0 0 4px rgba(38, 12, 18, 0.9), inset 0 0 0 5px rgba(226, 181, 85, 0.42), 0 18px 50px rgba(0, 0, 0, 0.5), 0 0 22px rgba(226, 150, 60, 0.18);
+}
+.sheet, .side, #creator .panel, #hutPanel { padding-top: 30px; }
+#todPop, #soundPop, #sPop, #map, #prompt { --orn: 30px; padding-top: 24px; background-size: var(--orn) var(--orn), var(--orn) var(--orn), var(--orn) var(--orn), var(--orn) var(--orn), 110px 18px, 80px 11px, 18px 9px, 30px 30px, 100% 100%; }
+#prompt { padding-bottom: 18px; }
+#creator .actions { background: linear-gradient(180deg, rgba(40, 13, 19, 0), rgb(40, 13, 19) 30%); }
+
+/* titles in an Indian display face, warm gold */
+.sheet h2, .side h2, #creator h2, #hutPanel h2, #doneCard h2, #prompt b { font-family: var(--orn-title); font-weight: 400; color: #f4d48a; letter-spacing: 0.01em; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.45), 0 0 14px rgba(226, 150, 60, 0.25); }
+/* section headings: a small lotus, the label, then a gold rule ending in a diamond */
+.side h3, #creator h3, #todPop h3, #soundPop h3, #sPop h3 { display: flex; align-items: center; gap: 8px; }
+.side h3::before, #creator h3::before, #todPop h3::before, #soundPop h3::before, #sPop h3::before { content: ''; flex: none; width: 16px; height: 12px; background: var(--orn-lotus) no-repeat center / contain; }
+.side h3::after, #creator h3::after, #todPop h3::after, #soundPop h3::after, #sPop h3::after { content: ''; flex: 1; height: 7px; min-width: 20px;
+  background: linear-gradient(90deg, rgba(226, 181, 85, 0.75), rgba(226, 181, 85, 0.05)) left center / 100% 1px no-repeat, radial-gradient(circle, rgba(226, 181, 85, 0.85) 0 2.5px, transparent 3px) right center / 7px 7px no-repeat; }
+.choose::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(226, 181, 85, 0.7), rgba(226, 181, 85, 0)); }
+/* the close button becomes a small gold-ringed medallion */
+.sheet .close { border: 1.5px solid #c99a46; background: radial-gradient(circle at 50% 35%, #5a2430, #2a0d14); box-shadow: 0 0 0 3px rgba(38, 12, 18, 0.9), 0 0 0 4px rgba(226, 181, 85, 0.35); top: 14px; right: 14px; }
+/* options inside the menus: a fine gold edge, and a warmer, glowing selected state */
+#todPop button, #soundPop button[data-m], #sPop button.opt, #map .dest button, .schedule div, .pdetail, .tile { border-color: rgba(226, 181, 85, 0.36); background-color: rgba(255, 220, 160, 0.04); }
+#todPop button[aria-pressed=true], #soundPop button[aria-pressed=true], #sPop button.opt[aria-pressed=true], .schedule div.next, .tile[aria-checked=true], .chip[aria-pressed=true], .tabs button[aria-selected=true], .seg button[aria-pressed=true] {
+  border-color: #e2b555; background-color: rgba(226, 150, 60, 0.2); box-shadow: inset 0 0 0 1px rgba(255, 220, 150, 0.12), 0 0 12px rgba(226, 150, 60, 0.22); }
+.divider::before, .divider::after, .gset { border-color: rgba(226, 181, 85, 0.36); }
+/* panels measure their padding inside their width, so they never spill off a phone screen */
+.sheet, .side { box-sizing: border-box; }
+.side .close, .sheet .close { top: 16px !important; right: 18px !important; border: 1.5px solid #c99a46 !important; background: radial-gradient(circle at 50% 35%, #5a2430, #2a0d14) !important; box-shadow: 0 0 0 3px rgba(38, 12, 18, 0.9), 0 0 0 4px rgba(226, 181, 85, 0.35); color: #f4d48a; }
