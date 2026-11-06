@@ -69,16 +69,25 @@ export class Scenery {
     }, (c, h) => { c.set('#5b6f72').lerp(tmp.set('#7d8a84'), smooth(40, 120, h)); if (h > 125) c.lerp(tmp.set('#f2f4f6'), smooth(125, 150, h)); });
     this.farMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, flatShading: true });
     this.group.add(new THREE.Mesh(far, this.farMat));
-    // forest texture on the near slopes: instanced conifers and round trees
-    const n = low ? 500 : 1400, cone = new THREE.ConeGeometry(1, 3, 6); cone.translate(0, 1.5, 0);
-    const trees = new THREE.InstancedMesh(cone, new THREE.MeshStandardMaterial({ roughness: 1 }), n);
-    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), c = new THREE.Color(); let k = 0;
+    // forest on the near slopes: round, leafy canopies (a few lumpy lobes over a short trunk), some in pink blossom
+    const n = low ? 420 : 900, parts = [];
+    const lobe = (r, x, y, z, seed) => { const g = new THREE.IcosahedronGeometry(r, 1), p = g.attributes.position; for (let i = 0; i < p.count; i++) { const vx = p.getX(i), vy = p.getY(i), vz = p.getZ(i), k = 1 + 0.16 * Math.sin(vx * 7 + seed) * Math.sin(vy * 6 + seed * 2) * Math.sin(vz * 8 + seed * 3); p.setXYZ(i, vx * k + x, vy * k * 0.85 + y, vz * k + z); } return g.toNonIndexed(); };
+    parts.push(lobe(1.0, 0, 2.2, 0, 1), lobe(0.75, 0.62, 1.85, 0.25, 2), lobe(0.72, -0.6, 1.9, -0.2, 3), lobe(0.62, 0.1, 2.85, -0.1, 4));
+    const trunk = new THREE.CylinderGeometry(0.12, 0.2, 1.6, 5).translate(0, 0.8, 0).toNonIndexed();
+    const geoms = [...parts, trunk], cols = [];
+    for (const g of geoms) { const p = g.attributes.position, isTrunk = g === trunk; for (let i = 0; i < p.count; i++) { const y = p.getY(i); const v = isTrunk ? 0.35 : 0.55 + 0.45 * Math.min(1, Math.max(0, (y - 1.3) / 2)); cols.push(isTrunk ? 0.42 : v, isTrunk ? 0.3 : v, isTrunk ? 0.22 : v); } }
+    const merged = new THREE.BufferGeometry(); const total = geoms.reduce((a, g) => a + g.attributes.position.count, 0), pos = new Float32Array(total * 3); let o = 0;
+    for (const g of geoms) { pos.set(g.attributes.position.array, o * 3); o += g.attributes.position.count; }
+    merged.setAttribute('position', new THREE.BufferAttribute(pos, 3)); merged.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3)); merged.computeVertexNormals();
+    const trees = new THREE.InstancedMesh(merged, new THREE.MeshStandardMaterial({ roughness: 0.95, vertexColors: true, flatShading: true }), n);
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), c = new THREE.Color(), up = new THREE.Vector3(0, 1, 0); let k = 0;
     for (let i = 0; k < n && i < n * 4; i++) {
       const a = Math.random() * Math.PI * 2, r = 104 + Math.random() * 90, h = this.nearHeight(r, a);
       if (h < 1 || h > 60 || FALLS.some(fa => Math.abs(dAng(a, fa)) < 0.09)) continue;
-      const s = 1.6 + Math.random() * 2;
-      m.compose(new THREE.Vector3(Math.cos(a) * r, h - 0.5, Math.sin(a) * r), q, new THREE.Vector3(s, s * (1 + Math.random() * 0.8), s)); trees.setMatrixAt(k, m);
-      trees.setColorAt(k++, c.set(['#2c5228', '#355e2c', '#284a26', '#3d6630'][Math.floor(Math.random() * 4)]));
+      const s = 2.0 + Math.random() * 2.2; q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
+      m.compose(new THREE.Vector3(Math.cos(a) * r, h - 0.6, Math.sin(a) * r), q, new THREE.Vector3(s, s * (0.85 + Math.random() * 0.4), s)); trees.setMatrixAt(k, m);
+      const bloom = Math.random() < 0.16;
+      trees.setColorAt(k++, c.set(bloom ? ['#e2689a', '#d9528a', '#f08ab0'][Math.floor(Math.random() * 3)] : ['#3f7a34', '#4a8a3a', '#356c2e', '#5a9440', '#2f6230'][Math.floor(Math.random() * 5)]));
     }
     trees.count = k; this.group.add(trees);
   }

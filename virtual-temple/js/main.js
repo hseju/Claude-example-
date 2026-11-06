@@ -7,6 +7,7 @@ import { HallDirectory, LocalSimulation, HALL_CAPACITY } from './presence.js';
 import { ProfileStore, storageAvailable } from './profile.js';
 import { PostFX } from './postfx.js';
 import { setAnisotropy } from './textures.js';
+import { setPBRAnisotropy } from './pbr.js';
 import { HUT } from './hut.js';
 import { BREATHWORK, MEDITATIONS, TIMER, Guide, Session, PracticeLog } from './practice.js';
 import { meditatorSVG, MeditatorVisual } from './meditator.js';
@@ -44,7 +45,7 @@ renderer.setPixelRatio(Q.pr);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
 renderer.shadowMap.enabled = Q.shadows > 0; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-setAnisotropy(Math.min(8, renderer.capabilities.getMaxAnisotropy()));
+setAnisotropy(Math.min(8, renderer.capabilities.getMaxAnisotropy())); setPBRAnisotropy(Math.min(8, renderer.capabilities.getMaxAnisotropy()));
 const post = new PostFX(renderer); post.enabled = Q.post;
 const camera = new THREE.PerspectiveCamera(32, innerWidth / innerHeight, 0.1, 2200);
 
@@ -56,7 +57,7 @@ let world, hall, directory, sim, playerRing;
 const app = { mode: 'loading', hallState: null, currentHall: null, templeId: null, camMode: 'world', time: 0 };
 const me = { id: null, config: defaultConfig(), avatar: null };
 // the camera starts close behind your devotee, as in a third-person RPG; the overview is one tap away
-const CLOSE_DIST = 4.4;
+const CLOSE_DIST = 5.0;
 const cam = { close: 1, yaw: 0, pitch: 0.2, dist: CLOSE_DIST, tYaw: 0, tPitch: 0.2, tDist: CLOSE_DIST, eff: CLOSE_DIST, pos: new THREE.Vector3(), target: new THREE.Vector3(), fov: 32 };
 const input = { keys: new Set(), joy: new THREE.Vector2(), auto: [], pointers: new Map(), drag: false };
 
@@ -911,8 +912,19 @@ function updateHut(dt, t, ctx) {
   if (audio.ctx) { if (Math.floor(t) !== app.hutTick) { app.hutTick = Math.floor(t); audio.applyZone(HUT_ZONE, 1); } audio.setListener(av.root.position.clone().setY(av.root.position.y + 0.95), HUT.toWorld(0, 0, -1).sub(HUT.pos).normalize()); }
   camera.updateProjectionMatrix();
   post.tilt.amount = 0; renderer.toneMappingExposure = world.tod.exposure;
-  post.finalMat.uniforms.uVignette.value = S ? 0.55 : 0.46; post.finalMat.uniforms.uWarm.value = 0.18 + world.evening * 0.2; post.bloom.strength = Q.bloom * 1.6; post.bloom.threshold = 1.1;
+  aimShafts(S ? 0.35 : 0.7); post.finalMat.uniforms.uVignette.value = S ? 0.55 : 0.46; post.finalMat.uniforms.uWarm.value = 0.18 + world.evening * 0.2; post.bloom.strength = Q.bloom * 1.6; post.bloom.threshold = 1.1;
   post.render(world.scene, camera);
+}
+
+// light shafts stream from the sun's place on screen; they fade as you turn away from it and at night
+const _sunP = new THREE.Vector3(), _camF = new THREE.Vector3();
+function aimShafts(amount = 1) {
+  if (!world || !world.sunDir) { post.shafts.strength = 0; return; }
+  _sunP.copy(camera.position).addScaledVector(world.sunDir, 1000).project(camera);
+  camera.getWorldDirection(_camF); const facing = _camF.dot(world.sunDir);
+  post.shafts.sun.set(_sunP.x * 0.5 + 0.5, _sunP.y * 0.5 + 0.5);
+  const day = 1 - (world.tod.night || 0), low = 0.55 + 0.45 * (1 - Math.min(1, Math.max(0, world.sunDir.y - 0.15) / 0.7));
+  post.shafts.strength = Q.post ? amount * day * low * Math.max(0, Math.min(1, (facing + 0.15) / 0.6)) * 0.85 : 0;
 }
 
 // ---------------------------------------------------------------- per-frame
@@ -929,7 +941,7 @@ function loop(now) {
     // framed for a devotee about 1.3 m tall; zooming in ends on the face
     const pd = preview.dist || 4.4, zk = THREE.MathUtils.clamp((4.4 - pd) / 3.3, 0, 1), D = pd * 0.84 + zk * 0.6;
     if (narrow) { camera.position.set(0, 1.0 + zk * 0.1, 7.4 * D / 4.4); camera.lookAt(0, -0.12 + zk * 0.67, 0); } else { camera.position.set(0.216 * D, 0.95 + zk * 0.15, D); camera.lookAt(0.216 * D, 0.68 + zk * 0.34, 0); }
-    camera.updateProjectionMatrix(); post.tilt.amount = 0; post.bloom.strength = 0; post.finalMat.uniforms.uVignette.value = 0.5; post.render(preview.scene, camera); return;
+    camera.updateProjectionMatrix(); post.tilt.amount = 0; post.bloom.strength = 0; post.shafts.strength = 0; post.finalMat.uniforms.uVignette.value = 0.5; post.render(preview.scene, camera); return;
   }
   if (app.mode === 'hall') { updateHall(dt, t, ctx); positionLabels(); return; }
   if (app.mode === 'hut') { updateHut(dt, t, ctx); return; }
@@ -1012,7 +1024,7 @@ function updateWorld(dt, t, ctx) {
     cam.close = clamp01((10 - cam.dist) / 7);
     const right = new THREE.Vector3(Math.cos(cam.yaw), 0, -Math.sin(cam.yaw));
     // close up, the camera looks a little over your head, so your devotee sits low in the frame with the world ahead
-    const focus = p.clone().add(new THREE.Vector3(0, 1.05 + cam.close * 0.5, 0)).addScaledVector(right, cam.close * 0.3);
+    const focus = p.clone().add(new THREE.Vector3(0, 1.05 + cam.close * 0.8, 0)).addScaledVector(right, cam.close * 0.55);
     cam.target.lerp(focus, 1 - Math.exp(-dt * 8));
     // portrait screens get a little more distance; temples and the gateway pull the camera in rather than hide you
     let want = cam.dist * (camera.aspect < 1 ? 1 + (1 - camera.aspect) * 0.6 * (1 - cam.close) : 1);
@@ -1036,11 +1048,11 @@ function updateWorld(dt, t, ctx) {
     camera.position.copy(cam.target).addScaledVector(dir, cam.eff);
     camera.lookAt(cam.target); camera.fov = 52 - cam.close * 8;
     world.update(dt, t, p, ctx);
-    if (playerRing) { playerRing.position.set(p.x, 0.06, p.z); const k = settings.reducedMotion ? 1 : 1 + Math.sin(t * 2.4) * 0.06; playerRing.scale.set(k, k, k); playerRing.material.opacity = 0.85 * (1 - cam.close * 0.8); }
+    if (playerRing) { playerRing.position.set(p.x, 0.06, p.z); const k = settings.reducedMotion ? 1 : 1 + Math.sin(t * 2.4) * 0.06; playerRing.scale.set(k, k, k); playerRing.material.opacity = 0.85 * Math.max(0, 1 - cam.close * 1.4);   // the ring helps from afar; close up it would only clutter the scene }
   }
   camera.updateProjectionMatrix();
   post.tilt.amount = Q.tilt * (app.mode === 'welcome' ? 0.06 : 0.08 * (1 - (cam.close || 0))); post.tilt.focus = 0.4; post.tilt.band = 0.32; renderer.toneMappingExposure = world.tod.exposure;
-  post.finalMat.uniforms.uVignette.value = 0.44; post.finalMat.uniforms.uWarm.value = 0.16 + world.evening * 0.2; post.bloom.strength = Q.bloom * 1.6; post.bloom.threshold = 1.05;
+  aimShafts(1); post.finalMat.uniforms.uVignette.value = 0.32; post.finalMat.uniforms.uWarm.value = 0.16 + world.evening * 0.2; post.bloom.strength = Q.bloom * 1.6; post.bloom.threshold = 1.05;
   post.render(world.scene, camera);
 }
 
@@ -1064,7 +1076,7 @@ function updateHall(dt, t, ctx) {
   if (audio.ctx) audio.setListener(camera.position, tmp.copy(cam.target).sub(camera.position).normalize());
   post.tilt.amount = app.camMode === 'select' ? 0.3 : 0.22; post.tilt.band = app.camMode === 'select' ? 0.3 : 0.34; post.tilt.focus = 0.5;
   if (!Q.post) post.tilt.amount = 0;
-  post.bloom.strength = Q.bloom * 1.7; post.bloom.threshold = 1.0;
+  post.bloom.strength = Q.bloom * 1.7; post.bloom.threshold = 1.0; post.shafts.strength = 0;
   post.finalMat.uniforms.uVignette.value = app.aarti ? 0.6 : 0.42; post.finalMat.uniforms.uWarm.value = app.aarti ? 0.45 : 0.25;
   renderer.toneMappingExposure = 1.05;
   post.render(hall.scene, camera);

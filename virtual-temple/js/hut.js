@@ -4,6 +4,7 @@ import { SmokeSystem } from './fx.js';
 import { normalFromCanvas, merge } from './flora.js';
 import { figureSVG, CHAKRA_POINTS } from './meditator.js';
 import { softDot } from './textures.js';
+import { pbr, boxUV } from './pbr.js';
 
 // Dhyana Kutir: a round meditation hut in the south-west garden. Two tiers of thatch with a brass finial, a
 // front gable with a glowing Om medallion and a sign, carved teak posts with cream curtains tied back, lanterns
@@ -200,21 +201,23 @@ function leafGeo() {
 // ---------------------------------------------------------------- the hut
 export function buildHut(world) {
   const S = world.scene, Q = world.quality, g = new THREE.Group(); g.position.copy(HUT.pos); g.rotation.y = HUT.rot; S.add(g);
-  const add = (geo, mat, x = 0, y = 0, z = 0, cast = true, parent = g) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = cast; m.receiveShadow = true; parent.add(m); return m; };
-  const teak = new THREE.MeshStandardMaterial({ color: '#6e4223', roughness: 0.55 });
-  const darkTeak = new THREE.MeshStandardMaterial({ color: '#43261a', roughness: 0.6 });
+  // materials that carry a photographed surface project their UVs from the shape, so the tiling keeps a true scale
+  const add = (geo, mat, x = 0, y = 0, z = 0, cast = true, parent = g) => { if (mat.userData.boxTile) boxUV(geo, mat.userData.boxTile); const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = cast; m.receiveShadow = true; parent.add(m); return m; };
+  const teak = pbr('teak', { rotation: Math.PI / 2, color: '#d29a6c', roughness: 0.75 }); teak.userData.boxTile = 0.7;
+  const darkTeak = pbr('teak', { color: '#9a6448', roughness: 0.8 }); darkTeak.userData.boxTile = 0.8;
   const gold = new THREE.MeshStandardMaterial({ color: '#e0b04f', metalness: 0.9, roughness: 0.25 });
-  const plankC = planksCanvas(), plank = new THREE.MeshStandardMaterial({ map: texOf(plankC, [4, 4]), normalMap: nrm(plankC, 1.4, [4, 4]), roughness: 0.6 });
-  const thatchC = thatchCanvas(), thatch = new THREE.MeshStandardMaterial({ map: texOf(thatchC, [9, 1.4]), normalMap: nrm(thatchC, 3.2, [9, 1.4]), roughness: 0.95 });
+  const plank = pbr('planks', { color: '#f2d2a8', roughness: 0.8 }); plank.userData.boxTile = 1.8;
+  const thatchC = thatchCanvas(), thatch = pbr('thatch', { repeat: [15, 2.2], color: '#ffd994', normal: 1.3 });
   const fringe = new THREE.MeshStandardMaterial({ map: texOf(fringeCanvas(), [16, 1]), alphaTest: 0.45, side: THREE.DoubleSide, roughness: 1 });
-  const stone = stoneMat('#d6bfa6', [8, 0.5], { rows: 2 });
+  const stone = pbr('sandstone', { color: '#f6dcb8' }); stone.userData.boxTile = 1.3;
+  const plinthStone = pbr('sandstone', { repeat: [17, 0.42], color: '#f6dcb8' });
   const glowWarm = new THREE.MeshStandardMaterial({ color: '#ffd28a', emissive: '#ffb050', emissiveIntensity: 1.6, roughness: 0.6 });
   const lampMats = [];   // materials whose glow follows the time of day
   const atAngle = (r, a) => [Math.sin(a) * r, Math.cos(a) * r];
   const shaggy = (geo, amp, seed) => { const p = geo.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i), y = p.getY(i), a = Math.atan2(x, z), rr = Math.hypot(x, z); if (rr < 0.05) continue; const k = 1 + (Math.sin(a * 23 + seed) * 0.6 + Math.sin(a * 57 + y * 4 + seed) * 0.4) * amp / rr; p.setX(i, x * k); p.setZ(i, z * k); } geo.computeVertexNormals(); return geo; };
 
   // ---- plinth, floor, porch and glowing steps
-  add(new THREE.CylinderGeometry(R_PLINTH, R_PLINTH + 0.15, FLOOR, 48), stone, 0, FLOOR / 2);
+  add(new THREE.CylinderGeometry(R_PLINTH, R_PLINTH + 0.15, FLOOR, 48), plinthStone, 0, FLOOR / 2);
   const floorGeo = new THREE.CircleGeometry(R_PLINTH - 0.08, 48); floorGeo.rotateX(-Math.PI / 2); add(floorGeo, plank, 0, FLOOR + 0.004, 0, false);
   add(new THREE.BoxGeometry(3.6, FLOOR, 1.75), stone, 0, FLOOR / 2, 4.4);
   const porchFloor = new THREE.PlaneGeometry(3.45, 1.7); porchFloor.rotateX(-Math.PI / 2); add(porchFloor, plank, 0, FLOOR + 0.005, 4.45, false);
@@ -382,17 +385,27 @@ export function buildHut(world) {
   // ---- the path: cobbles, stone lanterns, a signpost, a lotus pond, rocks and flowering trees
   const cobC = cobbleCanvas();
   const pathGeo = new THREE.PlaneGeometry(2.6, 7.2, 1, 1); pathGeo.rotateX(-Math.PI / 2);
-  add(pathGeo, new THREE.MeshStandardMaterial({ map: texOf(cobC, [2.2, 6]), normalMap: nrm(cobC, 2.2, [2.2, 6]), roughness: 0.85, polygonOffset: true, polygonOffsetFactor: -2 }), 0, 0.02, 9.95, false);
-  const edgeMat = new THREE.MeshStandardMaterial({ color: '#b59c86', roughness: 0.9 });
+  add(pathGeo, pbr('flagstone', { repeat: [1.5, 4.1], color: '#ffe6c8', polygonOffset: true, polygonOffsetFactor: -2 }), 0, 0.02, 9.95, false); void cobC;
+  const edgeMat = pbr('sandstone', { color: '#d9bc98' }); edgeMat.userData.boxTile = 0.9;
+  // pink and marigold petals scattered along the path, thicker toward the edges
+  { const pg = new THREE.CircleGeometry(0.045, 6); pg.scale(1, 0.62, 1); pg.rotateX(-Math.PI / 2); const N = Q.level === 'low' ? 90 : 220, pet = new THREE.InstancedMesh(pg, new THREE.MeshStandardMaterial({ roughness: 0.7, side: THREE.DoubleSide }), N);
+    const pm = new THREE.Matrix4(), pq = new THREE.Quaternion(), pc = new THREE.Color(), r = rnd(77);
+    for (let i = 0; i < N; i++) { const u = r() * 2 - 1, x = Math.sign(u) * Math.pow(Math.abs(u), 0.55) * 1.3, z = 6.4 + r() * 7.1, sc = 0.7 + r() * 0.8;
+      pm.compose(new THREE.Vector3(x, 0.034 + r() * 0.004, z), pq.setFromAxisAngle(new THREE.Vector3(0, 1, 0), r() * 6.3), new THREE.Vector3(sc, 1, sc)); pet.setMatrixAt(i, pm);
+      pet.setColorAt(i, pc.set(['#e0438f', '#d21f7a', '#f06aa8', '#f29a17', '#ffffff'][Math.floor(r() * 5)])); }
+    pet.receiveShadow = true; g.add(pet); }
   for (const s of [-1, 1]) add(new THREE.BoxGeometry(0.16, 0.07, 7.2), edgeMat, s * 1.36, 0.035, 9.95, false);
   const lanternGlow = new THREE.MeshStandardMaterial({ color: '#ffe3b0', emissive: '#ffb055', emissiveIntensity: 1.8 }); lampMats.push([lanternGlow, 0.9, 0.4]);
-  const lanternStone = new THREE.MeshStandardMaterial({ color: '#c9b49a', roughness: 0.85 });
+  const lanternStone = pbr('sandstone', { color: '#ecd2ae' }); lanternStone.userData.boxTile = 0.55;
+  // every lantern lays a soft pool of warm light on the stones around it
+  const poolMat = new THREE.MeshBasicMaterial({ map: softDot(), color: new THREE.Color(1.0, 0.62, 0.28), transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false });
   for (const z of [7.3, 9.9, 12.5]) for (const s of [-1, 1]) {
     const x = s * 1.75;
     add(new THREE.BoxGeometry(0.36, 0.12, 0.36), lanternStone, x, 0.06, z); add(new THREE.BoxGeometry(0.16, 0.42, 0.16), lanternStone, x, 0.33, z);
     add(new THREE.BoxGeometry(0.32, 0.05, 0.32), lanternStone, x, 0.565, z); add(new THREE.BoxGeometry(0.24, 0.24, 0.24), lanternGlow, x, 0.71, z, false);
     for (const [dx, dz] of [[-0.12, -0.12], [0.12, -0.12], [-0.12, 0.12], [0.12, 0.12]]) add(new THREE.BoxGeometry(0.035, 0.26, 0.035), lanternStone, x + dx, 0.71, z + dz, false);
     const cap = add(new THREE.ConeGeometry(0.29, 0.18, 4), lanternStone, x, 0.92, z); cap.rotation.y = Math.PI / 4;
+    const pool = add(new THREE.PlaneGeometry(2.4, 2.4).rotateX(-Math.PI / 2), poolMat, x, 0.045, z, false); pool.receiveShadow = false; pool.renderOrder = 2;
     world.colliders.circles.push(...[toWorld(x, 0, z)].map(p => ({ x: p.x, z: p.z, r: 0.25 })));
   }
   // signpost
@@ -408,7 +421,7 @@ export function buildHut(world) {
   const pondShape = new THREE.Shape(); for (let i = 0; i <= 40; i++) { const a = i / 40 * Math.PI * 2, rr = pondR * (1 + Math.sin(a * 3 + 1) * 0.08 + Math.sin(a * 5) * 0.05); pondShape[i ? 'lineTo' : 'moveTo'](Math.cos(a) * rr, Math.sin(a) * rr); }
   const water = new THREE.ShapeGeometry(pondShape, 40); water.rotateX(-Math.PI / 2); add(water, world.pondWater, pondC[0], 0.16, pondC[1], false);
   const bed = new THREE.ShapeGeometry(pondShape, 40); bed.rotateX(-Math.PI / 2); add(bed, new THREE.MeshStandardMaterial({ color: '#2b3a2c', roughness: 1 }), pondC[0], 0.04, pondC[1], false);
-  const rockMat = new THREE.MeshStandardMaterial({ color: '#8f8578', roughness: 0.95, flatShading: true });
+  const rockMat = pbr('mossstone', { flatShading: true, color: '#d8ccb6' }); rockMat.userData.boxTile = 0.8;
   const rockGeo = (r, seed) => { const geo = new THREE.DodecahedronGeometry(r, 1), p = geo.attributes.position, rr = rnd(seed); for (let i = 0; i < p.count; i++) { const f = 0.82 + rr() * 0.3; p.setXYZ(i, p.getX(i) * f, p.getY(i) * f * 0.7, p.getZ(i) * f); } geo.computeVertexNormals(); return geo; };
   for (let i = 0; i < 18; i++) { const a = i / 18 * Math.PI * 2, rr = pondR * (1.06 + Math.sin(a * 3 + 1) * 0.08); add(rockGeo(0.2 + (i % 3) * 0.06, i + 3), rockMat, pondC[0] + Math.cos(a) * rr, 0.1, pondC[1] + Math.sin(a) * rr); }
   for (const [x, z, r] of [[-4.9, 8.4, 0.5], [-1.9, 11.4, 0.38], [3.0, 11.6, 0.45], [3.6, 6.4, 0.34], [-4.4, 11.3, 0.3]]) add(rockGeo(r, x * 7 + z), rockMat, x, r * 0.35, z);
@@ -416,6 +429,35 @@ export function buildHut(world) {
   // flowering trees and beds framing the hut
   for (const [x, z, s] of [[-8.6, 7.4, 0.95], [9.0, 10.2, 0.9], [-8.2, -6.2, 1.0]]) { const p = toWorld(x, 0, z); world.flora.addTree('bougainvillea', p.x, p.z, s); world.colliders.circles.push({ x: p.x, z: p.z, r: 0.6 }); world.flora.addFallen(p.x, p.z, 3.0 * s, ['#d21f7a', '#e0438f', '#b8186a'], 70); }
   for (const [x, z, r, pal] of [[3.3, 9.6, 0.9, ['hibiscus', 'jasmine']], [-2.4, 6.4, 0.7, ['jasmine', 'hibiscus']]]) { const p = toWorld(x, 0, z); world.flora.addBed(p.x, p.z, r, pal); world.colliders.circles.push({ x: p.x, z: p.z, r: r + 0.1 }); }
+
+  // ---- marigold garlands along the porch beam and down the front posts, and two tall lotus banners by the steps
+  const garlandPts = [];
+  const swag = (a0, a1, sag, n) => { for (let i = 0; i <= n; i++) { const u = i / n; garlandPts.push(new THREE.Vector3().lerpVectors(a0, a1, u).add(new THREE.Vector3(0, -sag * 4 * u * (1 - u), 0))); } };
+  const beamY = EAVE - 0.12, beamZ = 5.24;
+  for (let k = 0; k < 3; k++) swag(new THREE.Vector3(-1.5 + k, beamY, beamZ), new THREE.Vector3(-0.5 + k, beamY, beamZ), 0.16, 22);
+  for (const sx of [-1.5, -0.5, 0.5, 1.5]) for (let i = 0; i < 9; i++) garlandPts.push(new THREE.Vector3(sx, beamY - 0.06 - i * 0.075, beamZ));
+  for (const s2 of [-1, 1]) swag(new THREE.Vector3(s2 * 1.5, beamY, beamZ), new THREE.Vector3(s2 * 1.5, FLOOR + 0.45, beamZ - 0.02), 0.0, 28);
+  const flower = new THREE.IcosahedronGeometry(0.042, 1), garland = new THREE.InstancedMesh(flower, new THREE.MeshStandardMaterial({ roughness: 0.7 }), garlandPts.length);
+  const gm = new THREE.Matrix4(), gc = new THREE.Color();
+  garlandPts.forEach((pt, i) => { gm.makeTranslation(pt.x, pt.y, pt.z); garland.setMatrixAt(i, gm); garland.setColorAt(i, gc.set(i % 3 === 0 ? '#ffd23f' : i % 3 === 1 ? '#f29a17' : '#e8641a')); });
+  garland.castShadow = true; g.add(garland);
+  const bannerC = cv(256, 768), bx = bannerC.getContext('2d');
+  { const gr = bx.createLinearGradient(0, 0, 0, 768); gr.addColorStop(0, '#7a1630'); gr.addColorStop(1, '#5a0f24'); bx.fillStyle = gr; bx.fillRect(0, 0, 256, 768);
+    bx.strokeStyle = '#e8b85a'; bx.lineWidth = 10; bx.strokeRect(14, 14, 228, 690); bx.lineWidth = 3; bx.strokeRect(30, 30, 196, 658);
+    lotusIcon(bx, 128, 300, 150, '#f2c766'); bx.fillStyle = '#e8b85a';
+    for (let i = 0; i < 5; i++) { bx.beginPath(); bx.moveTo(14 + i * 57, 704); bx.lineTo(42 + i * 57, 768); bx.lineTo(70 + i * 57, 704); bx.fill(); } }
+  const bannerMat = new THREE.MeshStandardMaterial({ map: texOf(bannerC), side: THREE.DoubleSide, roughness: 0.8, emissive: '#3a0a14', emissiveIntensity: 0.25 });
+  const banners = [];
+  for (const s2 of [-1, 1]) {
+    const bxp = s2 * 2.45, bzp = 6.35;
+    add(new THREE.CylinderGeometry(0.045, 0.06, 3.5, 10), teak, bxp, 1.75, bzp);
+    add(new THREE.SphereGeometry(0.075, 12, 8), gold, bxp, 3.55, bzp, false);
+    add(new THREE.CylinderGeometry(0.02, 0.02, 0.85, 6).rotateZ(Math.PI / 2), gold, bxp, 3.3, bzp, false);
+    const geo = new THREE.PlaneGeometry(0.78, 2.3, 4, 12); geo.translate(0, -1.15, 0);
+    const b = new THREE.Mesh(geo, bannerMat); b.position.set(bxp, 3.28, bzp + 0.02); b.castShadow = true; g.add(b);
+    banners.push({ mesh: b, base: geo.attributes.position.array.slice(), ph: s2 * 1.3 });
+    world.colliders.circles.push((() => { const p = toWorld(bxp, 0, bzp); return { x: p.x, z: p.z, r: 0.15 }; })());
+  }
 
   // ---- incense smoke at the altar, and a wind chime at the porch
   const smoke = new SmokeSystem(Q.level === 'low' ? 60 : 140); S.add(smoke.points);
@@ -439,6 +481,8 @@ export function buildHut(world) {
     figMat.emissiveIntensity = 0.9 + f * 0.55 + night * 0.3;
     chakras.forEach((sp, i) => { const k = Math.max(0, Math.min(1, (f * 7.4 - i) / 1.4)); sp.material.opacity = (active ? 0.15 : 0.08) + k * (active ? 0.85 : 0.5); sp.scale.setScalar(0.1 + k * 0.08); });
     for (const tb of tubes) { tb.pivot.rotation.x = Math.sin(t * 1.3 + tb.ph) * 0.08; tb.pivot.rotation.z = Math.cos(t * 1.1 + tb.ph) * 0.06; }
+    poolMat.opacity = 0.18 + Math.min(0.55, lamps * 0.09);
+    for (const bn of banners) { const p = bn.mesh.geometry.attributes.position, B = bn.base; for (let i = 0; i < p.count; i++) { const y = B[i * 3 + 1], k = -y / 2.3; p.setZ(i, B[i * 3 + 2] + Math.sin(t * 1.4 + bn.ph + y * 1.6) * 0.07 * k + Math.sin(t * 2.3 + B[i * 3] * 3) * 0.015 * k); } p.needsUpdate = true; }
     smoke.update(dt, t);
   });
 

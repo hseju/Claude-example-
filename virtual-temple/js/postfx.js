@@ -1,6 +1,6 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 
-// Minimal post pipeline: HDR scene target -> tilt-shift blur (horizontal, vertical) -> bloom -> painterly grade.
+// Minimal post pipeline: HDR scene target -> tilt-shift blur (horizontal, vertical) -> bloom and light shafts -> painterly grade.
 // The tilt-shift gives the campus its handcrafted-miniature look; in the prayer hall the
 // blur band is opened up so the sanctum stays sharp. Disabled on the low quality tier.
 
@@ -24,10 +24,10 @@ export class PostFX {
           gl_FragColor = c; }`,
     });
     this.finalMat = new THREE.ShaderMaterial({
-      uniforms: { tDiffuse: { value: null }, tBloom: { value: null }, uBloom: { value: 0.0 }, uVignette: { value: 0.32 }, uWarm: { value: 0.0 }, uSat: { value: 1.2 }, uGrade: { value: 1.0 } },
+      uniforms: { tDiffuse: { value: null }, tBloom: { value: null }, tShafts: { value: null }, uShafts: { value: 0.0 }, uBloom: { value: 0.0 }, uVignette: { value: 0.32 }, uWarm: { value: 0.0 }, uSat: { value: 1.2 }, uGrade: { value: 1.0 } },
       vertexShader: quadVS, depthTest: false, depthWrite: false, toneMapped: true,
-      fragmentShader: `uniform sampler2D tDiffuse; uniform sampler2D tBloom; uniform float uBloom; uniform float uVignette; uniform float uWarm; uniform float uSat; uniform float uGrade; varying vec2 vUv;
-        void main(){ vec4 c = texture2D(tDiffuse, vUv); c.rgb += texture2D(tBloom, vUv).rgb * uBloom;
+      fragmentShader: `uniform sampler2D tDiffuse; uniform sampler2D tBloom; uniform sampler2D tShafts; uniform float uShafts; uniform float uBloom; uniform float uVignette; uniform float uWarm; uniform float uSat; uniform float uGrade; varying vec2 vUv;
+        void main(){ vec4 c = texture2D(tDiffuse, vUv); c.rgb += texture2D(tBloom, vUv).rgb * uBloom; c.rgb += texture2D(tShafts, vUv).rgb * vec3(1.0,0.86,0.62) * uShafts;
           float l = dot(c.rgb, vec3(0.2126,0.7152,0.0722)); c.rgb = mix(vec3(l), c.rgb, uSat);
           c.rgb *= mix(vec3(1.0), vec3(1.08,0.98,0.86), uWarm);
           // a painterly grade: shadows lean violet, highlights lean gold
@@ -51,6 +51,14 @@ export class PostFX {
           c += (texture2D(tDiffuse, vUv+st*1.3846153846)+texture2D(tDiffuse, vUv-st*1.3846153846))*0.3162162162;
           c += (texture2D(tDiffuse, vUv+st*3.2307692308)+texture2D(tDiffuse, vUv-st*3.2307692308))*0.0702702703; gl_FragColor = c; }` });
     this.bloom = { strength: 0.55, threshold: 1.0 };
+    // light shafts: the glow of the sun and the lanterns, blurred outward along lines from the sun's place on screen
+    this.shafts = { sun: new THREE.Vector2(0.5, 1.2), strength: 0 };
+    this.rtF = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType });
+    this.shaftMat = new THREE.ShaderMaterial({ uniforms: { tDiffuse: { value: null }, uSun: { value: this.shafts.sun } }, vertexShader: quadVS, depthTest: false, depthWrite: false,
+      fragmentShader: `uniform sampler2D tDiffuse; uniform vec2 uSun; varying vec2 vUv;
+        void main(){ vec2 d = (vUv - uSun) * (0.85 / 36.0); vec2 uv = vUv; vec3 c = vec3(0.0); float w = 1.0;
+          for (int i = 0; i < 36; i++) { uv -= d; vec2 q = clamp(uv, 0.0, 1.0); c += texture2D(tDiffuse, q).rgb * w; w *= 0.955; }
+          gl_FragColor = vec4(c / 18.0, 1.0); }` });
     this.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.blurMat); this.quad.frustumCulled = false;
     this.qScene = new THREE.Scene(); this.qScene.add(this.quad); this.qCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
     this.tilt = { focus: 0.5, band: 0.16, amount: 2.2 };
@@ -59,7 +67,7 @@ export class PostFX {
     const W = Math.floor(w * pr), H = Math.floor(h * pr);
     this.rtA.setSize(W, H); this.rtB.setSize(Math.floor(W / 2), Math.floor(H / 2)); this.rtC.setSize(Math.floor(W / 2), Math.floor(H / 2));
     this.blurMat.uniforms.uRes.value.set(W / 2, H / 2);
-    this.rtD.setSize(Math.max(1, Math.floor(W / 4)), Math.max(1, Math.floor(H / 4))); this.rtE.setSize(Math.max(1, Math.floor(W / 4)), Math.max(1, Math.floor(H / 4)));
+    this.rtD.setSize(Math.max(1, Math.floor(W / 4)), Math.max(1, Math.floor(H / 4))); this.rtE.setSize(Math.max(1, Math.floor(W / 4)), Math.max(1, Math.floor(H / 4))); this.rtF.setSize(Math.max(1, Math.floor(W / 4)), Math.max(1, Math.floor(H / 4)));
     this.gaussMat.uniforms.uRes.value.set(W / 4, H / 4);
   }
   render(scene, camera) {
@@ -89,7 +97,9 @@ export class PostFX {
       const g = this.gaussMat.uniforms; this.quad.material = this.gaussMat;
       for (let i = 0; i < 3; i++) { g.tDiffuse.value = this.rtD.texture; g.uDir.value.set(1, 0); r.setRenderTarget(this.rtE); r.render(this.qScene, this.qCam); g.tDiffuse.value = this.rtE.texture; g.uDir.value.set(0, 1); r.setRenderTarget(this.rtD); r.render(this.qScene, this.qCam); }
       this.finalMat.uniforms.tBloom.value = this.rtD.texture; this.finalMat.uniforms.uBloom.value = this.bloom.strength;
-    } else this.finalMat.uniforms.uBloom.value = 0;
+      if (this.shafts.strength > 0.01) { this.quad.material = this.shaftMat; this.shaftMat.uniforms.tDiffuse.value = this.rtD.texture; r.setRenderTarget(this.rtF); r.render(this.qScene, this.qCam); }
+      this.finalMat.uniforms.tShafts.value = this.rtF.texture; this.finalMat.uniforms.uShafts.value = this.shafts.strength;
+    } else { this.finalMat.uniforms.uBloom.value = 0; this.finalMat.uniforms.uShafts.value = 0; }
     this.quad.material = this.finalMat; this.finalMat.uniforms.tDiffuse.value = src;
     r.setRenderTarget(null); r.render(this.qScene, this.qCam);
   }

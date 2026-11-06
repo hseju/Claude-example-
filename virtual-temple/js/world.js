@@ -6,6 +6,7 @@ import { Avatar, randomConfig } from './avatar.js';
 import { Scenery } from './scenery.js';
 import { Flora, normalFromCanvas } from './flora.js';
 import { HUT, buildHut } from './hut.js';
+import { pbr } from './pbr.js';
 
 export const TEMPLES = {
   ganesha: { id: 'ganesha', name: 'Ganesha Temple', short: 'Ganesha', pos: new THREE.Vector3(-31, 0, 0), rot: Math.PI / 2, entrance: new THREE.Vector3(-19.5, 0, 0), stone: '#f1e4cf', accent: '#b8442a', icon: 'modak', flag: '#e8731c', blurb: 'Remover of obstacles. Flower offerings and aarti.' },
@@ -28,7 +29,7 @@ NODES.hut = [HUT.entrance.x, HUT.entrance.z]; NODES.hutPath = [HUT.pathEnd.x, HU
 const TOD_PRESETS = {
   morning: { sky: '#8aa6e6', mid: '#f3bccb', hor: '#ffd9a2', sun: '#ffc98c', sunI: 2.6, hemi: 0.9, ground: '#6b5236', elev: 14, az: 18, fogNear: 70, fogFar: 560, lamps: 1.6, stars: 0, mist: 0.75, warm: 0.36, night: 0, exposure: 1.06, cloud: '#ffe4d8' },
   afternoon: { sky: '#5a8ee0', mid: '#b6c8f0', hor: '#ffe7c6', sun: '#fff0d2', sunI: 3.0, hemi: 1.0, ground: '#6b5a3e', elev: 58, az: 140, fogNear: 100, fogFar: 720, lamps: 1.0, stars: 0, mist: 0.2, warm: 0.2, night: 0, exposure: 1.02, cloud: '#fff6ee' },
-  evening: { sky: '#6a5ab6', mid: '#f19bb2', hor: '#ffc579', sun: '#ffb062', sunI: 3.0, hemi: 0.95, ground: '#5e4030', elev: 9, az: 196, fogNear: 70, fogFar: 560, lamps: 3.8, stars: 0.06, mist: 0.4, warm: 0.55, night: 0.1, exposure: 1.15, cloud: '#ffc7b6' },
+  evening: { sky: '#6a5ab6', mid: '#f19bb2', hor: '#ffc579', sun: '#ffb062', sunI: 3.4, hemi: 1.15, ground: '#6a4632', elev: 11, az: 196, fogNear: 70, fogFar: 560, lamps: 3.8, stars: 0.06, mist: 0.4, warm: 0.55, night: 0.1, exposure: 1.2, cloud: '#ffc7b6' },
   night: { sky: '#0a0f30', mid: '#20296a', hor: '#463a7a', sun: '#a9bcff', sunI: 0.8, hemi: 0.36, ground: '#24202e', elev: 40, az: -55, fogNear: 70, fogFar: 520, lamps: 7.0, stars: 1, mist: 0.3, warm: 0.32, night: 1, exposure: 1.32, cloud: '#464c80' },
 };
 
@@ -117,7 +118,8 @@ export class World {
   }
 
   _ground() {
-    const g = new THREE.Mesh(new THREE.PlaneGeometry(260, 260), new THREE.MeshStandardMaterial({ map: TX.grass([60, 60]), roughness: 0.95 }));
+    // photographed grass (CC0), tinted to a lush green and tiled every two metres
+    const g = new THREE.Mesh(new THREE.PlaneGeometry(260, 260), pbr('grass', { repeat: [130, 130], color: '#c8e49c', normal: 1.2 }));
     g.rotation.x = -Math.PI / 2; g.receiveShadow = true; g.userData.ground = true; this.scene.add(g); this.ground = g; this.pickables.push(g);
     // inner lawn tone inside the walls: compacted earth paths
     const pathMat = new THREE.MeshStandardMaterial({ map: TX.paving('path', '#e0c9a6', [1, 8]), roughness: 0.85 });
