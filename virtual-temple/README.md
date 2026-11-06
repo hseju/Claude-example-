@@ -21,7 +21,7 @@ Opening `index.html` straight from disk (`file://`) does not work, because brows
 | Area | Status |
 | --- | --- |
 | Miniature campus at golden hour: ivory-and-gold temples with shikharas, domed mandapas and rooftop chhatris; gateway with swinging brass bells; courtyard fountain, lotus ponds and kunds with pavilions; carved balustrades, lamp posts and rangoli; flowering trees, a brass Nandi, peacocks, hills and a waterfall; diyas, bunting, birds; tilt-shift and bloom | Working |
-| Painterly RPG look: golden-hour skies in lavender, rose and gold; lanterns, diyas and shrine doors that glow; golden motes of light drifting over the gardens (fireflies by night); a colour grade with violet shadows and gold highlights; and an interface of plum glass in gilded frames, with gold headings and glowing round buttons. Visual only: every screen, control and behaviour works as before | Working |
+| Painterly look: golden-hour skies in lavender, rose and gold; lanterns, diyas and shrine doors that glow; golden motes of light drifting over the gardens (fireflies by night); a colour grade with violet shadows and gold highlights | Working |
 | Devotees: cute, rounded characters about two and a half heads tall, so a person reads at a glance from skin tone, hair, attire, marks and jewellery rather than a detailed face. Each is one skinned mesh on a 27-bone skeleton (eyes, lids, brows, jaw and mouth corners included), smoothly weighted across shoulders, elbows, wrists, waist, knees and neck. Faces have big shiny eyes, rosy cheeks and a small smile; they blink, glance around, close into happy curves in prayer and open to chant during aarti. Mitten hands and bare feet. Hair: short, wavy, bun with jasmine, braid, ponytail, long open, curly, top knot, shikha, receding; head coverings: safa turban or Gandhi topi; hairlines are soft-edged. Saree with pleats, zari border and pallu; kurta with collar, placket and churidar; dhoti with gold border, front pleats and angavastram; salwar kameez with dupatta. Bangles, earrings, mangalsutra, anklets, bindi, tilak or tripundra, moustache or beard, glasses; elders with walking sticks, devotees carrying lit puja thalis, children walking with a parent | Working |
 | Avatar creator: name, gender (male or female), attire, colour, skin tone, hair, head covering, build, age, facial hair, forehead mark, glasses, jewellery; scroll or pinch to look closely | Working |
 | Movement: WASD/arrows, click or tap to walk, on-screen joystick on touch screens, drag to orbit, wheel/pinch zoom from overview down to a close over-the-shoulder view (also a Close view button), map with shrine destinations, collisions | Working |
@@ -57,7 +57,7 @@ Everything is listed in `audio/manifest.json`: an ambience loop per time of day,
 
 ```
 index.html          screens and HUD markup
-css/app.css         UI layer, with the gilded RPG skin at the end (visual overrides only)
+css/app.css         UI layer
 js/main.js          app state machine, input, cameras, UI wiring, render loop
 js/world.js         campus: terrain, temples, gardens, NPC devotees, waypoint graph, collisions, time-of-day presets
 js/scenery.js       mountains, waterfalls, river, clouds, mist, bird flocks, butterflies, fireflies, stars, moon

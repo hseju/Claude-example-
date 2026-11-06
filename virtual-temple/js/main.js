@@ -21,7 +21,7 @@ const prefersReduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const settings = profiles.loadSettings({ quality: 'auto', tod: 'auto', incense: true, reducedMotion: prefersReduced, master: 80, ambience: 70, effects: 85, ceremony: 80, muted: false, musicStyle: 'auto', guideMode: 'guide', voiceURI: '', practiceBg: 'auto', breathTones: true });
 const dpr = window.devicePixelRatio || 1;
 function qualityPreset(q) {
-  if (q === 'auto') q = (isTouch && Math.min(screen.width, screen.height) < 820) ? 'medium' : 'high';
+  if (q === 'auto') q = 'high';   // the app is made for phones: they get the full look by default
   return {
     low: { level: 'low', pr: Math.min(dpr, 1), shadows: 0, post: false, npcs: 10, tilt: 0, bloom: 0 },
     medium: { level: 'medium', pr: Math.min(dpr, isTouch ? 1.3 : 1.5), shadows: 1024, post: true, npcs: 18, tilt: 1.5, bloom: 0.5 },
@@ -55,7 +55,9 @@ audio.muted = settings.muted;
 let world, hall, directory, sim, playerRing;
 const app = { mode: 'loading', hallState: null, currentHall: null, templeId: null, camMode: 'world', time: 0 };
 const me = { id: null, config: defaultConfig(), avatar: null };
-const cam = { close: 0, yaw: 0, pitch: 0.27, dist: 27, tYaw: 0, tPitch: 0.27, tDist: 27, eff: 27, pos: new THREE.Vector3(), target: new THREE.Vector3(), fov: 32 };
+// the camera starts close behind your devotee, as in a third-person RPG; the overview is one tap away
+const CLOSE_DIST = 4.4;
+const cam = { close: 1, yaw: 0, pitch: 0.2, dist: CLOSE_DIST, tYaw: 0, tPitch: 0.2, tDist: CLOSE_DIST, eff: CLOSE_DIST, pos: new THREE.Vector3(), target: new THREE.Vector3(), fov: 32 };
 const input = { keys: new Set(), joy: new THREE.Vector2(), auto: [], pointers: new Map(), drag: false };
 
 // ---------------------------------------------------------------- boot
@@ -548,6 +550,7 @@ function bindUI() {
   $('enterBtn').addEventListener('click', () => { const T = nearShrine(); if (T) enterTemple(T.id); else if (nearHut()) enterHut(); });
   bindHut();
   $('pranamBtn').addEventListener('click', worldPranam);
+  $('closeBtn').setAttribute('aria-pressed', 'true');
   $('closeBtn').addEventListener('click', () => { const near = cam.tDist < 6; if (!near) cam.farDist = cam.tDist; cam.tDist = near ? (cam.farDist || 27) : 2.9; if (!near) cam.tYaw = me.avatar.root.rotation.y + Math.PI; $('closeBtn').setAttribute('aria-pressed', String(!near)); });
   document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => goTo(b.dataset.go)));
   $('mapCanvas').addEventListener('click', (e) => {
@@ -677,7 +680,7 @@ function leaveHut() {
     if (playerRing) playerRing.visible = true;
     $('doneCard').hidden = true; $('hutUI').classList.remove('insession');
     setMode('world');
-    cam.tYaw = cam.yaw = HUT.rot + Math.PI - 0.7; cam.tDist = cam.dist = cam.eff = 10; cam.tPitch = cam.pitch = 0.3; snapCamera();
+    cam.tYaw = cam.yaw = HUT.rot + Math.PI; cam.tDist = cam.dist = cam.eff = CLOSE_DIST; cam.tPitch = cam.pitch = 0.2; snapCamera();
   });
 }
 function showHutPanel() {
@@ -1003,10 +1006,13 @@ function updateWorld(dt, t, ctx) {
   } else {
     // close up, the camera drops to just behind the shoulder and follows your devotee
     if (app.mode === 'world' && input.auto.length && cam.close > 0.3) cam.tYaw = lerpAngle(cam.tYaw, av.root.rotation.y + Math.PI, 1 - Math.exp(-dt * 1.5 * cam.close));
+    // close up, the camera drifts round behind you as you walk (never when you walk toward it, so it cannot spin)
+    else if (app.mode === 'world' && cam.close > 0.5 && av.state === 'walk' && !input.drag) { const d = Math.atan2(Math.sin(av.root.rotation.y + Math.PI - cam.tYaw), Math.cos(av.root.rotation.y + Math.PI - cam.tYaw)); if (Math.abs(d) < 2.0) cam.tYaw += d * (1 - Math.exp(-dt * 0.9)); }
     cam.yaw += (cam.tYaw - cam.yaw) * lerp; cam.pitch += (cam.tPitch - cam.pitch) * lerp; cam.dist += (cam.tDist - cam.dist) * lerp;
     cam.close = clamp01((10 - cam.dist) / 7);
     const right = new THREE.Vector3(Math.cos(cam.yaw), 0, -Math.sin(cam.yaw));
-    const focus = p.clone().add(new THREE.Vector3(0, 1.05 - cam.close * 0.05, 0)).addScaledVector(right, cam.close * 0.26);
+    // close up, the camera looks a little over your head, so your devotee sits low in the frame with the world ahead
+    const focus = p.clone().add(new THREE.Vector3(0, 1.05 + cam.close * 0.5, 0)).addScaledVector(right, cam.close * 0.3);
     cam.target.lerp(focus, 1 - Math.exp(-dt * 8));
     // portrait screens get a little more distance; temples and the gateway pull the camera in rather than hide you
     let want = cam.dist * (camera.aspect < 1 ? 1 + (1 - camera.aspect) * 0.6 * (1 - cam.close) : 1);
