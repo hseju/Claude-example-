@@ -5,6 +5,7 @@ import { normalFromCanvas, merge } from './flora.js';
 import { figureSVG, CHAKRA_POINTS } from './meditator.js';
 import { softDot } from './textures.js';
 import { pbr, boxUV } from './pbr.js';
+import { relief } from './ornament.js';
 
 // Dhyana Kutir: a round meditation hut in the south-west garden. Two tiers of thatch with a brass finial, a
 // front gable with a glowing Om medallion and a sign, carved teak posts with cream curtains tied back, lanterns
@@ -232,7 +233,15 @@ export function buildHut(world) {
   const postAngles = [...Array(12)].map((_, i) => (i + 0.5) / 12 * Math.PI * 2);
   const pg = postGeo(EAVE - FLOOR);
   for (const a of postAngles) { const [x, z] = atAngle(R_POST, a); add(pg, teak, x, FLOOR, z); add(new THREE.BoxGeometry(0.4, 0.12, 0.4), stone, x, FLOOR + 0.06, z); }
-  const band = new THREE.CylinderGeometry(R_POST + 0.1, R_POST + 0.1, 0.3, 48, 1, true); add(band, new THREE.MeshStandardMaterial({ color: '#4a2a18', roughness: 0.6, side: THREE.DoubleSide }), 0, EAVE - 0.1, 0);
+  // a carved creeper runs round the ring beam, and curved brackets brace every post
+  const beamCarve = relief('vine', '#a8743f', { repeat: [14, 1], roughness: 0.7 }); beamCarve.side = THREE.DoubleSide;
+  const band = new THREE.CylinderGeometry(R_POST + 0.1, R_POST + 0.1, 0.34, 64, 1, true); add(band, beamCarve, 0, EAVE - 0.12, 0);
+  for (const a of postAngles) for (const sd of [-1, 1]) {
+    const t = a + sd * 0.17, p0 = new THREE.Vector3(Math.sin(a) * R_POST, EAVE - 0.95, Math.cos(a) * R_POST), p2 = new THREE.Vector3(Math.sin(t) * (R_POST + 0.06), EAVE - 0.26, Math.cos(t) * (R_POST + 0.06));
+    const p1 = new THREE.Vector3(Math.sin(a) * R_POST, EAVE - 0.3, Math.cos(a) * R_POST);
+    add(new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(p0, p1, p2), 10, 0.045, 6), teak, 0, 0, 0, false);
+    add(new THREE.SphereGeometry(0.05, 8, 6), gold, p0.x, p0.y - 0.02, p0.z, false);
+  }
   // the porch: two posts, a beam, and the gable above
   for (const s of [-1, 1]) { add(postGeo(EAVE - FLOOR + 0.05), teak, s * 1.5, FLOOR, 5.05); add(new THREE.BoxGeometry(0.42, 0.12, 0.42), stone, s * 1.5, FLOOR + 0.06, 5.05); }
   add(new THREE.BoxGeometry(3.5, 0.22, 0.24), darkTeak, 0, EAVE + 0.02, 5.08);

@@ -1,6 +1,7 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 import { sandstone, carvedBand } from './textures.js';
 import { triplanar } from './pbr.js';
+import { relief, petalRing, beadRing, mergeGeos } from './ornament.js';
 
 // Shared architectural pieces used by the campus and the prayer halls.
 
@@ -13,12 +14,27 @@ export const darkStone = new THREE.MeshStandardMaterial({ color: '#2a2522', roug
 const lathe = (pts, seg = 24) => new THREE.LatheGeometry(pts.map(([x, y]) => new THREE.Vector2(x, y)), seg);
 
 export function pillarGeometry(h = 3.2, r = 0.28) {
-  // square-feeling turned pillar: base, ringed shaft, pot-and-foliage capital, bracket
-  const p = [[0, 0], [r * 1.5, 0], [r * 1.5, h * 0.06], [r * 1.25, h * 0.08], [r * 1.2, h * 0.14], [r, h * 0.16],
-    [r * 0.92, h * 0.4], [r * 1.12, h * 0.42], [r * 1.12, h * 0.45], [r * 0.9, h * 0.47], [r * 0.85, h * 0.7], [r * 1.05, h * 0.72],
-    [r * 1.05, h * 0.75], [r * 0.85, h * 0.77], [r * 0.8, h * 0.82], [r * 1.25, h * 0.88], [r * 1.35, h * 0.92], [r * 0.9, h * 0.94],
-    [r * 1.6, h * 0.96], [r * 1.6, h], [0, h]];
-  return lathe(p, 8);
+  // a turned pillar with stepped base mouldings, a fluted shaft, a beaded collar, a pot-and-foliage capital
+  // and a cross bracket (four arms with hanging lotus buds) carrying the beam
+  const p = [[0, 0], [r * 1.55, 0], [r * 1.55, h * 0.03], [r * 1.42, h * 0.045], [r * 1.42, h * 0.06], [r * 1.28, h * 0.075], [r * 1.22, h * 0.11], [r * 1.3, h * 0.125], [r * 1.05, h * 0.15], [r, h * 0.16],
+    [r * 0.94, h * 0.4], [r * 1.14, h * 0.415], [r * 1.14, h * 0.445], [r * 0.92, h * 0.46], [r * 0.86, h * 0.68], [r * 1.02, h * 0.7], [r * 1.08, h * 0.72],
+    [r * 1.02, h * 0.74], [r * 0.84, h * 0.76], [r * 0.8, h * 0.8], [r * 1.0, h * 0.82], [r * 1.3, h * 0.86], [r * 1.38, h * 0.895], [r * 1.2, h * 0.915], [r * 0.92, h * 0.93],
+    [r * 1.0, h * 0.945], [r * 1.0, h * 0.955], [r * 0.9, h * 0.96], [0, h * 0.96]];
+  const shaft = lathe(p, 32), pos = shaft.attributes.position;
+  for (let i = 0; i < pos.count; i++) {   // sixteen flutes on the two shaft sections
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i), a = Math.atan2(z, x), onShaft = (y > h * 0.165 && y < h * 0.395) || (y > h * 0.465 && y < h * 0.675);
+    if (onShaft) { const k = 1 - 0.075 * (0.5 + 0.5 * Math.cos(a * 16)); pos.setXYZ(i, x * k, y, z * k); }
+  }
+  shaft.computeVertexNormals();
+  const parts = [shaft, beadRing(r * 1.16, 18, r * 0.08, h * 0.43), beadRing(r * 1.1, 16, r * 0.07, h * 0.72)];
+  // the bracket: two crossing arms with rounded ends and a lotus bud hanging under each end
+  for (const rot of [0, Math.PI / 2]) {
+    const arm = new THREE.BoxGeometry(r * 4.2, r * 0.42, r * 0.95); arm.translate(0, h * 0.98, 0); arm.rotateY(rot); parts.push(arm);
+    const under = new THREE.BoxGeometry(r * 3.0, r * 0.3, r * 0.8); under.translate(0, h * 0.95, 0); under.rotateY(rot); parts.push(under);
+    for (const sgn of [-1, 1]) { const bud = new THREE.SphereGeometry(r * 0.24, 10, 8); bud.scale(1, 1.4, 1); const at = new THREE.Vector3(sgn * r * 1.9, h * 0.935, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), rot); bud.translate(at.x, at.y, at.z); parts.push(bud); }
+  }
+  const top = new THREE.BoxGeometry(r * 3.6, r * 0.25, r * 3.6); top.translate(0, h - r * 0.125 + 0.001, 0); parts.push(top);
+  return mergeGeos(parts);
 }
 
 export function bellGeometry(s = 1) {
@@ -83,7 +99,10 @@ export function lampStand(h = 1.5) {
 }
 
 export function kalasha(s = 1, mat = gold) {
-  return new THREE.Mesh(lathe([[0, 0], [0.18, 0], [0.22, 0.08], [0.3, 0.25], [0.28, 0.42], [0.14, 0.52], [0.12, 0.6], [0.2, 0.66], [0.06, 0.7], [0.08, 0.82], [0.04, 0.95], [0, 1.0]].map(([x, y]) => [x * s, y * s]), 20), mat);
+  // the finial pot: on a ring of lotus petals, with a beaded shoulder, a collar and a pointed bud on top
+  const pot = lathe([[0, 0], [0.18, 0], [0.22, 0.08], [0.3, 0.25], [0.28, 0.42], [0.14, 0.52], [0.12, 0.6], [0.2, 0.66], [0.06, 0.7], [0.08, 0.82], [0.04, 0.95], [0, 1.0]].map(([x, y]) => [x * s, y * s]), 20);
+  const geo = mergeGeos([pot, petalRing(0.2 * s, 10, 0.14 * s, { y: 0.0, lean: 0.85, rows: 1 }), beadRing(0.3 * s, 20, 0.022 * s, 0.32 * s), beadRing(0.16 * s, 12, 0.018 * s, 0.63 * s)]);
+  const m = new THREE.Mesh(geo, mat); m.castShadow = true; return m;
 }
 
 export function amalaka(r = 1.2, mat) {
@@ -111,18 +130,21 @@ export function garland(a, b, sag = 0.5, n = 28, colors = ['#f29a17', '#f6c025',
 export function stoneMat(base, repeat = [1, 1], opts = {}) {
   // photographed stone projected in world space (see pbr.js): fine-grained for carved and smooth pieces, cut blocks for walls and plinths
   void repeat; void sandstone;
-  return triplanar(opts.blocks === false ? 'sandstone' : 'ashlar', { tint: base, tile: opts.blocks === false ? 1.6 : 2.6, roughness: 0.95, ...opts.mat });
+  const m = triplanar(opts.blocks === false ? 'sandstone' : 'ashlar', { tint: base, tile: opts.blocks === false ? 1.6 : 2.6, roughness: 0.95, ...opts.mat }); m.userData.tint = base; return m;
 }
-export function bandMat(base) { const t = carvedBand(base).clone(); t.needsUpdate = true; t.repeat.set(6, 1); return new THREE.MeshStandardMaterial({ map: t, roughness: 0.85 }); }
+// a carved band: a lotus frieze in relief (see ornament.js); `kind` picks another motif
+export function bandMat(base, kind = 'lotus', repeat = [6, 1]) { void carvedBand; return relief(kind, base, { repeat }); }
+const tintOf = (m) => m.userData.tint || '#' + m.color.getHexString();
 
 // Curvilinear nagara-style tower assembled from offset tiers, with corner sub-spires.
 export function shikhara(baseSize, height, mat, accentMat, tiers = 12) {
   const g = new THREE.Group();
   const th = height / tiers;
   const widthAt = (k) => baseSize * (1 - Math.pow(k, 1.7) * 0.74);
+  const carved = relief('gavaksha', tintOf(mat), { repeat: [1, 1] });   // the mesh of chaitya arches that covers the tower
   for (let i = 0; i < tiers; i++) {
     const k = i / tiers, w = widthAt(k);
-    const slab = new THREE.Mesh(new THREE.BoxGeometry(w, th * 0.78, w), mat); slab.position.y = i * th + th * 0.39; slab.castShadow = true; slab.receiveShadow = true; g.add(slab);
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(w, th * 0.78, w), carved); slab.position.y = i * th + th * 0.39; slab.castShadow = true; slab.receiveShadow = true; g.add(slab);
     const lip = new THREE.Mesh(new THREE.BoxGeometry(w * 1.04, th * 0.22, w * 1.04), accentMat); lip.position.y = i * th + th * 0.89; lip.castShadow = true; g.add(lip);
     // central offset band (raha) gives the tower its vertical ribs
     const raha = new THREE.Mesh(new THREE.BoxGeometry(w * 0.36, th * 0.98, w * 1.08), mat); raha.position.y = i * th + th * 0.5; g.add(raha);
@@ -134,7 +156,17 @@ export function shikhara(baseSize, height, mat, accentMat, tiers = 12) {
     for (let i = 0; i < ts; i++) { const k = i / ts, w = sw * (1 - Math.pow(k, 1.6) * 0.7); const s = new THREE.Mesh(new THREE.BoxGeometry(w, sh / ts * 0.8, w), mat); s.position.y = i * sh / ts + sh / ts * 0.4; s.castShadow = true; sub.add(s);
       const l = new THREE.Mesh(new THREE.BoxGeometry(w * 1.05, sh / ts * 0.2, w * 1.05), accentMat); l.position.y = i * sh / ts + sh / ts * 0.9; sub.add(l); }
     const am = amalaka(sw * 0.32, accentMat); am.position.y = sh + 0.05; sub.add(am);
+    const sk = kalasha(sw * 0.28, accentMat); sk.position.y = sh + 0.05 + sw * 0.12; sub.add(sk);
     sub.position.set(sx * baseSize * 0.36, 0, sz * baseSize * 0.36); g.add(sub);
+  }
+  // a smaller spirelet half-set into the middle of each face (the shikhara's clustered profile)
+  if (baseSize > 3) for (let f = 0; f < 4; f++) {
+    const sub = new THREE.Group(), ts = 5, sh = height * 0.27, sw = baseSize * 0.24;
+    for (let i = 0; i < ts; i++) { const k = i / ts, w = sw * (1 - Math.pow(k, 1.6) * 0.7); const sl = new THREE.Mesh(new THREE.BoxGeometry(w, sh / ts * 0.8, w), carved); sl.position.y = i * sh / ts + sh / ts * 0.4; sl.castShadow = true; sub.add(sl);
+      const l = new THREE.Mesh(new THREE.BoxGeometry(w * 1.05, sh / ts * 0.2, w * 1.05), accentMat); l.position.y = i * sh / ts + sh / ts * 0.9; sub.add(l); }
+    const am = amalaka(sw * 0.3, accentMat); am.position.y = sh + 0.04; sub.add(am);
+    const sk = kalasha(sw * 0.26, accentMat); sk.position.y = sh + 0.04 + sw * 0.1; sub.add(sk);
+    const ang = f * Math.PI / 2; sub.position.set(Math.sin(ang) * baseSize * 0.5, height * 0.06, Math.cos(ang) * baseSize * 0.5); g.add(sub);
   }
   const top = height;
   const neck = new THREE.Mesh(new THREE.CylinderGeometry(widthAt(1) * 0.32, widthAt(1) * 0.4, 0.3, 16), mat); neck.position.y = top + 0.15; g.add(neck);
@@ -162,7 +194,7 @@ export function chhatri(s = 1, stone = ivory, trim = paleGold) {
     const a = new THREE.Mesh(new THREE.TorusGeometry(0.95 * s, 0.07 * s, 6, 18, Math.PI), trim);
     const ang = i * Math.PI / 2; a.position.set(Math.sin(ang) * 1.12 * s, 1.45 * s, Math.cos(ang) * 1.12 * s); a.rotation.y = ang; g.add(a);
   }
-  add(new THREE.BoxGeometry(2.75 * s, 0.28 * s, 2.75 * s), stone, 0, 2.54 * s, 0);
+  add(new THREE.BoxGeometry(2.75 * s, 0.28 * s, 2.75 * s), relief('beads', tintOf(stone), { repeat: [3, 1] }), 0, 2.54 * s, 0);
   const eave = add(new THREE.CylinderGeometry(1.75 * s, 2.15 * s, 0.14 * s, 4, 1), stone, 0, 2.74 * s, 0); eave.rotation.y = Math.PI / 4;
   add(new THREE.CylinderGeometry(1.0 * s, 1.05 * s, 0.22 * s, 20), trim, 0, 2.9 * s, 0);
   const dome = new THREE.LatheGeometry([[0, 0], [1.0, 0], [1.08, 0.22], [1.02, 0.55], [0.8, 0.9], [0.45, 1.15], [0.14, 1.32], [0, 1.36]].map(([x, y]) => new THREE.Vector2(x * s, y * s)), 24);

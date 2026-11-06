@@ -89,7 +89,7 @@ export function triplanar(name, { tile = 2, tint, normal = 1, ao = 1, roughness 
   const key = cacheKey && `${name}|${tile}|${tint}|${cacheKey}`;
   if (key && _tpCache.has(key)) return _tpCache.get(key);
   const color = new THREE.Color(1, 1, 1);
-  if (tint) { const t = new THREE.Color(tint), m = MEAN[name] || [0.5, 0.5, 0.5]; color.setRGB(Math.min(2.2, t.r / m[0]), Math.min(2.2, t.g / m[1]), Math.min(2.2, t.b / m[2])); }
+  if (tint) { const t = new THREE.Color(tint), m = MEAN[name] || [0.5, 0.5, 0.5]; color.setRGB(Math.min(3.6, t.r / m[0]), Math.min(3.6, t.g / m[1]), Math.min(3.6, t.b / m[2])); }   // enough range to turn the warm photo pale grey for Shiva's stone
   const mat = new THREE.MeshStandardMaterial({ color, roughness, ...rest });
   const u = { tpMap: { value: base(`${name}_diff.jpg`, true) }, tpNor: { value: base(`${name}_nor.jpg`, false) }, tpArm: { value: base(`${name}_arm.jpg`, false) }, uTpScale: { value: 1 / tile }, uTpNormal: { value: normal }, uTpAO: { value: ao } };
   mat.userData.triplanar = u;

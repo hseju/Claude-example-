@@ -6,6 +6,7 @@ import { Avatar, randomConfig } from './avatar.js';
 import { Scenery } from './scenery.js';
 import { Flora, normalFromCanvas } from './flora.js';
 import { HUT, buildHut } from './hut.js';
+import { relief, petalRing } from './ornament.js';
 import { pbr, triplanar } from './pbr.js';
 
 export const TEMPLES = {
@@ -154,23 +155,30 @@ export class World {
   _gateway() {
     const S = this.scene, z = 40;
     const m = stoneMat('#efe2cb', [1, 3], { rows: 6 }), band = bandMat('#e3cfa9');
+    const gatePil = relief('diamond', '#efe2cb', { repeat: [4, 1], vertical: true }), tierCarve = relief('gavaksha', '#efe2cb', { repeat: [3, 1] });
     const gate = new THREE.Group(); gate.position.set(0, 0, z); S.add(gate); this.occluders = [gate];
     for (const s of [-1, 1]) {
       const p = new THREE.Mesh(new THREE.BoxGeometry(2.2, 6.4, 2.4), m); p.position.set(s * 3.6, 3.2, 0); p.castShadow = p.receiveShadow = true; gate.add(p);
       const b = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.4, 2.6), band); b.position.set(s * 3.6, 1.0, 0); gate.add(b);
       const b2 = b.clone(); b2.position.y = 4.6; gate.add(b2);
+      for (const face of [1, -1]) {
+        for (const u of [-0.82, 0.82]) { const pl = new THREE.Mesh(new THREE.BoxGeometry(0.42, 5.9, 0.12), gatePil); pl.position.set(s * 3.6 + u, 3.35, face * 1.25); gate.add(pl); }
+        const niche = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.5, 0.1), darkStone); niche.position.set(s * 3.6, 2.85, face * 1.22); gate.add(niche);
+        const arc = new THREE.Mesh(new THREE.TorusGeometry(0.52, 0.06, 6, 18, Math.PI), paleGold); arc.position.set(s * 3.6, 3.55, face * 1.27); gate.add(arc);
+        const sill = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.14, 0.25), paleGold); sill.position.set(s * 3.6, 2.08, face * 1.27); gate.add(sill);
+      }
       this.colliders.boxes.push({ minX: s * 3.6 - 1.25, maxX: s * 3.6 + 1.25, minZ: z - 1.3, maxZ: z + 1.3 });
       // guardian lamp posts
-      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 1.6, 8), m); post.position.set(s * 5.6, 0.8, 2.6); S.add(post);
-      const lamp = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.18, 0.2, 10), brass); lamp.position.set(s * 5.6, 1.7, 2.6); S.add(lamp);
+      const post = new THREE.Mesh(lampPostGeometry(1.6), m); post.position.set(s * 5.6, 0, 2.6); post.castShadow = true; S.add(post);
+      const lamp = new THREE.Mesh(petalRing(0.16, 10, 0.22, { lean: 0.9, rows: 2 }), brass); lamp.position.set(s * 5.6, 1.6, 2.6); S.add(lamp);
       this.flames.add(new THREE.Vector3(s * 5.6, 1.88, 2.6), 0.6);
     }
-    const lintel = new THREE.Mesh(new THREE.BoxGeometry(10, 1.1, 2.8), m); lintel.position.y = 6.9; lintel.castShadow = true; gate.add(lintel);
+    const lintel = new THREE.Mesh(new THREE.BoxGeometry(10, 1.1, 2.8), relief('vine', '#efe2cb', { repeat: [2.5, 1] })); lintel.position.y = 6.9; lintel.castShadow = true; gate.add(lintel);
     const lb = new THREE.Mesh(new THREE.BoxGeometry(10.2, 0.35, 3.0), band); lb.position.y = 6.3; gate.add(lb);
     // stepped gopuram tiers
     for (let i = 0; i < 5; i++) {
       const w = 9.6 - i * 1.4, d = 2.6 - i * 0.25;
-      const t = new THREE.Mesh(new THREE.BoxGeometry(w, 0.9, d), m); t.position.y = 7.9 + i * 0.95; t.castShadow = true; gate.add(t);
+      const t = new THREE.Mesh(new THREE.BoxGeometry(w, 0.9, d), tierCarve); t.position.y = 7.9 + i * 0.95; t.castShadow = true; gate.add(t);
       const l = new THREE.Mesh(new THREE.BoxGeometry(w + 0.2, 0.14, d + 0.2), band); l.position.y = 8.35 + i * 0.95; gate.add(l);
       for (let k = -2; k <= 2; k++) { if (Math.abs(k) * 1.6 > w / 2 - 0.4) continue; const n = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.55, 0.2), darkStone); n.position.set(k * 1.6, 7.9 + i * 0.95, d / 2 + 0.05); gate.add(n); }
     }
@@ -208,16 +216,19 @@ export class World {
       px.fillStyle = '#f3e8d4'; px.beginPath(); px.arc(x0 + 32, 32, 5, 0, Math.PI * 2); px.fill(); }
     const panel = new THREE.CanvasTexture(pc); panel.colorSpace = THREE.SRGBColorSpace; panel.wrapS = THREE.RepeatWrapping; panel.repeat.set(3, 1);
     const carved = new THREE.MeshStandardMaterial({ map: panel, normalMap: normalFromCanvas(pc, 3), roughness: 0.75 });
-    const basin = new THREE.Mesh(new THREE.CylinderGeometry(2.7, 2.85, 0.6, 48, 1, true), carved); basin.position.y = 0.3; basin.castShadow = basin.receiveShadow = true; S.add(basin);
+    void carved; const basin = new THREE.Mesh(new THREE.CylinderGeometry(2.7, 2.85, 0.6, 48, 1, true), relief('diamond', '#e3cfae', { repeat: [10, 1] })); basin.position.y = 0.3; basin.castShadow = basin.receiveShadow = true; S.add(basin);
     const lip = new THREE.Mesh(new THREE.TorusGeometry(2.75, 0.14, 8, 40), stone); lip.rotation.x = Math.PI / 2; lip.position.y = 0.6; S.add(lip);
     this.water = new THREE.MeshStandardMaterial({ color: '#3d7d7a', roughness: 0.22, metalness: 0.2, normalMap: TX.waterNormal(), normalScale: new THREE.Vector2(0.35, 0.35), transparent: true, opacity: 0.92 });
     this.pondWater = this.water.clone(); this.pondWater.opacity = 0.66; this.pondWater.roughness = 0.38; this.pondWater.color.set('#2c6a62');
     const w = new THREE.Mesh(new THREE.CircleGeometry(2.7, 40), this.water); w.rotation.x = -Math.PI / 2; w.position.y = 0.5; S.add(w);
-    const ped = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.6, 1.3, 16), stone); ped.position.y = 0.95; S.add(ped);
+    const ped = new THREE.Mesh(lampPostGeometry(1.3).scale(1.6, 1, 1.6), stone); ped.position.y = 0.3; S.add(ped);
+    { const pr = new THREE.Mesh(petalRing(0.95, 18, 0.45, { lean: 0.75, rows: 2 }), stone); pr.position.y = 1.32; pr.castShadow = true; S.add(pr); }
     const bowl = new THREE.Mesh(new THREE.SphereGeometry(1.0, 24, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), stone); bowl.position.y = 1.75; bowl.scale.y = 0.45; S.add(bowl);
     const bw = new THREE.Mesh(new THREE.CircleGeometry(0.95, 24), this.water); bw.rotation.x = -Math.PI / 2; bw.position.y = 1.72; S.add(bw);
     // lotus bud finial
-    const bud = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 10), new THREE.MeshStandardMaterial({ color: '#e9a7b0', roughness: 0.6 })); bud.scale.y = 1.5; bud.position.y = 2.0; S.add(bud);
+    const pink = new THREE.MeshStandardMaterial({ color: '#efa9b8', roughness: 0.55, side: THREE.DoubleSide });
+    const bud = new THREE.Mesh(petalRing(0.12, 8, 0.36, { lean: 0.35, rows: 2 }), pink); bud.position.y = 1.78; S.add(bud);
+    const bud2 = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), new THREE.MeshStandardMaterial({ color: '#f6d36b', roughness: 0.5 })); bud2.position.y = 1.9; S.add(bud2);
     const jets = fountainJets(this.quality.level === 'low' ? 220 : 520, new THREE.Vector3(0, 2.1, 0), { height: 0.9, radius: 2.1 });
     S.add(jets); this.updaters.push((dt, t) => { jets.material.uniforms.uTime.value = t; });
     { const c = document.createElement('canvas'); c.width = 128; c.height = 16; const x = c.getContext('2d');
@@ -301,7 +312,8 @@ export class World {
     // platform (jagati) with mouldings
     add(new THREE.BoxGeometry(13, 1.2, 16), stone, 0, 0.6, 0);
     add(new THREE.BoxGeometry(13.4, 0.25, 16.4), band, 0, 0.14, 0);
-    add(new THREE.BoxGeometry(13.3, 0.22, 16.3), band, 0, 1.12, 0);
+    add(new THREE.BoxGeometry(13.3, 0.22, 16.3), relief('beads', T.stone, { repeat: [10, 1] }), 0, 1.12, 0);
+    add(new THREE.BoxGeometry(13.2, 0.42, 16.2), relief('diamond', T.stone, { repeat: [6, 1] }), 0, 0.62, 0);
     for (let i = 0; i < 5; i++) add(new THREE.BoxGeometry(4.2, 0.24 * (i + 1), 0.42), stoneFine, 0, 0.12 * (i + 1), 9.9 - i * 0.4);
     for (const s of [-1, 1]) { add(new THREE.BoxGeometry(0.5, 1.3, 2.2), band, s * 2.35, 0.65, 9.0); this._diyaLocal(g, new THREE.Vector3(s * 2.35, 1.32, 9.6)); this._diyaLocal(g, new THREE.Vector3(s * 2.35, 1.32, 8.4)); }
     // mandapa pillars
@@ -310,13 +322,15 @@ export class World {
     let k = 0; const m4 = new THREE.Matrix4();
     for (const x of [-4.4, -1.5, 1.5, 4.4]) for (const z of [1.4, 4.3, 7.2]) { m4.makeTranslation(x, 1.2, z); pillars.setMatrixAt(k++, m4); }
     g.add(pillars);
-    add(new THREE.BoxGeometry(10.4, 0.5, 7.4), stone, 0, 4.65, 4.3);
-    add(new THREE.BoxGeometry(10.9, 0.18, 7.9), band, 0, 4.4, 4.3);
+    add(new THREE.BoxGeometry(10.4, 0.5, 7.4), relief('vine', T.stone, { repeat: [5, 1] }), 0, 4.65, 4.3);
+    add(new THREE.BoxGeometry(10.9, 0.18, 7.9), relief('beads', T.stone, { repeat: [9, 1] }), 0, 4.4, 4.3);
     add(new THREE.BoxGeometry(11.2, 0.22, 8.2), accent, 0, 4.95, 4.3);
     // sloping eave (chajja)
     const eave = add(new THREE.BoxGeometry(11.6, 0.12, 1.2), accent, 0, 4.25, 8.2); eave.rotation.x = 0.35;
     // dome over the mandapa: this is the prayer hall
-    add(new THREE.CylinderGeometry(3.0, 3.2, 0.7, 24), band, 0, 5.4, 4.3);
+    add(new THREE.CylinderGeometry(3.0, 3.2, 0.7, 32), relief('lotus', T.stone, { repeat: [12, 1] }), 0, 5.4, 4.3);
+    add(petalRing(3.0, 28, 0.55, { y: 0, lean: 0.35 }), stoneFine, 0, 5.72, 4.3);
+    add(petalRing(0.55, 12, 0.42, { y: 0, lean: 1.1, rows: 2 }), accent, 0, 8.08, 4.3);
     const dome = add(new THREE.SphereGeometry(3.0, 32, 14, 0, Math.PI * 2, 0, Math.PI / 2), stoneFine, 0, 5.75, 4.3); dome.scale.y = 0.85;
     for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; const rib = add(new THREE.TorusGeometry(3.0, 0.05, 4, 24, Math.PI / 2), accent, 0, 5.75, 4.3); rib.rotation.set(0, a, Math.PI / 2); rib.scale.set(0.85, 1, 1); }
     const dk = kalasha(0.8); dk.position.set(0, 8.2, 4.3); g.add(dk);
@@ -333,6 +347,12 @@ export class World {
       n.position.add(new THREE.Vector3(Math.sin(ry) * 0.06, 0, Math.cos(ry) * 0.06));
     }
     add(new THREE.BoxGeometry(8.0, 0.35, 8.0), band, 0, 6.2, -3.6);
+    const pil = relief('diamond', T.stone, { repeat: [3.5, 1], vertical: true });
+    for (const [cx, cz, ry] of [[3.8, -3.6, Math.PI / 2], [-3.8, -3.6, -Math.PI / 2], [0, -7.4, Math.PI]]) {
+      const across = new THREE.Vector3(Math.cos(ry), 0, -Math.sin(ry)), out = new THREE.Vector3(Math.sin(ry), 0, Math.cos(ry));
+      for (const u of [-3.45, -1.25, 1.25, 3.45]) { const p = new THREE.Vector3(cx, 3.7, cz).addScaledVector(across, u).addScaledVector(out, 0.06); const m = add(new THREE.BoxGeometry(0.5, 4.7, 0.14), pil, p.x, p.y, p.z); m.rotation.y = ry; }
+      const ped = shikhara(1.25, 1.2, stoneFine, accent, 4); const pp = new THREE.Vector3(cx, 4.85, cz).addScaledVector(out, -0.35); ped.position.copy(pp); ped.rotation.y = ry; g.add(ped);
+    }
     // shikhara
     const tower = shikhara(6.8, 9.5, stone, accent); tower.position.set(0, 6.35, -3.6); g.add(tower);
     // flag on the finial
@@ -353,7 +373,12 @@ export class World {
     // sanctum doorway, glowing from within
     add(new THREE.BoxGeometry(2.4, 3.2, 0.3), gold, 0, 2.8, 0.12);
     add(new THREE.BoxGeometry(1.9, 2.8, 0.32), new THREE.MeshStandardMaterial({ color: '#2a120a', emissive: '#ffa548', emissiveIntensity: 1.6, roughness: 1 }), 0, 2.6, 0.14);
-    add(new THREE.BoxGeometry(0.2, 3.4, 0.4), band, -1.3, 2.9, 0.15); add(new THREE.BoxGeometry(0.2, 3.4, 0.4), band, 1.3, 2.9, 0.15);
+    const jamb = relief('vine', T.stone, { repeat: [3, 1], vertical: true });
+    for (const s2 of [-1, 1]) { add(new THREE.BoxGeometry(0.42, 3.6, 0.42), jamb, s2 * 1.42, 3.0, 0.16); add(new THREE.BoxGeometry(0.22, 3.6, 0.46), relief('beads', T.stone, { repeat: [5, 1], vertical: true }), s2 * 1.74, 3.0, 0.14); }
+    add(new THREE.BoxGeometry(3.9, 0.42, 0.5), relief('lotus', T.stone, { repeat: [3, 1] }), 0, 4.62, 0.17);
+    const torana = new THREE.Mesh(new THREE.TorusGeometry(1.55, 0.09, 8, 28, Math.PI), accent); torana.position.set(0, 4.85, 0.3); torana.castShadow = true; g.add(torana);
+    const torana2 = new THREE.Mesh(new THREE.TorusGeometry(1.32, 0.045, 6, 28, Math.PI), accent); torana2.position.set(0, 4.85, 0.3); g.add(torana2);
+    add(new THREE.CylinderGeometry(0.28, 0.28, 0.08, 20).rotateX(Math.PI / 2), accent, 0, 6.35, 0.32); add(new THREE.SphereGeometry(0.13, 12, 8), gold, 0, 6.35, 0.38);
     this._diyaLocal(g, new THREE.Vector3(-1.05, 1.24, 0.6)); this._diyaLocal(g, new THREE.Vector3(1.05, 1.24, 0.6));
     // garlands between the front pillars
     for (const [a, b] of [[-4.4, -1.5], [-1.5, 1.5], [1.5, 4.4]]) g.add(garland(new THREE.Vector3(a, 4.15, 7.45), new THREE.Vector3(b, 4.15, 7.45), 0.55, 24));
