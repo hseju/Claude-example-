@@ -47,6 +47,8 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure
 renderer.shadowMap.enabled = Q.shadows > 0; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 setAnisotropy(Math.min(8, renderer.capabilities.getMaxAnisotropy())); setPBRAnisotropy(Math.min(8, renderer.capabilities.getMaxAnisotropy()));
 const post = new PostFX(renderer); post.enabled = Q.post;
+// the painted look: small brush strokes at full resolution (a broader brush on high), off on low
+post.paint.enabled = Q.level !== 'low'; post.paint.radius = Q.level === 'high' ? 3 : 2; post.paint.scale = 1;   // full resolution keeps signs and lanterns crisp post.finalMat.uniforms.uGrain.value = Q.level === 'low' ? 0 : 0.035;
 const camera = new THREE.PerspectiveCamera(32, innerWidth / innerHeight, 0.1, 2200);
 
 const audio = new TempleAudio();
@@ -89,7 +91,7 @@ async function boot() {
   world.scene.add(me.avatar.root);
   playerRing = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.68, 48), new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffc861').multiplyScalar(2.2), transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending }));
   playerRing.rotation.x = -Math.PI / 2; world.scene.add(playerRing);
-  if (/[?&]debug\b/.test(location.search)) window.__vt = { app, me, world, hall, directory, cam, input, settings, audio, preview, refreshCreator, hut: { state: hutState, guide, model: HUT, enter: enterHut, leave: leaveHut, start: startSession, end: endSession } }; // local testing hook
+  if (/[?&]debug\b/.test(location.search)) window.__vt = { app, me, world, hall, post, directory, cam, input, settings, audio, preview, refreshCreator, hut: { state: hutState, guide, model: HUT, enter: enterHut, leave: leaveHut, start: startSession, end: endSession } }; // local testing hook
   setMode('welcome');
   $('loading').style.opacity = '0'; setTimeout(() => $('loading').remove(), 900);
   last = performance.now(); requestAnimationFrame(loop);
