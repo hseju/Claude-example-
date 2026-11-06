@@ -1,5 +1,6 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 import { softDot } from './textures.js';
+import { shikhara } from './architecture.js';
 
 // The living backdrop around the campus: layered mountain ranges, three great waterfalls with
 // mist and a river, drifting clouds and valley mist, flocks of egrets, crows and parakeets,
@@ -18,6 +19,7 @@ const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a
 const dAng = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 
 export const FALLS = [-Math.PI * 0.5, -Math.PI * 0.68, -Math.PI * 0.31]; // north, north-west, north-east
+const PALACE_A = -Math.PI * 0.405;   // the palace on the hill, framed between the north and north-east falls
 
 export class Scenery {
   constructor(scene, quality, water, beds = []) {
@@ -28,6 +30,7 @@ export class Scenery {
     this._mountains();
     this._falls();
     this._clouds();
+    this._palace();
     this._flocks();
     this._butterflies();
     this._night();
@@ -71,23 +74,24 @@ export class Scenery {
     this.group.add(new THREE.Mesh(far, this.farMat));
     // forest on the near slopes: round, leafy canopies (a few lumpy lobes over a short trunk), some in pink blossom
     const n = low ? 420 : 900, parts = [];
-    const lobe = (r, x, y, z, seed) => { const g = new THREE.IcosahedronGeometry(r, 1), p = g.attributes.position; for (let i = 0; i < p.count; i++) { const vx = p.getX(i), vy = p.getY(i), vz = p.getZ(i), k = 1 + 0.16 * Math.sin(vx * 7 + seed) * Math.sin(vy * 6 + seed * 2) * Math.sin(vz * 8 + seed * 3); p.setXYZ(i, vx * k + x, vy * k * 0.85 + y, vz * k + z); } return g; };
+    const lobe = (r, x, y, z, seed) => { const g = new THREE.SphereGeometry(r, 9, 7), p = g.attributes.position; for (let i = 0; i < p.count; i++) { const vx = p.getX(i), vy = p.getY(i), vz = p.getZ(i), k = 1 + 0.16 * Math.sin(vx * 7 + seed) * Math.sin(vy * 6 + seed * 2) * Math.sin(vz * 8 + seed * 3); p.setXYZ(i, vx * k + x, vy * k * 0.85 + y, vz * k + z); } g.computeVertexNormals(); return g.toNonIndexed(); };
     parts.push(lobe(1.0, 0, 2.2, 0, 1), lobe(0.75, 0.62, 1.85, 0.25, 2), lobe(0.72, -0.6, 1.9, -0.2, 3), lobe(0.62, 0.1, 2.85, -0.1, 4));
     const trunk = new THREE.CylinderGeometry(0.12, 0.2, 1.6, 5).translate(0, 0.8, 0).toNonIndexed();
     const geoms = [...parts, trunk], cols = [];
     for (const g of geoms) { const p = g.attributes.position, isTrunk = g === trunk; for (let i = 0; i < p.count; i++) { const y = p.getY(i); const v = isTrunk ? 0.35 : 0.55 + 0.45 * Math.min(1, Math.max(0, (y - 1.3) / 2)); cols.push(isTrunk ? 0.42 : v, isTrunk ? 0.3 : v, isTrunk ? 0.22 : v); } }
     const merged = new THREE.BufferGeometry(); const total = geoms.reduce((a, g) => a + g.attributes.position.count, 0), pos = new Float32Array(total * 3); let o = 0;
     for (const g of geoms) { pos.set(g.attributes.position.array, o * 3); o += g.attributes.position.count; }
-    merged.setAttribute('position', new THREE.BufferAttribute(pos, 3)); merged.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3)); merged.computeVertexNormals();
-    const trees = new THREE.InstancedMesh(merged, new THREE.MeshStandardMaterial({ roughness: 0.95, vertexColors: true, flatShading: true }), n);
+    const nor = new Float32Array(total * 3); o = 0; for (const g of geoms) { nor.set(g.attributes.normal.array, o * 3); o += g.attributes.normal.count; }
+    merged.setAttribute('position', new THREE.BufferAttribute(pos, 3)); merged.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); merged.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));   // smooth, rounded crowns
+    const trees = new THREE.InstancedMesh(merged, new THREE.MeshStandardMaterial({ roughness: 0.95, vertexColors: true }), n);
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), c = new THREE.Color(), up = new THREE.Vector3(0, 1, 0); let k = 0;
     for (let i = 0; k < n && i < n * 4; i++) {
       const a = Math.random() * Math.PI * 2, r = 104 + Math.random() * 90, h = this.nearHeight(r, a);
-      if (h < 1 || h > 60 || FALLS.some(fa => Math.abs(dAng(a, fa)) < 0.09)) continue;
+      if (h < 1 || h > 60 || FALLS.some(fa => Math.abs(dAng(a, fa)) < 0.09) || Math.abs(dAng(a, PALACE_A)) < 0.17) continue;   // keep the palace in view
       const s = 2.0 + Math.random() * 2.2; q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
       m.compose(new THREE.Vector3(Math.cos(a) * r, h - 0.6, Math.sin(a) * r), q, new THREE.Vector3(s, s * (0.85 + Math.random() * 0.4), s)); trees.setMatrixAt(k, m);
       const bloom = Math.random() < 0.16;
-      trees.setColorAt(k++, c.set(bloom ? ['#e2689a', '#d9528a', '#f08ab0'][Math.floor(Math.random() * 3)] : ['#3f7a34', '#4a8a3a', '#356c2e', '#5a9440', '#2f6230'][Math.floor(Math.random() * 5)]));
+      trees.setColorAt(k++, c.set(bloom ? ['#f4a2c4', '#ec8ab6', '#f8bdd4'][Math.floor(Math.random() * 3)] : ['#3f7a34', '#4a8a3a', '#356c2e', '#5a9440', '#2f6230'][Math.floor(Math.random() * 5)]));
     }
     trees.count = k; this.group.add(trees);
   }
@@ -154,21 +158,68 @@ export class Scenery {
     this.group.add(new THREE.Mesh(g, this.water));
   }
 
+  // ------------------------------------------------------------ a palace on the hill
+  // Framed between the two northern waterfalls when you look up the main approach: an ivory palace on a terrace,
+  // with domed pavilions, a tall tower, rows of warmly lit windows and a soft halo above it at dusk.
+  _palace() {
+    const a = PALACE_A, r = 172, h = this.nearHeight(r, a), g = new THREE.Group();
+    g.position.set(Math.cos(a) * r, h + 2, Math.sin(a) * r); g.rotation.y = Math.atan2(-g.position.x, -g.position.z); this.group.add(g);
+    const ivory = new THREE.MeshStandardMaterial({ color: '#f4e6cc', roughness: 0.8 }), gold = new THREE.MeshStandardMaterial({ color: '#e6b85c', metalness: 0.6, roughness: 0.4 });
+    const glow = this.palaceGlow = new THREE.MeshStandardMaterial({ color: '#ffd59a', emissive: '#ffb050', emissiveIntensity: 1.6 });
+    const box = (w, hh, d, x, y, z, m = ivory) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, hh, d), m); b.position.set(x, y + hh / 2, z); g.add(b); return b; };
+    const cyl = (r0, hh, x, y, z, m = ivory) => { const c = new THREE.Mesh(new THREE.CylinderGeometry(r0, r0 * 1.08, hh, 14), m); c.position.set(x, y + hh / 2, z); g.add(c); return c; };
+    const dome = (rr, x, y, z, m = ivory) => { const d = new THREE.Mesh(new THREE.SphereGeometry(rr, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), m); d.scale.y = 1.3; d.position.set(x, y, z); g.add(d);
+      const f = new THREE.Mesh(new THREE.ConeGeometry(rr * 0.1, rr * 0.75, 8), gold); f.position.set(x, y + rr * 1.3 + rr * 0.3, z); g.add(f); };
+    // an arched window: a tall glowing slot with a rounded head
+    const arch = (x, y, z, w = 1.3, hh = 4) => { box(w, hh, 0.3, x, y, z, glow); const c = new THREE.Mesh(new THREE.CylinderGeometry(w / 2, w / 2, 0.3, 12, 1, false, 0, Math.PI), glow); c.rotation.set(Math.PI / 2, 0, Math.PI / 2); c.position.set(x, y + hh, z); g.add(c); };
+    const chhatri = (x, y, z, rr = 1.6) => { for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) cyl(0.16, 2.4, x + dx * rr * 0.6, y, z + dz * rr * 0.6); box(rr * 1.6, 0.3, rr * 1.6, x, y + 2.4, z); dome(rr * 0.75, x, y + 2.7, z, gold); };
+    box(52, 6, 30, 0, -2, 0); box(54, 0.8, 32, 0, 4, 0, gold);                              // terrace and its gilded lip
+    box(26, 12, 14, 0, 4.8, 0); box(28, 1, 16, 0, 16.8, 0);                                 // main hall
+    cyl(6.4, 3, 0, 17.8, 0); dome(7, 0, 20.8, 0, gold);                                      // golden central dome on its drum
+    for (const s of [-1, 1]) {
+      box(9, 9, 11, s * 18.5, 4.8, 1.5); dome(3.8, s * 18.5, 13.8, 1.5);                   // side pavilions
+      chhatri(s * 11, 17.8, 5); chhatri(s * 11, 17.8, -5);                                 // pavilions on the roof corners
+      for (const z of [-13, 13]) { cyl(0.85, 22, s * 25, 4.8, z); box(2.4, 0.5, 2.4, s * 25, 26.8, z, gold); dome(1.2, s * 25, 27.3, z); }   // minarets at the terrace corners
+      arch(s * 18.5, 7, 7.1, 1.2, 3.4);
+    }
+    const tower = shikhara(9, 30, ivory, gold, 10); tower.position.set(0, 4.8, -12); g.add(tower);
+    for (let i = 0; i < 7; i++) arch(-9 + i * 3, 7.5, 7.1);
+    const halo = this.palaceHalo = new THREE.Sprite(new THREE.SpriteMaterial({ map: softDot(), color: new THREE.Color(1.0, 0.78, 0.45), transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+    halo.scale.set(90, 90, 1); halo.position.set(0, 30, -6); g.add(halo);
+  }
+
   // ------------------------------------------------------------ clouds and valley mist
-  _cloudTexture() {
-    const S = 256, c = document.createElement('canvas'); c.width = S; c.height = S / 2; const x = c.getContext('2d');
-    for (let i = 0; i < 26; i++) { const px = S * (0.15 + Math.random() * 0.7), py = S / 2 * (0.45 + Math.random() * 0.3), r = 18 + Math.random() * 34;
-      const g = x.createRadialGradient(px, py, 0, px, py, r); g.addColorStop(0, 'rgba(255,255,255,0.75)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, S, S / 2); }
+  // painted clouds: billowing lobes along a flat base, a warm rim where the sun catches the tops, violet in the undersides
+  _cloudTexture(stratus = false) {
+    const S = 512, H = stratus ? 96 : 256, c = document.createElement('canvas'); c.width = S; c.height = H; const x = c.getContext('2d');
+    const lobes = stratus ? 30 : 34;
+    for (let i = 0; i < lobes; i++) {
+      const u = 0.1 + Math.random() * 0.8, mid = 1 - Math.abs(u - 0.5) * 1.5, r = stratus ? 14 + Math.random() * 18 : (24 + Math.random() * 46) * (0.45 + mid * 0.75);
+      const px = S * u, py = stratus ? H * (0.42 + Math.random() * 0.2) : H * 0.66 - r * (0.2 + Math.random() * 0.55) * mid;
+      const g = x.createRadialGradient(px, py - r * 0.3, r * 0.1, px, py, r); g.addColorStop(0, 'rgba(255,255,255,0.98)'); g.addColorStop(0.55, 'rgba(255,255,255,0.82)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+      x.fillStyle = g; x.beginPath(); x.ellipse(px, py, r * (stratus ? 2.6 : 1.05), r, 0, 0, Math.PI * 2); x.fill();
+    }
+    x.globalCompositeOperation = 'destination-out';   // a soft, flat base
+    const cut = x.createLinearGradient(0, H * 0.62, 0, H * 0.8); cut.addColorStop(0, 'rgba(0,0,0,0)'); cut.addColorStop(1, 'rgba(0,0,0,1)'); x.fillStyle = cut; x.fillRect(0, 0, S, H);
+    x.globalCompositeOperation = 'source-atop';        // shading only where there is cloud
+    const sh = x.createLinearGradient(0, 0, 0, H * 0.75); sh.addColorStop(0, 'rgba(255,236,200,0.5)'); sh.addColorStop(0.45, 'rgba(255,255,255,0)'); sh.addColorStop(1, 'rgba(150,118,178,0.55)'); x.fillStyle = sh; x.fillRect(0, 0, S, H);
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
   }
   _clouds() {
     const tex = this._cloudTexture();
     this.cloudMat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, fog: false, opacity: 0.85 });
     this.clouds = [];
-    for (let i = 0; i < (this.quality.level === 'low' ? 10 : 18); i++) {
-      const s = new THREE.Sprite(this.cloudMat); const w = 90 + Math.random() * 150; s.scale.set(w, w * 0.4, 1);
+    for (let i = 0; i < (this.quality.level === 'low' ? 10 : 20); i++) {
+      const s = new THREE.Sprite(this.cloudMat); const w = 110 + Math.random() * 170; s.scale.set(w, w * 0.5, 1);
       const a = Math.random() * Math.PI * 2, r = 260 + Math.random() * 260; s.position.set(Math.cos(a) * r, 90 + Math.random() * 110, Math.sin(a) * r);
       this.followers.add(s); this.clouds.push({ s, a, r, sp: 0.004 + Math.random() * 0.006 });
+    }
+    // low banks of layered cloud resting on the far ranges give the sky depth
+    this.bankMat = new THREE.SpriteMaterial({ map: this._cloudTexture(true), transparent: true, depthWrite: false, fog: false, opacity: 0.8 });
+    for (let i = 0; i < (this.quality.level === 'low' ? 6 : 12); i++) {
+      const sp = new THREE.Sprite(this.bankMat), w = 160 + Math.random() * 200; sp.scale.set(w, w * 0.19, 1);
+      const a = Math.random() * Math.PI * 2, r = 330 + Math.random() * 160; sp.position.set(Math.cos(a) * r, 34 + Math.random() * 40, Math.sin(a) * r);
+      this.followers.add(sp); this.clouds.push({ s: sp, a, r, sp: 0.002 + Math.random() * 0.003 });
     }
     this.mistMat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, fog: false, opacity: 0.5 });
     this.mists = [];
@@ -254,7 +305,8 @@ export class Scenery {
     for (const tex of this.fallTex) tex.offset.y = (t * (tex === this.fallTex[0] ? 0.55 : 0.8)) % 1;
     // tint by time of day
     const day = 1 - tod.night;
-    this.cloudMat.color.copy(tod.cloud); this.cloudMat.opacity = 0.35 + 0.5 * day;
+    this.cloudMat.color.copy(tod.cloud); this.cloudMat.opacity = 0.35 + 0.55 * day; this.bankMat.color.copy(tod.cloud); this.bankMat.opacity = 0.3 + 0.5 * day;
+    if (this.palaceGlow) { const lamps = tod.lamps ?? 1; this.palaceGlow.emissiveIntensity = 0.6 + lamps * 0.55; this.palaceHalo.material.opacity = 0.12 + Math.min(0.5, lamps * 0.08); }
     this.mistMat.color.copy(tod.cloud).lerp(new THREE.Color('#ffffff'), 0.4 * day); this.mistMat.opacity = tod.mist * 0.55;
     this.mistU.uColor.value.copy(tod.cloud).lerp(new THREE.Color('#ffffff'), 0.6 * day); this.mistU.uOpacity.value = 0.35 + 0.45 * day;
     for (const m of this.fallMats) m.color.setScalar(0.12 + 0.88 * day);

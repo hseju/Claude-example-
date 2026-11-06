@@ -62,6 +62,8 @@ const LEAF_KINDS = {
   gulmohar: { greens: ['#5b8c3c', '#6d9c45', '#4b7a33'], leaves: 120, len: [10, 16], wid: [3, 5], bloom: ['#e2391c', '#f2541f', '#c92a14', '#ff7a2e'], blooms: 60 },
   jacaranda: { greens: ['#4b7a33', '#5b8a3a'], leaves: 60, len: [10, 16], wid: [3, 5], bloom: ['#8f6ad6', '#a07fe0', '#7a58c4', '#b394ec'], blooms: 80 },
 };
+// the shadowed inside of each crown: the darker greens, or the darker blossom where a tree is in flower
+const CORE_TONE = { neem: '#2c5222', gulmohar: '#8c2c16', bougainvillea: '#8a1a52', jacaranda: '#5a4296' };
 function leafTexture(kind) {
   const K = LEAF_KINDS[kind], S = 512, c = cv(S), x = c.getContext('2d');
   x.scale(2, 2);
@@ -81,7 +83,7 @@ function leafTexture(kind) {
     x.strokeStyle = 'rgba(255,255,220,0.12)'; x.lineWidth = 0.6; leafShape(x, len, wid); x.stroke();
     x.restore();
   }
-  if (K.bloom) for (let i = 0; i < K.blooms * 1.5; i++) {
+  if (K.bloom) for (let i = 0; i < K.blooms * 2.4; i++) {
     const r = Math.sqrt(rnd()) * 105, a = rnd() * Math.PI * 2, cx = 128 + Math.cos(a) * r, cy = 128 + Math.sin(a) * r, col = pick(K.bloom);
     for (let k = 0; k < 4 + Math.floor(rnd() * 4); k++) { const pa = rnd() * Math.PI * 2, d = 3 + rnd() * 6; x.fillStyle = col; x.beginPath(); x.ellipse(cx + Math.cos(pa) * d, cy + Math.sin(pa) * d, 4 + rnd() * 3, 3 + rnd() * 2, pa, 0, Math.PI * 2); x.fill(); }
     x.fillStyle = 'rgba(255,240,200,0.8)'; x.beginPath(); x.arc(cx, cy, 1.2, 0, Math.PI * 2); x.fill();
@@ -207,11 +209,16 @@ export class Flora {
       }
     }
     clusters.push(centre.clone().add(new V(0, o.h * 0.14, 0)));
-    for (const cc of clusters) for (let k = 0; k < Math.ceil(o.cards * 0.6); k++) {
+    // a soft, lumpy mass inside every main cluster, in the canopy's shadow tone, so the crown reads full rather than see-through
+    const cores = [];
+    for (const cc of clusters) { const rr = o.spread * (cores.length % 3 === 0 ? 0.36 : 0.27), g = new THREE.IcosahedronGeometry(rr, 1), p = g.attributes.position, sd = rnd() * 10;
+      for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i), k = 1 + 0.18 * Math.sin(x * 5 + sd) * Math.sin(y * 6 + sd) * Math.sin(z * 5.5 + sd); p.setXYZ(i, x * k + cc.x, y * k * 0.8 + cc.y, z * k + cc.z); }
+      g.computeVertexNormals(); cores.push(g); }
+    for (const cc of clusters) for (let k = 0; k < o.cards; k++) {
       const d = new V(rnd() - 0.5, (rnd() - 0.5) * 0.7, rnd() - 0.5).normalize().multiplyScalar(o.spread * 0.34 * Math.cbrt(rnd()));
       leaves.push(card(o.card * (0.7 + rnd() * 0.35), cc.clone().add(d), centre));
     }
-    return { wood: merge(wood), leaves: merge(leaves) };
+    return { wood: merge(wood), leaves: merge(leaves), core: merge(cores) };
   }
   _ashoka(o) {
     const wood = [seg(new V(0, 0, 0), new V(0, o.h * 0.95, 0), o.trunk, o.trunk * 0.2, 7)], leaves = [], centre = new V(0, o.h * 0.5, 0);
@@ -256,18 +263,20 @@ export class Flora {
       const o = specs[kind]; if (!list.length) continue;
       const leafM = foliageMaterial(kind === 'palm' ? frondTexture() : leafTexture(kind), this.windTime, { amp: kind === 'palm' ? 0.18 : 0.07, freq: kind === 'palm' ? 1.1 : 1.5 });
       const variants = [0, 1].map(() => (o.type === 'palm' ? this._palm(o) : o.type === 'ashoka' ? this._ashoka(o) : this._broadleaf(o)));
+      const coreM = foliageMaterial(null, this.windTime, { amp: 0.07, freq: 1.5, alphaTest: 0 }); coreM.color.set(CORE_TONE[kind] || '#2f5a26');
       variants.forEach((v, vi) => {
         const mine = list.filter((_, i) => i % 2 === vi); if (!mine.length) return;
         const wood = new THREE.InstancedMesh(v.wood, o.type === 'palm' ? palmBarkM : barkM, mine.length);
         const leaves = new THREE.InstancedMesh(v.leaves, leafM, mine.length);
+        const core = v.core ? new THREE.InstancedMesh(v.core, coreM, mine.length) : null;
         const nuts = v.nuts ? new THREE.InstancedMesh(v.nuts, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7 }), mine.length) : null;
         mine.forEach((t, i) => {
           m.compose(new V(t.x, 0, t.z), q.setFromAxisAngle(new V(0, 1, 0), t.r), new V(t.s, t.s * (0.9 + rnd() * 0.2), t.s));
-          wood.setMatrixAt(i, m); leaves.setMatrixAt(i, m); if (nuts) nuts.setMatrixAt(i, m);
-          leaves.setColorAt(i, c.setHSL(0, 0, 0.88 + rnd() * 0.14));
+          wood.setMatrixAt(i, m); leaves.setMatrixAt(i, m); if (nuts) nuts.setMatrixAt(i, m); if (core) core.setMatrixAt(i, m);
+          leaves.setColorAt(i, c.setHSL(0, 0, 0.88 + rnd() * 0.14)); if (core) core.setColorAt(i, c);
         });
         wood.castShadow = leaves.castShadow = true; leaves.receiveShadow = this.quality.level === 'high'; wood.receiveShadow = true;
-        S.add(wood, leaves); if (nuts) S.add(nuts);
+        S.add(wood, leaves); if (nuts) S.add(nuts); if (core) { core.castShadow = true; core.receiveShadow = leaves.receiveShadow; S.add(core); }
       });
     }
   }

@@ -8,9 +8,10 @@ const images = new Map();
 let aniso = 4;
 export function setPBRAnisotropy(a) { aniso = a; }
 
+const clones = new Map();   // tiled copies to refresh once their shared image has arrived
 function base(file, srgb) {
   if (!images.has(file)) {
-    const t = loader.load(`textures/${file}`);
+    const t = loader.load(`textures/${file}`, () => { for (const c of clones.get(file) || []) c.needsUpdate = true; });
     t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = aniso;
     if (srgb) t.colorSpace = THREE.SRGBColorSpace;
     images.set(file, t);
@@ -18,8 +19,9 @@ function base(file, srgb) {
   return images.get(file);
 }
 function tiled(file, srgb, repeat, rotation) {
-  const t = base(file, srgb).clone();   // a clone shares the image, so it uploads once
-  t.repeat.set(repeat[0], repeat[1]); t.rotation = rotation; t.needsUpdate = true;
+  const src = base(file, srgb), t = src.clone();   // a clone shares the image, so it uploads once
+  t.repeat.set(repeat[0], repeat[1]); t.rotation = rotation;
+  if (src.image) t.needsUpdate = true; else { if (!clones.has(file)) clones.set(file, []); clones.get(file).push(t); }
   return t;
 }
 
