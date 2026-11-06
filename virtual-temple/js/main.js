@@ -1048,7 +1048,7 @@ function updateWorld(dt, t, ctx) {
     camera.position.copy(cam.target).addScaledVector(dir, cam.eff);
     camera.lookAt(cam.target); camera.fov = 52 - cam.close * 8;
     world.update(dt, t, p, ctx);
-    if (playerRing) { playerRing.position.set(p.x, 0.06, p.z); const k = settings.reducedMotion ? 1 : 1 + Math.sin(t * 2.4) * 0.06; playerRing.scale.set(k, k, k); playerRing.material.opacity = 0.85 * Math.max(0, 1 - cam.close * 1.4);   // the ring helps from afar; close up it would only clutter the scene }
+    if (playerRing) { playerRing.position.set(p.x, 0.06, p.z); const k = settings.reducedMotion ? 1 : 1 + Math.sin(t * 2.4) * 0.06; playerRing.scale.set(k, k, k); playerRing.material.opacity = 0.85 * Math.max(0, 1 - cam.close * 1.4); }   // the ring helps from afar; close up it would only clutter the scene
   }
   camera.updateProjectionMatrix();
   post.tilt.amount = Q.tilt * (app.mode === 'welcome' ? 0.06 : 0.08 * (1 - (cam.close || 0))); post.tilt.focus = 0.4; post.tilt.band = 0.32; renderer.toneMappingExposure = world.tod.exposure;
