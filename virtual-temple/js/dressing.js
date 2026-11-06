@@ -1,7 +1,7 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 import { brass, gold, lampPostGeometry } from './architecture.js';
 import { triplanar } from './pbr.js';
-import { mergeGeos } from './ornament.js';
+import { mergeGeos, relief } from './ornament.js';
 
 // Set dressing: the small things that make the grounds feel lived in and rich, all instanced so phones stay smooth.
 //   floor:    carved curbs along every path, fallen petals over the paving, glowing golden lotus inlays
@@ -16,7 +16,7 @@ const GATE_Z = 40;
 function rnd(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
 const inRect = (x, z, [cx, cz, w, d], pad = 0) => Math.abs(x - cx) < w / 2 + pad && Math.abs(z - cz) < d / 2 + pad;
 
-export function dressWorld(world, temples) {
+export function dressWorld(world, temples, HUT) {
   const S = world.scene, r = rnd(4242), Q = world.quality, low = Q.level === 'low';
   const hits = (x, z, rad) => {
     for (const b of world.colliders.boxes) if (x > b.minX - rad && x < b.maxX + rad && z > b.minZ - rad && z < b.maxZ + rad) return true;
@@ -72,7 +72,8 @@ export function dressWorld(world, temples) {
     const t = new THREE.CanvasTexture(cvs); t.colorSpace = THREE.SRGBColorSpace; return t;
   })();
   const inlayMat = new THREE.MeshBasicMaterial({ map: inlayTex, color: new THREE.Color(1.3, 0.95, 0.55), transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -6 });
-  const inlays = [[0, 22.5, 2.6], [0, 28.5, 2.6], [-14.5, 0, 2.4], [14.5, 0, 2.4], [0, -14.8, 2.4]];
+  const hutInlay = HUT.toWorld(0, 0, 7.55);
+  const inlays = [[0, 22.5, 2.6], [0, 28.5, 2.6], [-14.5, 0, 2.4], [14.5, 0, 2.4], [0, -14.8, 2.4], [hutInlay.x, hutInlay.z, 1.9]];
   for (const [x, z, s] of inlays) { const p = new THREE.Mesh(new THREE.PlaneGeometry(s, s).rotateX(-Math.PI / 2), inlayMat); p.position.set(x, 0.045, z); S.add(p); }
 
   // ---------------------------------------------------------------- lanterns
@@ -82,7 +83,8 @@ export function dressWorld(world, temples) {
   for (let t = 17.6; t < 23; t += 4.4) for (const s of [-1, 1]) { lanternSpots.push([t, s * 2.95]); lanternSpots.push([-t, s * 2.95]); }
   lanternSpots.push([0 + 3.0, -19.5], [-3.0, -19.5]);
   for (const s of [-1, 1]) lanternSpots.push([s * 2.95, 44.5], [s * 2.95, 48.5]);
-  const ok = lanternSpots.filter(([x, z]) => !hits(x, z, 0.2));
+  const ok = lanternSpots.filter(([x, z]) => !hits(x, z, 0.2)).map(([x, z]) => [x, z, 1]);
+  for (const [lx, lz] of HUT.pathLanterns || []) { const p = HUT.toWorld(lx, 0, lz); ok.push([p.x, p.z, 0.82]); }   // smaller lanterns along the hut path
   const H = 1.05, postGeo = lampPostGeometry(H).scale(0.7, 1, 0.7);
   const body = new THREE.CylinderGeometry(0.15, 0.15, 0.32, 6, 1, true); body.translate(0, H + 0.22, 0);
   const frameParts = [];
@@ -104,10 +106,10 @@ export function dressWorld(world, temples) {
   const poolMat = new THREE.MeshBasicMaterial({ map: poolTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -5 });
   const pools = new THREE.InstancedMesh(new THREE.PlaneGeometry(2.6, 2.6).rotateX(-Math.PI / 2), poolMat, ok.length);
   const haloMat = new THREE.SpriteMaterial({ map: poolTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.6 });
-  ok.forEach(([x, z], i) => {
-    m.compose(new THREE.Vector3(x, 0, z), q.setFromAxisAngle(up, r() * 6.3), new THREE.Vector3(1, 1, 1)); posts.setMatrixAt(i, m); bodies.setMatrixAt(i, m); frames.setMatrixAt(i, m);
+  ok.forEach(([x, z, k], i) => {
+    m.compose(new THREE.Vector3(x, 0, z), q.setFromAxisAngle(up, r() * 6.3), new THREE.Vector3(k, k, k)); posts.setMatrixAt(i, m); bodies.setMatrixAt(i, m); frames.setMatrixAt(i, m);
     m.makeTranslation(x, 0.05, z); pools.setMatrixAt(i, m);
-    const sp = new THREE.Sprite(haloMat); sp.scale.set(0.95, 0.95, 1); sp.position.set(x, H + 0.22, z); S.add(sp);   // a soft glow that always faces you
+    const sp = new THREE.Sprite(haloMat); sp.scale.set(0.95 * k, 0.95 * k, 1); sp.position.set(x, (H + 0.22) * k, z); S.add(sp);   // a soft glow that always faces you
     world.colliders.circles.push({ x, z, r: 0.28 });
   });
   posts.castShadow = frames.castShadow = true; S.add(posts, bodies, frames, pools);
@@ -118,6 +120,27 @@ export function dressWorld(world, temples) {
     haloMat.opacity = 0.2 + Math.min(0.55, lamps * 0.09);
     inlayMat.opacity = (0.45 + Math.min(0.35, lamps * 0.06)) * (0.85 + 0.15 * Math.sin(t * 0.9));
   });
+
+  // ---------------------------------------------------------------- the meditation hut's path
+  // a carved stone railing runs between the path and the lotus pond, its panels carved with lotus friezes, from lantern to lantern
+  const hg = new THREE.Group(); hg.position.copy(HUT.pos); hg.rotation.y = HUT.rot; S.add(hg);
+  const panel = relief('lotus', '#e8d4b2', { repeat: [1, 1] }), railStone = triplanar('sandstone', { tint: '#e8d4b2', tile: 1.2, roughness: 0.9 });
+  const hadd = (geo, mat, x, y, z) => { const o = new THREE.Mesh(geo, mat); o.position.set(x, y, z); o.castShadow = o.receiveShadow = true; hg.add(o); return o; };
+  for (const [z0, z1] of [[7.55, 9.65], [10.15, 12.25]]) {
+    const L = z1 - z0, zc = (z0 + z1) / 2;
+    hadd(new THREE.BoxGeometry(0.22, 0.12, L), railStone, -1.75, 0.06, zc);
+    const pnl = hadd(new THREE.BoxGeometry(L, 0.42, 0.12), panel, -1.75, 0.33, zc); pnl.rotation.y = Math.PI / 2;
+    hadd(new THREE.BoxGeometry(0.26, 0.09, L + 0.1), railStone, -1.75, 0.585, zc);
+    for (let k = 1; k < 3; k++) { const z = z0 + L * k / 3; hadd(new THREE.CylinderGeometry(0.05, 0.05, 0.1, 10), brass, -1.75, 0.66, z); }
+    for (let k = 0; k < 6; k++) { const p = HUT.toWorld(-1.75, 0, z0 + L * (k + 0.5) / 6); world.colliders.circles.push({ x: p.x, z: p.z, r: 0.16 }); }
+  }
+  // an incense urn on a carved pedestal beside the steps, smoke curling up from it
+  { const ped = lampPostGeometry(0.95).scale(1.1, 1, 1.1); hadd(ped, railStone, 2.55, 0, 6.55);
+    const bowl = new THREE.LatheGeometry([[0, 0], [0.12, 0], [0.24, 0.08], [0.3, 0.2], [0.27, 0.24], [0.2, 0.2], [0, 0.18]].map(([a, b]) => new THREE.Vector2(a, b)), 22);
+    hadd(bowl, brass, 2.55, 0.95, 6.55);
+    const ember = new THREE.Mesh(new THREE.CircleGeometry(0.17, 16).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 0.9, 0.3) })); ember.position.set(2.55, 1.14, 6.55); hg.add(ember);
+    const p = HUT.toWorld(2.55, 0, 6.55); world.colliders.circles.push({ x: p.x, z: p.z, r: 0.32 });
+    if (world.hutSmoke) world.hutSmoke.addEmitter(HUT.toWorld(2.55, 1.2, 6.55), { rate: 5, life: 1e9, spread: 0.04 }); }
 
   // ---------------------------------------------------------------- planting
   // flowering bushes along the paths: try spots a little way off each path edge, keep the walkway and everything else clear
@@ -135,7 +158,13 @@ export function dressWorld(world, temples) {
     }
   }
   for (let k = 0; k < (low ? 30 : 70); k++) { const a = r() * Math.PI * 2, rr = 14 + r() * 3.5; tryBush(Math.cos(a) * rr, Math.sin(a) * rr, 0.55 + r() * 0.4); }
-  for (const [x, z, rad] of bushes) { world.flora.addHedge(x, z, rad, true); world.colliders.circles.push({ x, z, r: rad * 0.8 }); }
+  // and along the meditation hut's path, clear of the walkway, the steps and the pond
+  for (let k = 0; k < 60; k++) {
+    const lz = 6.2 + r() * 8.4, side = r() < 0.5 ? -1 : 1, lx = side * (2.05 + r() * 1.7), rad = 0.45 + r() * 0.35;
+    if (Math.hypot(lx + 3.75, lz - 9.9) < 2.2 + rad) continue;
+    const p = HUT.toWorld(lx, 0, lz); tryBush(p.x, p.z, rad);
+  }
+  for (const [x, z, rad] of bushes) { world.flora.addHedge(x, z, rad, true); world.colliders.circles.push({ x, z, r: rad * 0.8 }); (world.bedSpots = world.bedSpots || []).push([x, z]); }
 
   // brass urns of leafy palms at the foot of each temple's steps
   const urnGeo = new THREE.LatheGeometry([[0, 0], [0.16, 0], [0.18, 0.04], [0.14, 0.08], [0.2, 0.16], [0.3, 0.32], [0.3, 0.44], [0.24, 0.54], [0.26, 0.58], [0.3, 0.6], [0.28, 0.62], [0, 0.6]].map(([a, b]) => new THREE.Vector2(a, b)), 22);

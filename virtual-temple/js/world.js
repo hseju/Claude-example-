@@ -94,7 +94,7 @@ export class World {
     this._peacock(new THREE.Vector3(-21, 0, -10), 0.9);
     this._rangolis();
     this._gardens();
-    dressWorld(this, TEMPLES);   // curbs, petals, lotus inlays, lanterns, flowering bushes, potted palms
+    dressWorld(this, TEMPLES, HUT);   // curbs, petals, lotus inlays, lanterns, flowering bushes, potted palms
     this._urlis();
     this._grassPoints();
     this.flora.build((p) => this._diya(p, 0.38));
@@ -281,6 +281,8 @@ export class World {
       if (Math.abs(x) < 3.8 && z > 11 && z < 41) return true;
       if (Math.abs(z) < 3.2 && Math.abs(x) > 11 && Math.abs(x) < 23) return true;
       if (Math.abs(x) < 3.2 && z < -11 && z > -23) return true;
+      { const dx = x - HUT.pos.x, dz = z - HUT.pos.z, c = Math.cos(-HUT.rot), sn = Math.sin(-HUT.rot), lx = dx * c + dz * sn, lz = -dx * sn + dz * c;   // the hut path, in the hut's own frame
+        if (Math.abs(lx) < 1.6 && lz > 5.5 && lz < 13.9) return true; }
       for (const b of this.colliders.boxes) if (x > b.minX - 0.3 && x < b.maxX + 0.3 && z > b.minZ - 0.3 && z < b.maxZ + 0.3) return true;
       for (const c of this.colliders.circles) if (Math.hypot(x - c.x, z - c.z) < c.r + 0.2) return true;
       return false;

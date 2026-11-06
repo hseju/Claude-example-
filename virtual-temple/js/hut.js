@@ -9,7 +9,7 @@ import { relief } from './ornament.js';
 
 // Dhyana Kutir: a round meditation hut in the south-west garden. Two tiers of thatch with a brass finial, a
 // front gable with a glowing Om medallion and a sign, carved teak posts with cream curtains tied back, lanterns
-// under the eaves, a porch with glowing steps, and a cobbled path lined with stone lanterns past a lotus pond.
+// under the eaves, a porch with glowing steps, and a flagstone path lined with brass lanterns past a lotus pond.
 // Inside: a round jute mat, a ring of cushions, a woven pendant lamp, and an altar where a golden meditator sits
 // in a halo of light that breathes with you.
 // Local frame: origin at the centre of the plinth on the ground; +z points out of the door toward the courtyard.
@@ -391,7 +391,7 @@ export function buildHut(world) {
   const leafIm = new THREE.InstancedMesh(leafGeo(), leafMat, leaves.length);
   leaves.forEach((m, i) => { leafIm.setMatrixAt(i, m); leafIm.setColorAt(i, leafCols[i]); }); leafIm.castShadow = true; g.add(leafIm);
 
-  // ---- the path: cobbles, stone lanterns, a signpost, a lotus pond, rocks and flowering trees
+  // ---- the path: flagstones, a signpost, a lotus pond, rocks and flowering trees (its lanterns, railing and incense urn are in dressing.js)
   const cobC = cobbleCanvas();
   const pathGeo = new THREE.PlaneGeometry(2.6, 7.2, 1, 1); pathGeo.rotateX(-Math.PI / 2);
   add(pathGeo, pbr('flagstone', { repeat: [1.5, 4.1], color: '#ffe6c8', polygonOffset: true, polygonOffsetFactor: -2 }), 0, 0.02, 9.95, false); void cobC;
@@ -408,15 +408,9 @@ export function buildHut(world) {
   const lanternStone = pbr('sandstone', { color: '#ecd2ae' }); lanternStone.userData.boxTile = 0.55;
   // every lantern lays a soft pool of warm light on the stones around it
   const poolMat = new THREE.MeshBasicMaterial({ map: softDot(), color: new THREE.Color(1.0, 0.62, 0.28), transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false });
-  for (const z of [7.3, 9.9, 12.5]) for (const s of [-1, 1]) {
-    const x = s * 1.75;
-    add(new THREE.BoxGeometry(0.36, 0.12, 0.36), lanternStone, x, 0.06, z); add(new THREE.BoxGeometry(0.16, 0.42, 0.16), lanternStone, x, 0.33, z);
-    add(new THREE.BoxGeometry(0.32, 0.05, 0.32), lanternStone, x, 0.565, z); add(new THREE.BoxGeometry(0.24, 0.24, 0.24), lanternGlow, x, 0.71, z, false);
-    for (const [dx, dz] of [[-0.12, -0.12], [0.12, -0.12], [-0.12, 0.12], [0.12, 0.12]]) add(new THREE.BoxGeometry(0.035, 0.26, 0.035), lanternStone, x + dx, 0.71, z + dz, false);
-    const cap = add(new THREE.ConeGeometry(0.29, 0.18, 4), lanternStone, x, 0.92, z); cap.rotation.y = Math.PI / 4;
-    const pool = add(new THREE.PlaneGeometry(2.4, 2.4).rotateX(-Math.PI / 2), poolMat, x, 0.045, z, false); pool.receiveShadow = false; pool.renderOrder = 2;
-    world.colliders.circles.push(...[toWorld(x, 0, z)].map(p => ({ x: p.x, z: p.z, r: 0.25 })));
-  }
+  // the path lanterns are brass lattice lanterns built with the rest of the campus lanterns (dressing.js); this is where they stand
+  HUT.pathLanterns = []; for (const z of [7.3, 9.9, 12.5]) for (const s of [-1, 1]) HUT.pathLanterns.push([s * 1.75, z]);
+  void lanternStone; void lanternGlow; void poolMat;
   // signpost
   const postW = add(new THREE.CylinderGeometry(0.06, 0.07, 1.5, 8), teak, 2.65, 0.75, 8.4);
   const arrowC = signCanvas('Meditation', 768, 200);

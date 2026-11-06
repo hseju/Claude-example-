@@ -302,11 +302,11 @@ export class Scenery {
     mat.onBeforeCompile = (sh) => { sh.uniforms.uTime = this.uTime; sh.vertexShader = 'uniform float uTime;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
       float ph = instanceMatrix[3].x * 3.1 + instanceMatrix[3].z * 2.3; float f = sin(uTime * 22.0 + ph);
       transformed.y += abs(position.x) * f * 1.2; transformed.x *= 0.6 + 0.4 * abs(cos(uTime * 22.0 + ph));`); };
-    const n = this.beds.length ? Math.min(40, this.beds.length * 2) : 0;
+    const n = this.beds.length ? Math.min(this.quality.level === 'low' ? 30 : 70, this.beds.length * 2) : 0;
     this.flutter = new THREE.InstancedMesh(wing, mat, Math.max(1, n)); this.flutter.count = n; this.flutter.frustumCulled = false;
     const cols = ['#f29a17', '#f6d23a', '#ffffff', '#3d7fd8', '#e35d9a'], c = new THREE.Color();
     this.flies = [];
-    for (let i = 0; i < n; i++) { const b = this.beds[i % this.beds.length]; this.flies.push({ x: b[0], z: b[1], ph: Math.random() * 10, r: 0.8 + Math.random() * 1.6, s: 0.5 + Math.random() * 0.6 }); this.flutter.setColorAt(i, c.set(cols[i % cols.length])); }
+    for (let i = 0; i < n; i++) { const b = this.beds[i % this.beds.length]; this.flies.push({ x: b[0], z: b[1], ph: Math.random() * 10, r: 0.8 + Math.random() * 1.6, s: 0.5 + Math.random() * 0.6 }); if (i % 3 === 0) this.flutter.setColorAt(i, c.setRGB(2.4, 1.7, 0.55)); else this.flutter.setColorAt(i, c.set(cols[i % cols.length])); }
     this.group.add(this.flutter);
   }
 
