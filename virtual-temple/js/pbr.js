@@ -47,3 +47,57 @@ export function boxUV(geo, tile = 1) {
   geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   return geo;
 }
+
+// ---------------------------------------------------------------- stone projected from world position
+// For the many temple pieces built in code (walls, plinths, pillars, steps, paving), the photographed surface is
+// projected along the three world axes and blended by the surface normal, so it keeps a true scale on any shape
+// without per-piece texture coordinates. A tint is given as the colour the stone should read as on average.
+const MEAN = { slabs: [0.444, 0.337, 0.194], ashlar: [0.377, 0.288, 0.176], sandstone: [0.562, 0.376, 0.216], flagstone: [0.22, 0.149, 0.097] };
+const TP_VERT_DECL = 'varying vec3 vTpPos;\nvarying vec3 vTpNormal;\n';
+const TP_VERT = `
+  vec4 tpW = vec4(transformed, 1.0);
+  vec3 tpN = objectNormal;
+  #ifdef USE_INSTANCING
+    tpW = instanceMatrix * tpW; tpN = mat3(instanceMatrix) * tpN;
+  #endif
+  tpW = modelMatrix * tpW; vTpPos = tpW.xyz; vTpNormal = normalize(mat3(modelMatrix) * tpN);`;
+const TP_FRAG_DECL = 'varying vec3 vTpPos;\nvarying vec3 vTpNormal;\nuniform sampler2D tpMap; uniform sampler2D tpNor; uniform sampler2D tpArm; uniform float uTpScale; uniform float uTpNormal; uniform float uTpAO;\n';
+const TP_MAP = `
+  vec3 tpWn = normalize(vTpNormal);
+  vec3 tpw = pow(abs(tpWn), vec3(4.0)); tpw /= (tpw.x + tpw.y + tpw.z);
+  vec2 tpUX = vTpPos.zy * uTpScale, tpUY = vTpPos.xz * uTpScale, tpUZ = vTpPos.xy * uTpScale;
+  diffuseColor.rgb *= (texture2D(tpMap, tpUX) * tpw.x + texture2D(tpMap, tpUY) * tpw.y + texture2D(tpMap, tpUZ) * tpw.z).rgb;
+  vec3 tpArmS = (texture2D(tpArm, tpUX) * tpw.x + texture2D(tpArm, tpUY) * tpw.y + texture2D(tpArm, tpUZ) * tpw.z).rgb;`;
+const TP_ROUGH = 'float roughnessFactor = roughness * tpArmS.g;';
+const TP_NORMAL = `
+  {
+    vec3 nX = texture2D(tpNor, tpUX).xyz * 2.0 - 1.0, nY = texture2D(tpNor, tpUY).xyz * 2.0 - 1.0, nZ = texture2D(tpNor, tpUZ).xyz * 2.0 - 1.0;
+    nX.xy *= uTpNormal; nY.xy *= uTpNormal; nZ.xy *= uTpNormal;
+    nX = vec3(nX.xy + tpWn.zy, abs(nX.z) * tpWn.x); nY = vec3(nY.xy + tpWn.xz, abs(nY.z) * tpWn.y); nZ = vec3(nZ.xy + tpWn.xy, abs(nZ.z) * tpWn.z);
+    vec3 tpNW = normalize(nX.zyx * tpw.x + nY.xzy * tpw.y + nZ.xyz * tpw.z);
+    normal = normalize((viewMatrix * vec4(tpNW, 0.0)).xyz);
+    #ifdef DOUBLE_SIDED
+      normal *= faceDirection;
+    #endif
+  }`;
+const TP_AO = 'reflectedLight.indirectDiffuse *= mix(1.0, tpArmS.r, uTpAO); reflectedLight.indirectSpecular *= mix(1.0, tpArmS.r, uTpAO);';
+
+const _tpCache = new Map();
+export function triplanar(name, { tile = 2, tint, normal = 1, ao = 1, roughness = 1, cacheKey, ...rest } = {}) {
+  const key = cacheKey && `${name}|${tile}|${tint}|${cacheKey}`;
+  if (key && _tpCache.has(key)) return _tpCache.get(key);
+  const color = new THREE.Color(1, 1, 1);
+  if (tint) { const t = new THREE.Color(tint), m = MEAN[name] || [0.5, 0.5, 0.5]; color.setRGB(Math.min(2.2, t.r / m[0]), Math.min(2.2, t.g / m[1]), Math.min(2.2, t.b / m[2])); }
+  const mat = new THREE.MeshStandardMaterial({ color, roughness, ...rest });
+  const u = { tpMap: { value: base(`${name}_diff.jpg`, true) }, tpNor: { value: base(`${name}_nor.jpg`, false) }, tpArm: { value: base(`${name}_arm.jpg`, false) }, uTpScale: { value: 1 / tile }, uTpNormal: { value: normal }, uTpAO: { value: ao } };
+  mat.userData.triplanar = u;
+  mat.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, u);
+    sh.vertexShader = TP_VERT_DECL + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>' + TP_VERT);
+    sh.fragmentShader = TP_FRAG_DECL + sh.fragmentShader.replace('#include <map_fragment>', TP_MAP).replace('#include <roughnessmap_fragment>', TP_ROUGH)
+      .replace('#include <normal_fragment_maps>', TP_NORMAL).replace('#include <aomap_fragment>', TP_AO);
+  };
+  mat.customProgramCacheKey = () => 'triplanar1';
+  if (key) _tpCache.set(key, mat);
+  return mat;
+}

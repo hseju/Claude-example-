@@ -6,7 +6,7 @@ import { Avatar, randomConfig } from './avatar.js';
 import { Scenery } from './scenery.js';
 import { Flora, normalFromCanvas } from './flora.js';
 import { HUT, buildHut } from './hut.js';
-import { pbr } from './pbr.js';
+import { pbr, triplanar } from './pbr.js';
 
 export const TEMPLES = {
   ganesha: { id: 'ganesha', name: 'Ganesha Temple', short: 'Ganesha', pos: new THREE.Vector3(-31, 0, 0), rot: Math.PI / 2, entrance: new THREE.Vector3(-19.5, 0, 0), stone: '#f1e4cf', accent: '#b8442a', icon: 'modak', flag: '#e8731c', blurb: 'Remover of obstacles. Flower offerings and aarti.' },
@@ -122,8 +122,9 @@ export class World {
     const g = new THREE.Mesh(new THREE.PlaneGeometry(260, 260), pbr('grass', { repeat: [130, 130], color: '#c8e49c', normal: 1.2 }));
     g.rotation.x = -Math.PI / 2; g.receiveShadow = true; g.userData.ground = true; this.scene.add(g); this.ground = g; this.pickables.push(g);
     // inner lawn tone inside the walls: compacted earth paths
-    const pathMat = new THREE.MeshStandardMaterial({ map: TX.paving('path', '#e0c9a6', [1, 8]), roughness: 0.85 });
-    const strip = (x, z, w, d, rep) => { const m = pathMat.clone(); m.map = TX.paving('path', '#e0c9a6', rep); const p = new THREE.Mesh(new THREE.PlaneGeometry(w, d), m); p.rotation.x = -Math.PI / 2; p.position.set(x, 0.02, z); p.receiveShadow = true; p.userData.ground = true; this.scene.add(p); this.pickables.push(p); };
+    // paths of large cream stone slabs (photographed, projected from above so every strip shares one true scale)
+    const pathMat = triplanar('slabs', { tint: '#dcc6a2', tile: 2.6, roughness: 0.9 });
+    const strip = (x, z, w, d, rep) => { void rep; const m = pathMat; const p = new THREE.Mesh(new THREE.PlaneGeometry(w, d), m); p.rotation.x = -Math.PI / 2; p.position.set(x, 0.02, z); p.receiveShadow = true; p.userData.ground = true; this.scene.add(p); this.pickables.push(p); };
     strip(0, 31, 5, 38, [1.25, 9.5]);   // south approach through the gate
     strip(-17.5, 0, 12, 5, [3, 1.25]);  // west to Ganesha
     strip(17.5, 0, 12, 5, [3, 1.25]);   // east to Krishna
@@ -190,7 +191,7 @@ export class World {
 
   _plaza() {
     const S = this.scene;
-    const plaza = new THREE.Mesh(new THREE.CircleGeometry(12.6, 64), new THREE.MeshStandardMaterial({ map: TX.paving('plaza', '#e6d3b4', [7, 7]), roughness: 0.82 }));
+    const plaza = new THREE.Mesh(new THREE.CircleGeometry(12.6, 64), triplanar('slabs', { tint: '#e6d3b4', tile: 3.0, roughness: 0.85 }));
     plaza.rotation.x = -Math.PI / 2; plaza.position.y = 0.03; plaza.receiveShadow = true; plaza.userData.ground = true; S.add(plaza); this.pickables.push(plaza);
     const ring = new THREE.Mesh(new THREE.RingGeometry(12.0, 12.8, 64), new THREE.MeshStandardMaterial({ color: '#9c7a52', roughness: 0.8 }));
     ring.rotation.x = -Math.PI / 2; ring.position.y = 0.04; S.add(ring);

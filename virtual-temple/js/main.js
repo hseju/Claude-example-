@@ -924,7 +924,7 @@ function aimShafts(amount = 1) {
   camera.getWorldDirection(_camF); const facing = _camF.dot(world.sunDir);
   post.shafts.sun.set(_sunP.x * 0.5 + 0.5, _sunP.y * 0.5 + 0.5);
   const day = 1 - (world.tod.night || 0), low = 0.55 + 0.45 * (1 - Math.min(1, Math.max(0, world.sunDir.y - 0.15) / 0.7));
-  post.shafts.strength = Q.post ? amount * day * low * Math.max(0, Math.min(1, (facing + 0.15) / 0.6)) * 0.85 : 0;
+  post.shafts.strength = Q.post ? amount * day * low * Math.max(0, Math.min(1, (facing + 0.15) / 0.6)) * 0.55 : 0;
 }
 
 // ---------------------------------------------------------------- per-frame

@@ -1,5 +1,6 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 import { sandstone, carvedBand } from './textures.js';
+import { triplanar } from './pbr.js';
 
 // Shared architectural pieces used by the campus and the prayer halls.
 
@@ -108,7 +109,9 @@ export function garland(a, b, sag = 0.5, n = 28, colors = ['#f29a17', '#f6c025',
 }
 
 export function stoneMat(base, repeat = [1, 1], opts = {}) {
-  return new THREE.MeshStandardMaterial({ map: sandstone(base, base, { repeat, ...opts }), roughness: 0.88, ...opts.mat });
+  // photographed stone projected in world space (see pbr.js): fine-grained for carved and smooth pieces, cut blocks for walls and plinths
+  void repeat; void sandstone;
+  return triplanar(opts.blocks === false ? 'sandstone' : 'ashlar', { tint: base, tile: opts.blocks === false ? 1.6 : 2.6, roughness: 0.95, ...opts.mat });
 }
 export function bandMat(base) { const t = carvedBand(base).clone(); t.needsUpdate = true; t.repeat.set(6, 1); return new THREE.MeshStandardMaterial({ map: t, roughness: 0.85 }); }
 

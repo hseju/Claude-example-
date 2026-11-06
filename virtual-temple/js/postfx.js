@@ -58,7 +58,7 @@ export class PostFX {
       fragmentShader: `uniform sampler2D tDiffuse; uniform vec2 uSun; varying vec2 vUv;
         void main(){ vec2 d = (vUv - uSun) * (0.85 / 36.0); vec2 uv = vUv; vec3 c = vec3(0.0); float w = 1.0;
           for (int i = 0; i < 36; i++) { uv -= d; vec2 q = clamp(uv, 0.0, 1.0); c += texture2D(tDiffuse, q).rgb * w; w *= 0.955; }
-          gl_FragColor = vec4(c / 18.0, 1.0); }` });
+          c /= 18.0; gl_FragColor = vec4(c / (1.0 + c * 0.6), 1.0); }` });   // soft roll-off so the rays never burn to white
     this.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.blurMat); this.quad.frustumCulled = false;
     this.qScene = new THREE.Scene(); this.qScene.add(this.quad); this.qCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
     this.tilt = { focus: 0.5, band: 0.16, amount: 2.2 };

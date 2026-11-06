@@ -71,7 +71,7 @@ export class Scenery {
     this.group.add(new THREE.Mesh(far, this.farMat));
     // forest on the near slopes: round, leafy canopies (a few lumpy lobes over a short trunk), some in pink blossom
     const n = low ? 420 : 900, parts = [];
-    const lobe = (r, x, y, z, seed) => { const g = new THREE.IcosahedronGeometry(r, 1), p = g.attributes.position; for (let i = 0; i < p.count; i++) { const vx = p.getX(i), vy = p.getY(i), vz = p.getZ(i), k = 1 + 0.16 * Math.sin(vx * 7 + seed) * Math.sin(vy * 6 + seed * 2) * Math.sin(vz * 8 + seed * 3); p.setXYZ(i, vx * k + x, vy * k * 0.85 + y, vz * k + z); } return g.toNonIndexed(); };
+    const lobe = (r, x, y, z, seed) => { const g = new THREE.IcosahedronGeometry(r, 1), p = g.attributes.position; for (let i = 0; i < p.count; i++) { const vx = p.getX(i), vy = p.getY(i), vz = p.getZ(i), k = 1 + 0.16 * Math.sin(vx * 7 + seed) * Math.sin(vy * 6 + seed * 2) * Math.sin(vz * 8 + seed * 3); p.setXYZ(i, vx * k + x, vy * k * 0.85 + y, vz * k + z); } return g; };
     parts.push(lobe(1.0, 0, 2.2, 0, 1), lobe(0.75, 0.62, 1.85, 0.25, 2), lobe(0.72, -0.6, 1.9, -0.2, 3), lobe(0.62, 0.1, 2.85, -0.1, 4));
     const trunk = new THREE.CylinderGeometry(0.12, 0.2, 1.6, 5).translate(0, 0.8, 0).toNonIndexed();
     const geoms = [...parts, trunk], cols = [];
