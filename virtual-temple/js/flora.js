@@ -63,7 +63,7 @@ const LEAF_KINDS = {
   jacaranda: { greens: ['#4b7a33', '#5b8a3a'], leaves: 60, len: [10, 16], wid: [3, 5], bloom: ['#8f6ad6', '#a07fe0', '#7a58c4', '#b394ec'], blooms: 80 },
 };
 // the shadowed inside of each crown: the darker greens, or the darker blossom where a tree is in flower
-const CORE_TONE = { neem: '#2c5222', gulmohar: '#8c2c16', bougainvillea: '#8a1a52', jacaranda: '#5a4296' };
+const CORE_TONE = { neem: '#3a6a2c', gulmohar: '#b03a1c', bougainvillea: '#b02a6c', jacaranda: '#7458b4' };
 function leafTexture(kind) {
   const K = LEAF_KINDS[kind], S = 512, c = cv(S), x = c.getContext('2d');
   x.scale(2, 2);
@@ -211,9 +211,9 @@ export class Flora {
     clusters.push(centre.clone().add(new V(0, o.h * 0.14, 0)));
     // a soft, lumpy mass inside every main cluster, in the canopy's shadow tone, so the crown reads full rather than see-through
     const cores = [];
-    for (const cc of clusters) { const rr = o.spread * (cores.length % 3 === 0 ? 0.36 : 0.27), g = new THREE.IcosahedronGeometry(rr, 1), p = g.attributes.position, sd = rnd() * 10;
+    for (const cc of clusters) { const rr = o.spread * (cores.length % 3 === 0 ? 0.33 : 0.25), g = new THREE.SphereGeometry(rr, 14, 10), p = g.attributes.position, sd = rnd() * 10;   // smooth, so it reads as soft foliage, not facets
       for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i), k = 1 + 0.18 * Math.sin(x * 5 + sd) * Math.sin(y * 6 + sd) * Math.sin(z * 5.5 + sd); p.setXYZ(i, x * k + cc.x, y * k * 0.8 + cc.y, z * k + cc.z); }
-      g.computeVertexNormals(); cores.push(g); }
+      g.computeVertexNormals(); const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 3, uv.getY(i) * 1.6); cores.push(g); }   // leaf clusters tiled over it
     for (const cc of clusters) for (let k = 0; k < o.cards; k++) {
       const d = new V(rnd() - 0.5, (rnd() - 0.5) * 0.7, rnd() - 0.5).normalize().multiplyScalar(o.spread * 0.34 * Math.cbrt(rnd()));
       leaves.push(card(o.card * (0.7 + rnd() * 0.35), cc.clone().add(d), centre));
@@ -263,12 +263,14 @@ export class Flora {
       const o = specs[kind]; if (!list.length) continue;
       const leafM = foliageMaterial(kind === 'palm' ? frondTexture() : leafTexture(kind), this.windTime, { amp: kind === 'palm' ? 0.18 : 0.07, freq: kind === 'palm' ? 1.1 : 1.5 });
       const variants = [0, 1].map(() => (o.type === 'palm' ? this._palm(o) : o.type === 'ashoka' ? this._ashoka(o) : this._broadleaf(o)));
-      const coreM = foliageMaterial(null, this.windTime, { amp: 0.07, freq: 1.5, alphaTest: 0 }); coreM.color.set(CORE_TONE[kind] || '#2f5a26');
+      // the inner mass wears the same leaves (tiled, a shade darker, as the inside of a crown is) so it reads as dense foliage
+      const coreLeaf = (kind === 'palm' ? frondTexture() : leafTexture(kind)); coreLeaf.wrapS = coreLeaf.wrapT = THREE.RepeatWrapping;
+      const coreLeafM = foliageMaterial(coreLeaf, this.windTime, { amp: 0.07, freq: 1.5 }); coreLeafM.color.set(CORE_TONE[kind] || '#2f5a26').lerp(new THREE.Color('#ffffff'), 0.55);
       variants.forEach((v, vi) => {
         const mine = list.filter((_, i) => i % 2 === vi); if (!mine.length) return;
         const wood = new THREE.InstancedMesh(v.wood, o.type === 'palm' ? palmBarkM : barkM, mine.length);
         const leaves = new THREE.InstancedMesh(v.leaves, leafM, mine.length);
-        const core = v.core ? new THREE.InstancedMesh(v.core, coreM, mine.length) : null;
+        const core = v.core ? new THREE.InstancedMesh(v.core, coreLeafM, mine.length) : null;
         const nuts = v.nuts ? new THREE.InstancedMesh(v.nuts, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7 }), mine.length) : null;
         mine.forEach((t, i) => {
           m.compose(new V(t.x, 0, t.z), q.setFromAxisAngle(new V(0, 1, 0), t.r), new V(t.s, t.s * (0.9 + rnd() * 0.2), t.s));

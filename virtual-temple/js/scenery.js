@@ -19,6 +19,17 @@ const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a
 const dAng = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 
 export const FALLS = [-Math.PI * 0.5, -Math.PI * 0.68, -Math.PI * 0.31]; // north, north-west, north-east
+// aerial perspective: beyond the campus, each layer further away fades a little more into the colour of the haze, so ridges
+// read one behind another the way they do in a painting
+const HAZE = { value: 0.5 };
+function hazeShader(sh, k = 1) {
+  sh.uniforms.uHaze = HAZE;
+  sh.fragmentShader = 'uniform float uHaze;\n' + sh.fragmentShader.replace('#include <fog_fragment>', `#include <fog_fragment>
+    #ifdef USE_FOG
+      gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, smoothstep(110.0, 420.0, vFogDepth) * uHaze * ${k.toFixed(2)});
+    #endif`);
+}
+function hazy(mat, k = 1) { const prev = mat.onBeforeCompile; mat.onBeforeCompile = (sh, r) => { if (prev) prev(sh, r); hazeShader(sh, k); }; mat.customProgramCacheKey = () => 'hazy' + k; return mat; }
 const PALACE_A = -Math.PI * 0.405;   // the palace on the hill, framed between the north and north-east falls
 const CASCADES = [-Math.PI * 0.585, -Math.PI * 0.245, -Math.PI * 0.79, -Math.PI * 0.12];   // streams tumbling down the near slopes
 const HILL_TEMPLES = [[-Math.PI * 0.9, 158, 1.0], [-Math.PI * 0.06, 162, 0.9], [-Math.PI * 0.66, 186, 0.75]];   // smaller temples on the far hills
@@ -63,43 +74,85 @@ export class Scenery {
       let gorge = 0; FALLS.forEach((fa, fi) => { const rTop = 128 + fi * 6, w = fi === 0 ? 0.085 : 0.065; gorge = Math.max(gorge, Math.exp(-Math.pow(dAng(a, fa) / w, 2)) * (1 - smooth(rTop - 5, rTop + 2, r))); });
       return rise * h * (1 - (cliff ? 0 : gorge) * 0.94) - 2;
     };
-    const greens = [new THREE.Color('#3f6a33'), new THREE.Color('#2f5a2c'), new THREE.Color('#58803e')], rock = new THREE.Color('#8a7a66'), tmp = new THREE.Color();
+    const greens = [new THREE.Color('#4c8a36'), new THREE.Color('#3b7430'), new THREE.Color('#6da444')], rock = new THREE.Color('#8a7a66'), tmp = new THREE.Color();
     const near = this._ring(92, 215, low ? 140 : 220, low ? 14 : 22, this.nearHeight, (c, h, r, a) => {
-      c.copy(greens[Math.floor(hash(a * 40, r) * 3)]).lerp(greens[2], smooth(0, 40, h) * 0.3);
+      // broad, soft patches of forest green and lighter meadow (no per-triangle speckle), greener and darker low down
+      const pn = fbm(a * 14 + 2, r * 0.04, 3); c.copy(greens[1]).lerp(greens[0], smooth(0.3, 0.6, pn)).lerp(greens[2], smooth(0.55, 0.8, pn) * 0.7 + smooth(0, 40, h) * 0.2); void hash;
       const cliff = Math.max(...FALLS.map(fa => Math.exp(-Math.pow(dAng(a, fa) / 0.07, 2)))) * smooth(10, 40, h);
       c.lerp(rock, Math.min(1, cliff * 1.2 + smooth(55, 85, h) * 0.6 + (fbm(a * 30, r * 0.1, 2) > 0.62 ? 0.3 : 0)));
     });
-    this.nearMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, flatShading: true });
+    this.nearMat = hazy(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }), 0.55);   // smooth, rolling slopes
     const nm = new THREE.Mesh(near, this.nearMat); nm.receiveShadow = false; this.group.add(nm);
     // far range: tall blue peaks with snow, fading into haze
     const far = this._ring(240, 360, low ? 120 : 180, low ? 8 : 12, (r, a) => {
       const rise = smooth(240, 290, r);
       return rise * (60 + 130 * ridged(a * 2.4 + 11, r * 0.008, 5)) * (0.75 + 0.35 * fbm(a * 3 + 7, 1.3, 3));
     }, (c, h) => { c.set('#5b6f72').lerp(tmp.set('#7d8a84'), smooth(40, 120, h)); if (h > 125) c.lerp(tmp.set('#f2f4f6'), smooth(125, 150, h)); });
-    this.farMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, flatShading: true });
+    this.farMat = hazy(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, flatShading: true }), 0.8);
     this.group.add(new THREE.Mesh(far, this.farMat));
-    // forest on the near slopes: round, leafy canopies (a few lumpy lobes over a short trunk), some in pink blossom
-    const n = low ? 420 : 900, parts = [];
-    const lobe = (r, x, y, z, seed) => { const g = new THREE.SphereGeometry(r, 9, 7), p = g.attributes.position; for (let i = 0; i < p.count; i++) { const vx = p.getX(i), vy = p.getY(i), vz = p.getZ(i), k = 1 + 0.16 * Math.sin(vx * 7 + seed) * Math.sin(vy * 6 + seed * 2) * Math.sin(vz * 8 + seed * 3); p.setXYZ(i, vx * k + x, vy * k * 0.85 + y, vz * k + z); } g.computeVertexNormals(); return g.toNonIndexed(); };
-    parts.push(lobe(1.0, 0, 2.2, 0, 1), lobe(0.75, 0.62, 1.85, 0.25, 2), lobe(0.72, -0.6, 1.9, -0.2, 3), lobe(0.62, 0.1, 2.85, -0.1, 4));
-    const trunk = new THREE.CylinderGeometry(0.12, 0.2, 1.6, 5).translate(0, 0.8, 0).toNonIndexed();
-    const geoms = [...parts, trunk], cols = [];
-    for (const g of geoms) { const p = g.attributes.position, isTrunk = g === trunk; for (let i = 0; i < p.count; i++) { const y = p.getY(i); const v = isTrunk ? 0.35 : 0.55 + 0.45 * Math.min(1, Math.max(0, (y - 1.3) / 2)); cols.push(isTrunk ? 0.42 : v, isTrunk ? 0.3 : v, isTrunk ? 0.22 : v); } }
-    const merged = new THREE.BufferGeometry(); const total = geoms.reduce((a, g) => a + g.attributes.position.count, 0), pos = new Float32Array(total * 3); let o = 0;
-    for (const g of geoms) { pos.set(g.attributes.position.array, o * 3); o += g.attributes.position.count; }
-    const nor = new Float32Array(total * 3); o = 0; for (const g of geoms) { nor.set(g.attributes.normal.array, o * 3); o += g.attributes.normal.count; }
-    merged.setAttribute('position', new THREE.BufferAttribute(pos, 3)); merged.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); merged.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));   // smooth, rounded crowns
-    const trees = new THREE.InstancedMesh(merged, new THREE.MeshStandardMaterial({ roughness: 0.95, vertexColors: true }), n);
-    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), c = new THREE.Color(), up = new THREE.Vector3(0, 1, 0); let k = 0;
+    // forest on the near slopes: thousands of painted canopy cards that always face you, packed so the crowns overlap into one
+    // continuous, lumpy forest (lit from the sun's side, darker underneath), with groves of pink blossom. Cheap on phones:
+    // one draw for the whole forest.
+    const n = low ? 1800 : 4400;
+    const tex = this._canopyAtlas();
+    const card = new THREE.PlaneGeometry(1, 1); card.translate(0, 0.42, 0);
+    { const nr = card.attributes.normal; for (let i = 0; i < nr.count; i++) nr.setXYZ(i, 0, 1, 0); }   // lit like the ground it stands on
+    const cell = new Float32Array(n), mat = new THREE.MeshLambertMaterial({ map: tex, alphaTest: 0.5, transparent: false });
+    mat.onBeforeCompile = (sh) => { hazeShader(sh, 0.45);
+      sh.vertexShader = 'attribute float aCell;\n' + sh.vertexShader
+        .replace('#include <uv_vertex>', '#include <uv_vertex>\n  #ifdef USE_MAP\n  vMapUv = (uv + vec2(mod(aCell, 2.0), floor(aCell / 2.0))) * 0.5;\n  #endif')
+        .replace('#include <project_vertex>', `
+          vec4 mvCenter = modelViewMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+          float bsx = length(instanceMatrix[0].xyz), bsy = length(instanceMatrix[1].xyz);
+          vec4 mvPosition = mvCenter + vec4(transformed.x * bsx, transformed.y * bsy, 0.0, 0.0);
+          gl_Position = projectionMatrix * mvPosition;`);
+    };
+    const trees = new THREE.InstancedMesh(card, mat, n);
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), c = new THREE.Color(); let k = 0;
+    const groveAt = (a) => fbm(a * 9 + 3, 0.5, 2) > 0.62;   // blossom grows in groves, not scattered
     for (let i = 0; k < n && i < n * 4; i++) {
-      const a = Math.random() * Math.PI * 2, r = 104 + Math.random() * 90, h = this.nearHeight(r, a);
-      if (h < 1 || h > 60 || FALLS.some(fa => Math.abs(dAng(a, fa)) < 0.09) || Math.abs(dAng(a, PALACE_A)) < 0.17 || CASCADES.some(ca => Math.abs(dAng(a, ca)) < 0.04) || HILL_TEMPLES.some(([ta]) => Math.abs(dAng(a, ta)) < 0.09)) continue;   // keep the palace in view
-      const s = 2.0 + Math.random() * 2.2; q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
-      m.compose(new THREE.Vector3(Math.cos(a) * r, h - 0.6, Math.sin(a) * r), q, new THREE.Vector3(s, s * (0.85 + Math.random() * 0.4), s)); trees.setMatrixAt(k, m);
-      const bloom = Math.random() < 0.16;
-      trees.setColorAt(k++, c.set(bloom ? ['#f4a2c4', '#ec8ab6', '#f8bdd4'][Math.floor(Math.random() * 3)] : ['#3f7a34', '#4a8a3a', '#356c2e', '#5a9440', '#2f6230'][Math.floor(Math.random() * 5)]));
+      const a = Math.random() * Math.PI * 2, r = 100 + Math.pow(Math.random(), 0.8) * 100, h = this.nearHeight(r, a);
+      if (h < 0.5 || h > 64 || FALLS.some(fa => Math.abs(dAng(a, fa)) < 0.1) || (Math.abs(dAng(a, PALACE_A)) < 0.17 && r > 135) || CASCADES.some(ca => Math.abs(dAng(a, ca)) < 0.035) || HILL_TEMPLES.some(([ta]) => Math.abs(dAng(a, ta)) < 0.09)) continue;
+      const s2 = (6.5 + Math.random() * 5.5) * (0.8 + r / 400), bloom = groveAt(a) && Math.random() < 0.5;
+      m.compose(new THREE.Vector3(Math.cos(a) * r, h - s2 * 0.12, Math.sin(a) * r), q, new THREE.Vector3(s2 * (0.95 + Math.random() * 0.3), s2, 1)); trees.setMatrixAt(k, m);
+      cell[k] = bloom ? 3 : Math.floor(Math.random() * 3);
+      const v = 1.0 + Math.random() * 0.28; trees.setColorAt(k++, c.setRGB(v, v * (0.98 + Math.random() * 0.06), v * 0.92));
     }
-    trees.count = k; this.group.add(trees);
+    card.setAttribute('aCell', new THREE.InstancedBufferAttribute(cell, 1));
+    trees.count = k; trees.frustumCulled = false; this.group.add(trees); this.hillForest = trees;
+  }
+  // four painted canopies in one texture: a broad round crown, a tall crown, a lighter feathery crown, and a crown in pink blossom
+  _canopyAtlas() {
+    const S = 256, cvs = document.createElement('canvas'); cvs.width = cvs.height = S * 2; const x = cvs.getContext('2d');
+    const rnd = (() => { let s2 = 7; return () => ((s2 = (s2 * 16807) % 2147483647) / 2147483647); })();
+    const crown = (ox, oy, { w = 0.8, hgt = 0.8, greens, bloom = null, lobes = 30 }) => {
+      const cx = ox + S / 2, base = oy + S * 0.92, top = base - S * hgt;
+      x.fillStyle = '#4a3424'; x.fillRect(cx - S * 0.022, base - S * 0.16, S * 0.044, S * 0.16);
+      // back to front, low to high: each billow is a soft ball lit from the upper left
+      const balls = [];
+      for (let i = 0; i < lobes; i++) { const t = rnd(), yy = top + S * 0.1 + (base - S * 0.2 - top) * Math.pow(t, 0.9), spread = Math.sin(Math.min(1, t * 1.1 + 0.15) * Math.PI) * S * w * 0.42;
+        balls.push([cx + (rnd() * 2 - 1) * spread, yy, S * (0.1 + rnd() * 0.07) * (0.7 + 0.5 * (1 - t)), t]); }
+      balls.sort((p1, p2) => p2[1] - p1[1]);
+      // each billow is painted with leaf dabs: a dark base, then small strokes that are lighter toward the sun (upper left);
+      // in a blossoming crown, some of the sunlit dabs are flowers
+      for (const [px, yy, rr, t] of balls) {
+        const col = new THREE.Color(greens[Math.floor(rnd() * greens.length)]), k = 1.0 - t * 0.35;
+        x.fillStyle = shade('#' + col.getHexString(), 0.62 * k); x.beginPath(); x.arc(px, yy, rr * 0.92, 0, Math.PI * 2); x.fill();
+        for (let d = 0; d < 70; d++) {
+          const ang = rnd() * Math.PI * 2, rad = Math.sqrt(rnd()) * rr, dx = Math.cos(ang) * rad, dy = Math.sin(ang) * rad;
+          const lit = Math.max(0, Math.min(1, 0.55 - (dx + dy * 1.2) / (2.2 * rr) + (rnd() - 0.5) * 0.25));
+          const flower = bloom && lit > 0.45 && rnd() < 0.42;
+          x.fillStyle = flower ? bloom[Math.floor(rnd() * bloom.length)] : shade(lit > 0.78 ? '#b8d878' : '#' + col.getHexString(), (0.7 + lit * 0.65) * k);
+          x.beginPath(); x.ellipse(px + dx, yy + dy, rr * (0.13 + rnd() * 0.1), rr * (0.09 + rnd() * 0.07), rnd() * Math.PI, 0, Math.PI * 2); x.fill();
+        }
+      }
+    };
+    const shade = (hex, k) => { const c2 = new THREE.Color(hex); return `rgb(${Math.min(255, c2.r * 255 * k) | 0},${Math.min(255, c2.g * 255 * k) | 0},${Math.min(255, c2.b * 255 * k) | 0})`; };
+    crown(0, 0, { w: 0.92, hgt: 0.74, greens: ['#4f9038', '#46852f', '#5c9c40'] });
+    crown(S, 0, { w: 0.64, hgt: 0.86, greens: ['#3f7a30', '#478434', '#36702c'] });
+    crown(0, S, { w: 0.88, hgt: 0.7, greens: ['#68a446', '#5c983e', '#74ae4e'] });
+    crown(S, S, { w: 0.9, hgt: 0.74, greens: ['#5a9040', '#4f8638'], bloom: ['#f5a8c8', '#ee88b4', '#fac8dc', '#fff0f5'] });
+    const t = new THREE.CanvasTexture(cvs); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
   }
 
   // ------------------------------------------------------------ waterfalls, pools and the river
@@ -116,7 +169,7 @@ export class Scenery {
     const tex = this._streakTexture();
     this.fallTex = [tex, tex.clone()]; this.fallTex[1].needsUpdate = true; this.fallTex[1].repeat.set(1, 1.6);
     this.fallMats = this.fallTex.map((t, i) => new THREE.MeshBasicMaterial({ map: t, transparent: true, opacity: i ? 0.55 : 0.9, depthWrite: false, side: THREE.DoubleSide, color: '#ffffff' }));
-    const rockM = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, flatShading: true });
+    const rockM = hazy(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, flatShading: true }), 0.7);
     const mistPts = [], mistSeed = [];
     FALLS.forEach((fa, fi) => {
       const rTop = 128 + fi * 6, rBase = 112 + fi * 4;
@@ -354,6 +407,7 @@ export class Scenery {
     this.mistU.uColor.value.copy(tod.cloud).lerp(new THREE.Color('#ffffff'), 0.6 * day); this.mistU.uOpacity.value = 0.35 + 0.45 * day;
     for (const m of this.fallMats) m.color.setScalar(0.12 + 0.88 * day);
     this.starU.uOpacity.value = tod.stars; this.flyU.uOpacity.value = Math.max(tod.night, 0.3 + tod.warm * 0.7);
+    HAZE.value = 0.35 + (tod.mist || 0) * 0.45;
     this.moon.material.opacity = tod.night; this.moon.position.copy(tod.moonDir).multiplyScalar(650);
     for (const c of this.clouds) { c.a += c.sp * dt * motion; c.s.position.x = Math.cos(c.a) * c.r; c.s.position.z = Math.sin(c.a) * c.r; }
     for (const m of this.mists) m.s.position.y = 10 + Math.sin(t * 0.05 + m.a * 3) * 2;
