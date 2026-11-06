@@ -637,7 +637,7 @@ function drawMap() {
 const guide = new Guide();
 const hutState = { view: 'altar', session: null, def: null, kind: null, tab: 'breathe', sel: { breathe: 'calm', meditate: 'breath', sit: 'timer' }, mins: {}, voiceOff: false, paused: false, wake: null, rec: null, ui: {}, pop: null };
 const HUT_ZONE = { entrance: 0, courtyard: 0, corridor: 0, dome: 0.15, garden: 0.9, ganesha: 0, shiva: 0, krishna: 0 };
-const VIEW_NAMES = { altar: 'Facing the altar', face: 'Facing your devotee', wide: 'The whole hut', flame: 'Looking at the lamp', focus: 'Focus: the breathing figure' };
+const VIEW_NAMES = { pov: 'Your view of the altar', altar: 'Facing the altar', face: 'Facing your devotee', wide: 'The whole hut', flame: 'Looking at the lamp', focus: 'Focus: the breathing figure' };
 // line icons for the practice tiles
 const P_ICONS = {
   lotus: '<path d="M16 7c-3 4-3 9 0 13 3-4 3-9 0-13zM16 20c-4-1-8-4-9.5-9 4.5 0 7.5 3 9.5 9zM16 20c4-1 8-4 9.5-9-4.5 0-7.5 3-9.5 9zM6 23c4 3 16 3 20 0"/>',
@@ -671,7 +671,7 @@ function leaveHut() {
   if (app.mode !== 'hut') return;
   endSession(true);
   fadeThrough(() => {
-    const av = me.avatar; av.setState('idle'); av.breath = null;
+    const av = me.avatar; av.setState('idle'); av.breath = null; av.root.visible = true;
     av.root.position.copy(HUT.entrance); av.root.rotation.y = HUT.rot;
     if (playerRing) playerRing.visible = true;
     $('doneCard').hidden = true; $('hutUI').classList.remove('insession');
@@ -748,7 +748,7 @@ function startSession(kind, id) {
   $('sTitle').textContent = `${def.name} · ${def.tag}`;
   $('orb').classList.toggle('calm', kind !== 'breath');
   setPauseIcon(false); $('sCaption').textContent = ''; $('sCaption').classList.add('dim'); $('sleepDim').style.opacity = 0;
-  hutState.view = def.view || (hutState.view === 'flame' ? 'altar' : hutState.view);
+  hutState.view = def.view || 'pov';   // while practising you see through your own eyes; your devotee is out of frame
   requestWake();
   S.start();
 }
@@ -773,7 +773,7 @@ function endSession(silent = false) {
   S.stop(); hutState.rec?.pause(); hutState.rec = null;
   if (S.elapsed > 60) PracticeLog.add({ kind: hutState.kind, id: hutState.def.id, minutes: S.elapsed / 60, partial: true });
   hutState.session = null; me.avatar.breath = null; releaseWake(); closeSessionPop();
-  audio.clearSessionMix(); HUT.breath = null;
+  audio.clearSessionMix(); HUT.breath = null; hutState.view = 'altar'; me.avatar.root.visible = true;
   if (!silent) showHutPanel();
 }
 function finishSession() {
@@ -781,7 +781,7 @@ function finishSession() {
   PracticeLog.add({ kind: hutState.kind, id: def.id, minutes: S.total / 60 });
   hutState.session = null; hutState.rec = null; me.avatar.breath = null; releaseWake(); closeSessionPop();
   setTimeout(() => { if (!hutState.session) audio.clearSessionMix(); }, def.sleep ? 12000 : 4000);   // let the last bowl (or the music) ring out
-  if (hutState.view === 'flame' || hutState.view === 'focus') hutState.view = 'altar';
+  hutState.view = 'altar'; me.avatar.root.visible = true;
   HUT.breath = null;
   const st = PracticeLog.summary(), mins = Math.round(S.total / 60);
   $('sessionUI').hidden = true; $('doneCard').hidden = false; $('hutUI').classList.remove('insession');
@@ -876,7 +876,7 @@ function bindHut() {
   $('sPrev').onclick = () => seekSession(-15); $('sNext').onclick = () => seekSession(15);
   $('sMusic').onclick = () => openSessionPop('music'); $('sVol').onclick = () => openSessionPop('vol');
   const cycleView = (inSession) => {
-    const order = ['altar', 'face', 'wide'].concat(inSession ? ['focus'] : []).concat(hutState.def?.view === 'flame' && hutState.session ? ['flame'] : []);
+    const order = inSession ? ['pov', 'focus'].concat(hutState.def?.view === 'flame' ? ['flame'] : []) : ['altar', 'face', 'wide'];
     hutState.view = order[(order.indexOf(hutState.view) + 1) % order.length]; toast(VIEW_NAMES[hutState.view], 1600);
   };
   $('hutView').onclick = () => cycleView(false); $('sView').onclick = () => cycleView(true);
@@ -890,11 +890,13 @@ function updateHut(dt, t, ctx) {
   else if (!S) av.mudra = null;
   if (S) updateSessionUI();
   av.update(dt, t);
-  const vk = hutState.view === 'focus' ? 'altar' : hutState.view, V = HUT.views[vk] || HUT.views.altar, drift = settings.reducedMotion ? 0 : Math.sin(t * 0.06) * 0.16;
+  const vk = hutState.view === 'focus' ? 'pov' : hutState.view, V = HUT.views[vk] || HUT.views.altar, pov = vk === 'pov' || vk === 'flame';
+  const drift = settings.reducedMotion ? 0 : Math.sin(t * 0.06) * (pov ? 0.03 : 0.16);
+  av.root.visible = !(S && pov);   // through your own eyes, your devotee is out of the picture
   const want = HUT.toWorld(V.pos[0] + drift, V.pos[1] + (settings.reducedMotion ? 0 : Math.sin(t * 0.045) * 0.04), V.pos[2]), look = HUT.toWorld(...V.look);
   const k = cam.hutSnap ? 1 : 1 - Math.exp(-dt * 1.4); cam.hutSnap = false;
   camera.position.lerp(want, k); cam.target.lerp(look, k); camera.lookAt(cam.target);
-  const fov = V.fov || 46; camera.fov += (fov - camera.fov) * k;
+  const fov = (V.fov || 46) * (camera.aspect < 1 && pov ? 1.25 : 1); camera.fov += (fov - camera.fov) * k;
   world.update(dt, t, av.root.position, ctx);
   if (world.hutSmoke) world.hutSmoke.enabled = settings.incense;
   if (audio.ctx) { if (Math.floor(t) !== app.hutTick) { app.hutTick = Math.floor(t); audio.applyZone(HUT_ZONE, 1); } audio.setListener(av.root.position.clone().setY(av.root.position.y + 0.95), HUT.toWorld(0, 0, -1).sub(HUT.pos).normalize()); }

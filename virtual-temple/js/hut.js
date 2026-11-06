@@ -33,6 +33,7 @@ HUT.sitterSeats = [65, -65, 125, -147, -95];
 // camera spots (local): behind you toward the altar, your face, a wide view of the room, and the altar lamps
 HUT.views = {
   altar: { pos: [0, 2.32, 3.5], look: [0, 1.92, -3.2], fov: 46 },
+  pov: { pos: [0, 1.52, 0.5], look: [0, 1.9, -3.2], fov: 52 },   // your own eyes, from the centre cushion: used while practising
   face: { pos: [0.55, 1.7, -1.35], look: [0, 1.62, 1.6], fov: 40 },
   wide: { pos: [1.7, 2.7, 2.2], look: [-0.7, 0.95, -1.5], fov: 58 },
   flame: { pos: [0.02, 1.42, 0.2], look: [0, FLOOR + 0.36, -2.47], fov: 30 },
@@ -434,8 +435,8 @@ export function buildHut(world) {
     for (const [m, base, per] of lampMats) m.emissiveIntensity = base + lamps * per;
     if (pendant) pendant.intensity = 1.6 + lamps * 1.1;
     const f = HUT.breath ?? (0.5 + 0.5 * Math.sin(t * 0.55)), active = HUT.breath != null;
-    halo.scale.setScalar(0.86 + f * 0.2); haloMat.color.setScalar((0.55 + f * 0.45) * (0.8 + night * 0.35)); haloRing.scale.setScalar(0.97 + f * 0.04);
-    figMat.emissiveIntensity = 0.65 + f * 0.6 + night * 0.3;
+    halo.scale.setScalar(0.88 + f * 0.18); haloMat.color.setScalar((0.72 + f * 0.38) * (0.88 + night * 0.3)); haloRing.scale.setScalar(0.97 + f * 0.04);
+    figMat.emissiveIntensity = 0.9 + f * 0.55 + night * 0.3;
     chakras.forEach((sp, i) => { const k = Math.max(0, Math.min(1, (f * 7.4 - i) / 1.4)); sp.material.opacity = (active ? 0.15 : 0.08) + k * (active ? 0.85 : 0.5); sp.scale.setScalar(0.1 + k * 0.08); });
     for (const tb of tubes) { tb.pivot.rotation.x = Math.sin(t * 1.3 + tb.ph) * 0.08; tb.pivot.rotation.z = Math.cos(t * 1.1 + tb.ph) * 0.06; }
     smoke.update(dt, t);
