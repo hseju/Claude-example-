@@ -26,10 +26,10 @@ const EDGES = [['spawn', 'gateOut'], ['gateOut', 'gateIn'], ['gateIn', 's1'], ['
 NODES.hut = [HUT.entrance.x, HUT.entrance.z]; NODES.hutPath = [HUT.pathEnd.x, HUT.pathEnd.z]; EDGES.push(['gSW', 'hutPath'], ['hutPath', 'hut']);
 
 const TOD_PRESETS = {
-  morning: { sky: '#7fb2e2', mid: '#f2cdbf', hor: '#ffe3bd', sun: '#ffd39b', sunI: 2.4, hemi: 0.85, ground: '#6b5a3a', elev: 14, az: 18, fogNear: 80, fogFar: 600, lamps: 0.8, stars: 0, mist: 0.75, warm: 0.22, night: 0, exposure: 1.05, cloud: '#fff1e6' },
-  afternoon: { sky: '#4a8bd6', mid: '#a8cbea', hor: '#e8eff2', sun: '#fff4e2', sunI: 3.0, hemi: 1.0, ground: '#6b5f45', elev: 62, az: 140, fogNear: 110, fogFar: 760, lamps: 0.25, stars: 0, mist: 0.12, warm: 0.04, night: 0, exposure: 1.0, cloud: '#ffffff' },
-  evening: { sky: '#5856a0', mid: '#ec9c95', hor: '#ffc683', sun: '#ffa35a', sunI: 2.2, hemi: 0.6, ground: '#4a3528', elev: 7, az: 196, fogNear: 80, fogFar: 600, lamps: 2.8, stars: 0.06, mist: 0.35, warm: 0.45, night: 0.12, exposure: 1.06, cloud: '#ffc4a8' },
-  night: { sky: '#060b24', mid: '#121c46', hor: '#283063', sun: '#9fb4ff', sunI: 0.75, hemi: 0.32, ground: '#22202c', elev: 40, az: -55, fogNear: 70, fogFar: 520, lamps: 6.0, stars: 1, mist: 0.3, warm: 0.3, night: 1, exposure: 1.3, cloud: '#3a4468' },
+  morning: { sky: '#8aa6e6', mid: '#f3bccb', hor: '#ffd9a2', sun: '#ffc98c', sunI: 2.6, hemi: 0.9, ground: '#6b5236', elev: 14, az: 18, fogNear: 70, fogFar: 560, lamps: 1.6, stars: 0, mist: 0.75, warm: 0.36, night: 0, exposure: 1.06, cloud: '#ffe4d8' },
+  afternoon: { sky: '#5a8ee0', mid: '#b6c8f0', hor: '#ffe7c6', sun: '#fff0d2', sunI: 3.0, hemi: 1.0, ground: '#6b5a3e', elev: 58, az: 140, fogNear: 100, fogFar: 720, lamps: 1.0, stars: 0, mist: 0.2, warm: 0.2, night: 0, exposure: 1.02, cloud: '#fff6ee' },
+  evening: { sky: '#6a5ab6', mid: '#f19bb2', hor: '#ffc579', sun: '#ffb062', sunI: 3.0, hemi: 0.95, ground: '#5e4030', elev: 9, az: 196, fogNear: 70, fogFar: 560, lamps: 3.8, stars: 0.06, mist: 0.4, warm: 0.55, night: 0.1, exposure: 1.15, cloud: '#ffc7b6' },
+  night: { sky: '#0a0f30', mid: '#20296a', hor: '#463a7a', sun: '#a9bcff', sunI: 0.8, hemi: 0.36, ground: '#24202e', elev: 40, az: -55, fogNear: 70, fogFar: 520, lamps: 7.0, stars: 1, mist: 0.3, warm: 0.32, night: 1, exposure: 1.32, cloud: '#464c80' },
 };
 
 export class World {

@@ -3,7 +3,7 @@ import { softDot } from './textures.js';
 
 // The living backdrop around the campus: layered mountain ranges, three great waterfalls with
 // mist and a river, drifting clouds and valley mist, flocks of egrets, crows and parakeets,
-// pigeons around the spires, butterflies over the flower beds, and at night fireflies, stars
+// pigeons around the spires, butterflies over the flower beds, golden motes of light (fireflies by night), stars
 // and the moon. Everything reacts to the time-of-day state passed to `update()`.
 
 const hash = (x, y) => { const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); };
@@ -233,7 +233,7 @@ export class Scenery {
       vertexShader: `attribute float aSeed; uniform float uTime; uniform float uPx; varying float vA;
         void main(){ vec3 p = position; p.x += sin(uTime*0.3+aSeed*30.0)*1.2; p.y += sin(uTime*0.5+aSeed*17.0)*0.5; p.z += cos(uTime*0.27+aSeed*23.0)*1.2;
           vA = pow(max(0.0, sin(uTime*(0.8+aSeed)+aSeed*40.0)), 3.0); vec4 mv = modelViewMatrix*vec4(p,1.0); gl_PointSize = uPx*90.0/-mv.z; gl_Position = projectionMatrix*mv; }`,
-      fragmentShader: 'uniform float uOpacity; varying float vA; void main(){ float a = smoothstep(0.5,0.0,length(gl_PointCoord-0.5))*vA*uOpacity; gl_FragColor = vec4(vec3(1.6,1.9,0.6)*a, a); }' }));
+      fragmentShader: 'uniform float uOpacity; varying float vA; void main(){ float a = smoothstep(0.5,0.0,length(gl_PointCoord-0.5))*vA*uOpacity; gl_FragColor = vec4(vec3(2.2,1.55,0.62)*a, a); }' }));
     this.fireflies.frustumCulled = false; this.group.add(this.fireflies);
   }
 
@@ -249,7 +249,7 @@ export class Scenery {
     this.mistMat.color.copy(tod.cloud).lerp(new THREE.Color('#ffffff'), 0.4 * day); this.mistMat.opacity = tod.mist * 0.55;
     this.mistU.uColor.value.copy(tod.cloud).lerp(new THREE.Color('#ffffff'), 0.6 * day); this.mistU.uOpacity.value = 0.35 + 0.45 * day;
     for (const m of this.fallMats) m.color.setScalar(0.12 + 0.88 * day);
-    this.starU.uOpacity.value = tod.stars; this.flyU.uOpacity.value = tod.night;
+    this.starU.uOpacity.value = tod.stars; this.flyU.uOpacity.value = Math.max(tod.night, 0.3 + tod.warm * 0.7);
     this.moon.material.opacity = tod.night; this.moon.position.copy(tod.moonDir).multiplyScalar(650);
     for (const c of this.clouds) { c.a += c.sp * dt * motion; c.s.position.x = Math.cos(c.a) * c.r; c.s.position.z = Math.sin(c.a) * c.r; }
     for (const m of this.mists) m.s.position.y = 10 + Math.sin(t * 0.05 + m.a * 3) * 2;

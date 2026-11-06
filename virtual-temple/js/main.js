@@ -908,7 +908,7 @@ function updateHut(dt, t, ctx) {
   if (audio.ctx) { if (Math.floor(t) !== app.hutTick) { app.hutTick = Math.floor(t); audio.applyZone(HUT_ZONE, 1); } audio.setListener(av.root.position.clone().setY(av.root.position.y + 0.95), HUT.toWorld(0, 0, -1).sub(HUT.pos).normalize()); }
   camera.updateProjectionMatrix();
   post.tilt.amount = 0; renderer.toneMappingExposure = world.tod.exposure;
-  post.finalMat.uniforms.uVignette.value = S ? 0.55 : 0.42; post.finalMat.uniforms.uWarm.value = 0.16 + world.evening * 0.2; post.bloom.strength = Q.bloom; post.bloom.threshold = 1.4;
+  post.finalMat.uniforms.uVignette.value = S ? 0.55 : 0.46; post.finalMat.uniforms.uWarm.value = 0.18 + world.evening * 0.2; post.bloom.strength = Q.bloom * 1.6; post.bloom.threshold = 1.1;
   post.render(world.scene, camera);
 }
 
@@ -1033,8 +1033,8 @@ function updateWorld(dt, t, ctx) {
     if (playerRing) { playerRing.position.set(p.x, 0.06, p.z); const k = settings.reducedMotion ? 1 : 1 + Math.sin(t * 2.4) * 0.06; playerRing.scale.set(k, k, k); playerRing.material.opacity = 0.85 * (1 - cam.close * 0.8); }
   }
   camera.updateProjectionMatrix();
-  post.tilt.amount = Q.tilt * (app.mode === 'welcome' ? 0.15 : 0.22 * (1 - (cam.close || 0))); post.tilt.focus = 0.4; post.tilt.band = 0.32; renderer.toneMappingExposure = world.tod.exposure;
-  post.finalMat.uniforms.uVignette.value = 0.34; post.finalMat.uniforms.uWarm.value = 0.12 + world.evening * 0.2; post.bloom.strength = Q.bloom; post.bloom.threshold = 1.5;
+  post.tilt.amount = Q.tilt * (app.mode === 'welcome' ? 0.06 : 0.08 * (1 - (cam.close || 0))); post.tilt.focus = 0.4; post.tilt.band = 0.32; renderer.toneMappingExposure = world.tod.exposure;
+  post.finalMat.uniforms.uVignette.value = 0.44; post.finalMat.uniforms.uWarm.value = 0.16 + world.evening * 0.2; post.bloom.strength = Q.bloom * 1.6; post.bloom.threshold = 1.05;
   post.render(world.scene, camera);
 }
 
@@ -1056,9 +1056,9 @@ function updateHall(dt, t, ctx) {
   const wantFov = camera.aspect < 1 ? Math.min(82, want.fov * (1 + (1 - camera.aspect) * 0.75)) : want.fov; camera.fov += (wantFov - camera.fov) * k;
   camera.lookAt(cam.target); camera.updateProjectionMatrix();
   if (audio.ctx) audio.setListener(camera.position, tmp.copy(cam.target).sub(camera.position).normalize());
-  post.tilt.amount = app.camMode === 'select' ? 0.6 : 0.5; post.tilt.band = app.camMode === 'select' ? 0.3 : 0.34; post.tilt.focus = 0.5;
+  post.tilt.amount = app.camMode === 'select' ? 0.3 : 0.22; post.tilt.band = app.camMode === 'select' ? 0.3 : 0.34; post.tilt.focus = 0.5;
   if (!Q.post) post.tilt.amount = 0;
-  post.bloom.strength = Q.bloom * 1.2; post.bloom.threshold = 1.2;
+  post.bloom.strength = Q.bloom * 1.7; post.bloom.threshold = 1.0;
   post.finalMat.uniforms.uVignette.value = app.aarti ? 0.6 : 0.42; post.finalMat.uniforms.uWarm.value = app.aarti ? 0.45 : 0.25;
   renderer.toneMappingExposure = 1.05;
   post.render(hall.scene, camera);

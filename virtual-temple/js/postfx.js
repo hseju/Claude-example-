@@ -1,6 +1,6 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 
-// Minimal post pipeline: HDR scene target -> tilt-shift blur (horizontal, vertical) -> grade.
+// Minimal post pipeline: HDR scene target -> tilt-shift blur (horizontal, vertical) -> bloom -> painterly grade.
 // The tilt-shift gives the campus its handcrafted-miniature look; in the prayer hall the
 // blur band is opened up so the sanctum stays sharp. Disabled on the low quality tier.
 
@@ -24,12 +24,16 @@ export class PostFX {
           gl_FragColor = c; }`,
     });
     this.finalMat = new THREE.ShaderMaterial({
-      uniforms: { tDiffuse: { value: null }, tBloom: { value: null }, uBloom: { value: 0.0 }, uVignette: { value: 0.32 }, uWarm: { value: 0.0 }, uSat: { value: 1.08 } },
+      uniforms: { tDiffuse: { value: null }, tBloom: { value: null }, uBloom: { value: 0.0 }, uVignette: { value: 0.32 }, uWarm: { value: 0.0 }, uSat: { value: 1.2 }, uGrade: { value: 1.0 } },
       vertexShader: quadVS, depthTest: false, depthWrite: false, toneMapped: true,
-      fragmentShader: `uniform sampler2D tDiffuse; uniform sampler2D tBloom; uniform float uBloom; uniform float uVignette; uniform float uWarm; uniform float uSat; varying vec2 vUv;
+      fragmentShader: `uniform sampler2D tDiffuse; uniform sampler2D tBloom; uniform float uBloom; uniform float uVignette; uniform float uWarm; uniform float uSat; uniform float uGrade; varying vec2 vUv;
         void main(){ vec4 c = texture2D(tDiffuse, vUv); c.rgb += texture2D(tBloom, vUv).rgb * uBloom;
           float l = dot(c.rgb, vec3(0.2126,0.7152,0.0722)); c.rgb = mix(vec3(l), c.rgb, uSat);
           c.rgb *= mix(vec3(1.0), vec3(1.08,0.98,0.86), uWarm);
+          // a painterly grade: shadows lean violet, highlights lean gold
+          float lg = dot(c.rgb, vec3(0.2126,0.7152,0.0722));
+          c.rgb = mix(c.rgb, c.rgb*vec3(0.95,0.91,1.12), (1.0-smoothstep(0.0,0.42,lg))*0.32*uGrade);
+          c.rgb = mix(c.rgb, c.rgb*vec3(1.1,1.0,0.84), smoothstep(0.42,1.5,lg)*0.3*uGrade);
           vec2 q = vUv - 0.5; c.rgb *= 1.0 - dot(q,q)*uVignette*2.0;
           gl_FragColor = c;
           #include <tonemapping_fragment>
@@ -83,7 +87,7 @@ export class PostFX {
     if (this.bloom.strength > 0) {
       this.quad.material = this.brightMat; this.brightMat.uniforms.tDiffuse.value = this.rtA.texture; this.brightMat.uniforms.uTh.value = this.bloom.threshold; r.setRenderTarget(this.rtD); r.render(this.qScene, this.qCam);
       const g = this.gaussMat.uniforms; this.quad.material = this.gaussMat;
-      for (let i = 0; i < 2; i++) { g.tDiffuse.value = this.rtD.texture; g.uDir.value.set(1, 0); r.setRenderTarget(this.rtE); r.render(this.qScene, this.qCam); g.tDiffuse.value = this.rtE.texture; g.uDir.value.set(0, 1); r.setRenderTarget(this.rtD); r.render(this.qScene, this.qCam); }
+      for (let i = 0; i < 3; i++) { g.tDiffuse.value = this.rtD.texture; g.uDir.value.set(1, 0); r.setRenderTarget(this.rtE); r.render(this.qScene, this.qCam); g.tDiffuse.value = this.rtE.texture; g.uDir.value.set(0, 1); r.setRenderTarget(this.rtD); r.render(this.qScene, this.qCam); }
       this.finalMat.uniforms.tBloom.value = this.rtD.texture; this.finalMat.uniforms.uBloom.value = this.bloom.strength;
     } else this.finalMat.uniforms.uBloom.value = 0;
     this.quad.material = this.finalMat; this.finalMat.uniforms.tDiffuse.value = src;
