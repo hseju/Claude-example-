@@ -20,6 +20,8 @@ const dAng = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 
 export const FALLS = [-Math.PI * 0.5, -Math.PI * 0.68, -Math.PI * 0.31]; // north, north-west, north-east
 const PALACE_A = -Math.PI * 0.405;   // the palace on the hill, framed between the north and north-east falls
+const CASCADES = [-Math.PI * 0.585, -Math.PI * 0.245, -Math.PI * 0.79, -Math.PI * 0.12];   // streams tumbling down the near slopes
+const HILL_TEMPLES = [[-Math.PI * 0.9, 158, 1.0], [-Math.PI * 0.06, 162, 0.9], [-Math.PI * 0.66, 186, 0.75]];   // smaller temples on the far hills
 
 export class Scenery {
   constructor(scene, quality, water, beds = []) {
@@ -31,6 +33,8 @@ export class Scenery {
     this._falls();
     this._clouds();
     this._palace();
+    this._cascades();
+    this._hillTemples();
     this._flocks();
     this._butterflies();
     this._night();
@@ -87,7 +91,7 @@ export class Scenery {
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), c = new THREE.Color(), up = new THREE.Vector3(0, 1, 0); let k = 0;
     for (let i = 0; k < n && i < n * 4; i++) {
       const a = Math.random() * Math.PI * 2, r = 104 + Math.random() * 90, h = this.nearHeight(r, a);
-      if (h < 1 || h > 60 || FALLS.some(fa => Math.abs(dAng(a, fa)) < 0.09) || Math.abs(dAng(a, PALACE_A)) < 0.17) continue;   // keep the palace in view
+      if (h < 1 || h > 60 || FALLS.some(fa => Math.abs(dAng(a, fa)) < 0.09) || Math.abs(dAng(a, PALACE_A)) < 0.17 || CASCADES.some(ca => Math.abs(dAng(a, ca)) < 0.04) || HILL_TEMPLES.some(([ta]) => Math.abs(dAng(a, ta)) < 0.09)) continue;   // keep the palace in view
       const s = 2.0 + Math.random() * 2.2; q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
       m.compose(new THREE.Vector3(Math.cos(a) * r, h - 0.6, Math.sin(a) * r), q, new THREE.Vector3(s, s * (0.85 + Math.random() * 0.4), s)); trees.setMatrixAt(k, m);
       const bloom = Math.random() < 0.16;
@@ -186,6 +190,41 @@ export class Scenery {
     for (let i = 0; i < 7; i++) arch(-9 + i * 3, 7.5, 7.1);
     const halo = this.palaceHalo = new THREE.Sprite(new THREE.SpriteMaterial({ map: softDot(), color: new THREE.Color(1.0, 0.78, 0.45), transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
     halo.scale.set(90, 90, 1); halo.position.set(0, 30, -6); g.add(halo);
+  }
+
+  // ------------------------------------------------------------ cascades and hill temples
+  // a stream of white water following the slope down from the ridge, stepping over ledges, with spray where it breaks
+  _cascades() {
+    const mat = this.fallMats[0], spray = new THREE.SpriteMaterial({ map: softDot(), color: '#ffffff', transparent: true, opacity: 0.5, depthWrite: false });
+    for (const [ci, ca] of CASCADES.entries()) {
+      const pos = [], uv = [], idx = [], N = 40, r0 = 196 - ci * 6, r1 = 116; let along = 0, prev = null;
+      for (let i = 0; i <= N; i++) {
+        const t = i / N, r = r0 + (r1 - r0) * t, a = ca + Math.sin(t * 5 + ci) * 0.018, h = this.nearHeight(r, a) + 0.7, w = 3.2 + t * 2.2;
+        const c = new THREE.Vector3(Math.cos(a) * r, h, Math.sin(a) * r), side = new THREE.Vector3(-Math.sin(a), 0, Math.cos(a));
+        if (prev) along += c.distanceTo(prev); prev = c;
+        for (const s2 of [-1, 1]) { const p = c.clone().addScaledVector(side, s2 * w / 2); pos.push(p.x, p.y, p.z); uv.push(s2 < 0 ? 0 : 1, along / 18); }
+        if (i < N) { const k = i * 2; idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); }
+        if (i % 8 === 4) { const sp = new THREE.Sprite(spray); sp.scale.set(w * 2.2, w * 1.2, 1); sp.position.copy(c).setY(h + 1.2); this.group.add(sp); }
+      }
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx);
+      const m = new THREE.Mesh(g, mat); m.renderOrder = 3; this.group.add(m);
+    }
+  }
+  // smaller temples on the far hills: a terrace, a tower, a domed hall and a lit doorway, glowing at dusk
+  _hillTemples() {
+    const ivory = new THREE.MeshStandardMaterial({ color: '#f1e1c6', roughness: 0.8 }), gold = new THREE.MeshStandardMaterial({ color: '#e6b85c', metalness: 0.6, roughness: 0.4 });
+    for (const [a, r, sc] of HILL_TEMPLES) {
+      const h = this.nearHeight(r, a), g = new THREE.Group(); g.position.set(Math.cos(a) * r, h + 1, Math.sin(a) * r); g.rotation.y = Math.atan2(-g.position.x, -g.position.z); g.scale.setScalar(sc * 1.4); this.group.add(g);
+      const box = (w, hh, d, x, y, z, m = ivory) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, hh, d), m); b.position.set(x, y + hh / 2, z); g.add(b); };
+      box(24, 4, 18, 0, -3, 0); box(25, 0.6, 19, 0, 1, 0, gold);
+      for (let k = 0; k < 4; k++) box(6 - k * 0.6, 0.5, 1.2, 0, -3 + k * 1, 9.2 + k * 0.4);                     // steps up to the terrace
+      box(10, 5, 8, 0, 1.6, 2.5); const dm = new THREE.Mesh(new THREE.SphereGeometry(3.4, 18, 9, 0, Math.PI * 2, 0, Math.PI / 2), ivory); dm.scale.y = 1.2; dm.position.set(0, 6.6, 2.5); g.add(dm);
+      const tower = shikhara(6.5, 15, ivory, gold, 8); tower.position.set(0, 1.6, -4.5); g.add(tower);
+      for (const s2 of [-1, 1]) { box(2.4, 2.6, 2.4, s2 * 8.5, 1.6, 5); const d2 = new THREE.Mesh(new THREE.SphereGeometry(1.3, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), gold); d2.position.set(s2 * 8.5, 4.2, 5); g.add(d2); }
+      box(2.2, 3.2, 0.3, 0, 1.6, 6.55, this.palaceGlow);
+      for (const s2 of [-1, 1]) box(0.8, 1.8, 0.3, s2 * 3, 2.4, 6.55, this.palaceGlow);
+      const halo = new THREE.Sprite(this.palaceHalo.material); halo.scale.set(46, 46, 1); halo.position.set(0, 12, -2); g.add(halo);
+    }
   }
 
   // ------------------------------------------------------------ clouds and valley mist

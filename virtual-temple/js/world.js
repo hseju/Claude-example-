@@ -7,6 +7,7 @@ import { Scenery } from './scenery.js';
 import { Flora, normalFromCanvas } from './flora.js';
 import { HUT, buildHut } from './hut.js';
 import { relief, petalRing } from './ornament.js';
+import { dressWorld } from './dressing.js';
 import { pbr, triplanar } from './pbr.js';
 
 export const TEMPLES = {
@@ -93,6 +94,7 @@ export class World {
     this._peacock(new THREE.Vector3(-21, 0, -10), 0.9);
     this._rangolis();
     this._gardens();
+    dressWorld(this, TEMPLES);   // curbs, petals, lotus inlays, lanterns, flowering bushes, potted palms
     this._urlis();
     this._grassPoints();
     this.flora.build((p) => this._diya(p, 0.38));

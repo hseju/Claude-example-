@@ -409,9 +409,9 @@ export class Flora {
     const pads = [], flowers = [], buds = [];
     for (const P of this.ponds) {
       const spot = () => { if (P.rect) return new V(P.x + (rnd() - 0.5) * P.rect[0], 0, P.z + (rnd() - 0.5) * P.rect[1]); const a = rnd() * Math.PI * 2, r = Math.sqrt(rnd()) * P.r; return new V(P.x + Math.cos(a) * r, 0, P.z + Math.sin(a) * r); };
-      for (let i = 0; i < P.flowers * 3; i++) pads.push({ p: spot().setY(P.y + 0.005 + rnd() * 0.004), s: 0.6 + rnd() * 0.8 });
-      for (let i = 0; i < P.flowers; i++) flowers.push({ p: spot().setY(P.y + 0.01), s: 0.8 + rnd() * 0.5 });
-      for (let i = 0; i < Math.ceil(P.flowers / 2); i++) buds.push({ p: spot().setY(P.y - 0.02), s: 0.8 + rnd() * 0.5 });
+      for (let i = 0; i < P.flowers * 4; i++) pads.push({ p: spot().setY(P.y + 0.005 + rnd() * 0.004), s: 0.8 + rnd() * 1.1 });
+      for (let i = 0; i < Math.ceil(P.flowers * 1.4); i++) { const raised = rnd() < 0.45; flowers.push({ p: spot().setY(P.y + 0.01 + (raised ? 0.18 + rnd() * 0.22 : 0)), s: 1.3 + rnd() * 0.9, raised, base: P.y }); }
+      for (let i = 0; i < P.flowers; i++) buds.push({ p: spot().setY(P.y - 0.02), s: 0.9 + rnd() * 0.6 });
     }
     const padIM = new THREE.InstancedMesh(padGeo, new THREE.MeshStandardMaterial({ map: padTexture(), roughness: 0.5, side: THREE.DoubleSide }), pads.length);
     pads.forEach((d, i) => { m.compose(d.p, q.setFromAxisAngle(new V(0, 1, 0), rnd() * 6), new V(d.s, 1, d.s)); padIM.setMatrixAt(i, m); padIM.setColorAt(i, c.setHSL(0.27, 0.2, 0.75 + rnd() * 0.25)); });
@@ -419,7 +419,12 @@ export class Flora {
     flowers.forEach((d, i) => { m.compose(d.p, q.setFromAxisAngle(new V(0, 1, 0), rnd() * 6), new V(d.s, d.s, d.s)); flIM.setMatrixAt(i, m); });
     const budIM = new THREE.InstancedMesh(this._budGeo(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6 }), buds.length);
     buds.forEach((d, i) => { e.set((rnd() - 0.5) * 0.2, rnd() * 6, (rnd() - 0.5) * 0.2); m.compose(d.p, q.setFromEuler(e), new V(d.s, d.s, d.s)); budIM.setMatrixAt(i, m); });
-    padIM.receiveShadow = true; S.add(padIM, flIM, budIM);
+    // stems under the flowers that stand above the water
+    const raised = flowers.filter((d) => d.raised), stemGeo = new THREE.CylinderGeometry(0.012, 0.016, 1, 5); stemGeo.translate(0, -0.5, 0);
+    const stemIM = new THREE.InstancedMesh(stemGeo, new THREE.MeshStandardMaterial({ color: '#4f7a33', roughness: 0.7 }), Math.max(1, raised.length));
+    raised.forEach((d, i) => { m.compose(d.p, q.identity(), new V(1, d.p.y - d.base + 0.05, 1)); stemIM.setMatrixAt(i, m); });
+    stemIM.count = raised.length;
+    padIM.receiveShadow = true; S.add(padIM, flIM, budIM, stemIM);
   }
 
   // -------- brass urli bowls with floating flowers
