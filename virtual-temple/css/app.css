@@ -246,18 +246,6 @@ body.reduced #soundPop .np i { animation: none; }
 #hutPanel .sub { margin: 0 0 12px; color: var(--muted); font-size: 14px; line-height: 1.45; }
 .eyebrow { margin: 0 0 2px; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--gold); }
 .eyebrow[lang=sa] { font-family: var(--deva); text-transform: none; letter-spacing: .02em; font-size: 14px; }
-.plist { display: grid; gap: 8px; }
-.pcard { border: 1px solid var(--line); border-radius: 14px; padding: 11px 12px; background: rgba(255,255,255,.03); display: grid; gap: 7px; }
-.pcard .h { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-.pcard .h b { font-size: 16px; font-weight: 600; }
-.pcard .h i { font-style: normal; font-size: 12px; color: var(--gold); letter-spacing: .04em; }
-.pcard .h .pat { margin-left: auto; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.pcard p { margin: 0; color: var(--muted); font-size: 13.5px; line-height: 1.4; }
-.pcard .go { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.pcard .mins { display: flex; gap: 4px; }
-.pcard .mins button { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 4px 10px; font-size: 13px; min-height: 32px; font-variant-numeric: tabular-nums; }
-.pcard .mins button[aria-pressed=true] { border-color: var(--gold); background: rgba(226,181,85,.18); }
-.pcard .start { margin-left: auto; }
 .gset { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 8px; }
 .gset summary { cursor: pointer; font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--gold); padding: 6px 0; }
 .gset .glab { font-size: 13px; color: var(--muted); margin: 10px 0 5px; }
@@ -269,11 +257,6 @@ body.reduced #soundPop .np i { animation: none; }
 /* the session: a breathing light, captions and a few quiet controls */
 #sessionUI { position: fixed; inset: 0; pointer-events: none; }
 #sessionUI > * { pointer-events: auto; }
-#sessionUI .stop { position: fixed; left: 50%; top: max(14px, env(safe-area-inset-top)); transform: translateX(-50%); text-align: center; background: var(--glass); border: 1px solid var(--line); border-radius: 16px; padding: 8px 18px 10px; min-width: 200px; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
-#sessionUI .stop b { display: block; font-family: var(--display); font-weight: 400; font-size: 18px; }
-#sessionUI .stop span { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.sbar { height: 3px; border-radius: 2px; background: rgba(255,255,255,.12); margin-top: 6px; overflow: hidden; }
-.sbar i { display: block; height: 100%; width: 0; background: var(--gold); transition: width .5s linear; }
 /* the meditator: a silhouette in lotus pose whose aura, light and chakras follow the breath */
 #orb { position: fixed; left: 50%; top: 45%; width: min(68vmin, 430px); transform: translate(-50%, -50%); pointer-events: none; display: flex; flex-direction: column; align-items: center; }
 #orb .medi-wrap { width: 100%; aspect-ratio: 1; }
@@ -289,15 +272,75 @@ body.reduced #soundPop .np i { animation: none; }
 .hut-head .mark svg { width: 100%; height: 100%; }
 .hut-head .mark.big { width: 76px; height: 76px; border: 0; background: none; overflow: visible; }
 .wlabel .ico .medi-mark { width: 30px; height: 30px; stroke: none; fill: initial; }
-#sCaption { position: fixed; left: 50%; bottom: calc(max(16px, env(safe-area-inset-bottom)) + 70px); transform: translateX(-50%); width: min(620px, calc(100vw - 32px)); margin: 0; text-align: center; font-size: clamp(16px, 2.4vmin, 19px); line-height: 1.45; text-shadow: 0 1px 10px rgba(20,8,4,.95), 0 0 3px rgba(20,8,4,.9); transition: opacity .6s; pointer-events: none; }
-#sCaption.dim { opacity: 0; }
-#sessionUI .sctl { position: fixed; left: 50%; bottom: max(14px, env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; gap: 10px; align-items: center; }
-#sessionUI .sctl svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; }
-#sVoice[aria-pressed=true] { background: rgba(158,42,38,.55); }
 #doneCard { z-index: 21; }
 @media (max-width: 720px) {
   #hutPanel { top: auto; left: 8px; right: 8px; width: auto; bottom: max(8px, env(safe-area-inset-bottom)); max-height: 60vh; border-radius: 18px 18px 14px 14px; }
   #orb { top: 45%; width: min(86vw, 360px); }
-  #sessionUI .stop { top: calc(max(12px, env(safe-area-inset-top)) + 54px); min-width: 0; width: calc(100vw - 120px); padding: 6px 12px 8px; }
-  #sCaption { bottom: calc(max(14px, env(safe-area-inset-bottom)) + 66px); }
+}
+
+/* practice picker: tiles with icons, and a detail card for the chosen one */
+.choose { display: flex; align-items: center; gap: 8px; margin: 12px 2px 8px; font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--gold); font-weight: 600; }
+.choose svg, .tile svg, .stitle b svg { width: 20px; height: 20px; stroke: var(--gold); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.tile { display: grid; justify-items: center; align-content: start; gap: 5px; padding: 12px 6px 10px; border-radius: 14px; border: 1px solid var(--line); background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.015)); text-align: center; min-height: 96px; transition: border-color .2s, background .2s, transform .1s; }
+.tile svg { width: 30px; height: 30px; stroke-width: 1.5; }
+.tile b { font-weight: 500; font-size: 13.5px; line-height: 1.2; }
+.tile small { color: var(--muted); font-size: 11.5px; }
+.tile[aria-checked=true] { border-color: var(--gold); background: linear-gradient(180deg, rgba(226,181,85,.22), rgba(226,181,85,.06)); box-shadow: 0 0 0 1px rgba(226,181,85,.35), 0 6px 18px rgba(226,140,40,.18); }
+.tile:active { transform: scale(.97); }
+.pdetail { margin-top: 10px; border: 1px solid var(--line); border-radius: 14px; padding: 12px; background: rgba(255,255,255,.03); display: grid; gap: 8px; }
+.pdetail .h { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.pdetail .h b { font-size: 17px; font-weight: 600; }
+.pdetail .h i { font-style: normal; font-size: 12px; color: var(--gold); }
+.pdetail .h .pat { margin-left: auto; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.pdetail p { margin: 0; color: var(--muted); font-size: 13.5px; line-height: 1.45; }
+.pdetail .go { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.pdetail .mins { display: flex; gap: 4px; }
+.pdetail .mins button { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 4px 10px; font-size: 13px; min-height: 32px; font-variant-numeric: tabular-nums; }
+.pdetail .mins button[aria-pressed=true] { border-color: var(--gold); background: rgba(226,181,85,.18); }
+.pdetail .start { margin-left: auto; }
+#hutSeats { color: var(--gold); }
+
+/* the session: a title bar, the scene, a phase cue, captions, a glowing waveform and player controls */
+#hutUI.insession .chipbar { display: none; }
+#sessionUI .stop { position: fixed; left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right)); top: max(12px, env(safe-area-inset-top)); display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; }
+#sBack svg { stroke-width: 2.2; }
+.stitle { justify-self: center; text-align: center; background: var(--glass); border: 1px solid var(--line); border-radius: 16px; padding: 7px 18px 8px; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); min-width: 0; max-width: 100%; box-sizing: border-box; }
+.stitle b { display: flex; align-items: center; justify-content: center; gap: 7px; font-family: var(--display); font-weight: 400; font-size: 19px; white-space: nowrap; }
+.stitle small { display: block; color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sbar { height: 3px; border-radius: 2px; background: rgba(255,255,255,.12); margin-top: 6px; overflow: hidden; }
+.sbar i { display: block; height: 100%; width: 0; background: var(--gold); transition: width .5s linear; }
+.sright { display: flex; gap: 8px; align-items: center; }
+.timer { display: inline-flex; align-items: center; gap: 6px; background: var(--glass); border: 1px solid var(--line); border-radius: 999px; padding: 8px 12px; font-variant-numeric: tabular-nums; font-size: 15px; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.timer svg { width: 17px; height: 17px; stroke: var(--gold); fill: none; stroke-width: 1.8; stroke-linecap: round; }
+#sPhase { position: fixed; left: 50%; bottom: calc(max(14px, env(safe-area-inset-bottom)) + 120px); transform: translateX(-50%); margin: 0; display: flex; align-items: baseline; gap: 10px; padding: 6px 18px 8px; border-radius: 999px; background: rgba(28,12,6,.55); border: 1px solid rgba(226,181,85,.35); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); pointer-events: none; transition: opacity .4s; }
+#sPhase b { font-family: var(--display); font-weight: 400; font-size: 22px; }
+#sPhase span { font-size: 24px; color: #fff3dc; font-variant-numeric: tabular-nums; min-width: 1ch; }
+#sPhase:empty, #sPhase.off { opacity: 0; }
+#sCaption { position: fixed; left: 50%; bottom: calc(max(14px, env(safe-area-inset-bottom)) + 172px); transform: translateX(-50%); width: min(640px, calc(100vw - 32px)); margin: 0; text-align: center; font-size: clamp(15px, 2.3vmin, 18px); line-height: 1.45; text-shadow: 0 1px 10px rgba(20,8,4,.95), 0 0 3px rgba(20,8,4,.9); transition: opacity .6s; pointer-events: none; }
+#sCaption.dim { opacity: 0; }
+#sWave { position: fixed; left: 50%; bottom: calc(max(14px, env(safe-area-inset-bottom)) + 76px); transform: translateX(-50%); width: min(560px, calc(100vw - 40px)); height: 40px; pointer-events: none; }
+.player { position: fixed; left: 50%; bottom: max(12px, env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; align-items: center; gap: clamp(10px, 4vw, 28px); padding: 6px 14px; border-radius: 999px; background: rgba(28,12,6,.62); border: 1px solid var(--line); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.pbtn { position: relative; width: 46px; height: 46px; border-radius: 50%; border: 1px solid rgba(226,181,85,.4); background: rgba(255,255,255,.04); display: grid; place-items: center; padding: 0; }
+.pbtn svg { width: 20px; height: 20px; stroke: #f6e3bc; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.pbtn i { position: absolute; bottom: 4px; right: 6px; font-style: normal; font-size: 9.5px; color: var(--gold); }
+.pbtn.big { width: 60px; height: 60px; border: 1.5px solid var(--gold); background: radial-gradient(circle, rgba(226,181,85,.28), rgba(226,181,85,.08)); box-shadow: 0 0 18px rgba(226,160,60,.35); }
+.pbtn.big svg { width: 24px; height: 24px; stroke-width: 2.2; }
+.pbtn[aria-expanded=true] { border-color: var(--gold); background: rgba(226,181,85,.2); }
+#sPop { position: fixed; left: 50%; bottom: calc(max(12px, env(safe-area-inset-bottom)) + 78px); transform: translateX(-50%); width: min(320px, calc(100vw - 32px)); background: var(--glass-strong); border: 1px solid var(--line); border-radius: 16px; padding: 12px; display: grid; gap: 6px; box-shadow: 0 16px 40px rgba(0,0,0,.45); z-index: 3; }
+#sPop h3 { margin: 2px 4px 4px; font-size: 11.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--gold); font-weight: 600; }
+#sPop button.opt { text-align: left; background: rgba(255,255,255,.03); border: 1px solid var(--line); border-radius: 12px; padding: 9px 12px; }
+#sPop button.opt[aria-pressed=true] { border-color: var(--gold); background: rgba(226,181,85,.14); }
+#sPop .setrow { margin: 6px 4px; }
+#sleepDim { position: fixed; inset: 0; background: #050203; opacity: 0; pointer-events: none; transition: opacity 2s; }
+#orb { top: 44%; }
+@media (max-width: 720px) {
+  .stitle b { font-size: 16px; }
+  .stitle { padding: 6px 10px 7px; }
+  .timer { padding: 7px 10px; font-size: 14px; }
+  #sessionUI .stop { gap: 6px; }
+  .pbtn { width: 42px; height: 42px; } .pbtn.big { width: 56px; height: 56px; }
+  #sPhase { bottom: calc(max(12px, env(safe-area-inset-bottom)) + 114px); }
+  #sCaption { bottom: calc(max(12px, env(safe-area-inset-bottom)) + 164px); }
+  #sPhase b { font-size: 19px; } #sPhase span { font-size: 21px; }
 }

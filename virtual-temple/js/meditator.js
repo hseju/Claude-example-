@@ -34,6 +34,18 @@ function lotusPetals() {
   return s;
 }
 
+// chakra positions on the figure (SVG units, 240 x 240 box, spine at x = 120) for 3D overlays
+export const CHAKRA_POINTS = CHAKRAS.map(([y, color, name]) => ({ y, color, name }));
+// the figure alone, in glowing gold on a transparent ground, with its lotus: used as the altar image in the hut
+export function figureSVG() {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="512" height="512"><defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff1c4"/><stop offset=".45" stop-color="#ffcf6e"/><stop offset="1" stop-color="#e59a2e"/></linearGradient>
+    <linearGradient id="p" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#d9822a"/><stop offset="1" stop-color="#ffe2a0"/></linearGradient></defs>
+    <g fill="url(#p)" stroke="#9a5418" stroke-width=".8">${lotusPetals()}</g>
+    <g fill="url(#g)" stroke="url(#g)">${FIGURE}</g>
+    <g stroke="#b8701e" opacity=".7">${DETAIL}</g></svg>`;
+}
+
 // full = the large session visual; otherwise a small static mark for labels and headers
 export function meditatorSVG(uid = 'm', { full = true } = {}) {
   const id = (n) => `${uid}-${n}`;

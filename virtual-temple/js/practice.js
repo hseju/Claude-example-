@@ -10,7 +10,7 @@
 // pattern phases: in, hold, out, holdOut, hum, rest, and the alternate-nostril variants inL/inR/outL/outR
 export const BREATHWORK = [
   {
-    id: 'calm', name: 'Calm breath', tag: 'Resonant breathing', sub: 'Slow, even breaths, about five seconds in and five out. Steadies the heart and the mind.',
+    id: 'calm', icon: 'lotus', name: 'Calm breath', tag: 'Resonant breathing', sub: 'Slow, even breaths, about five seconds in and five out. Steadies the heart and the mind.',
     minutes: [3, 5, 10], def: 5, pattern: [['in', 5.5], ['out', 5.5]],
     intro: ['Welcome. Sit comfortably, with your spine tall and your shoulders soft.',
       'Rest your hands on your knees. Let your eyes close, or soften your gaze toward the lamp.',
@@ -20,7 +20,7 @@ export const BREATHWORK = [
     close: ['Let go of the rhythm now, and breathe naturally.', 'Notice how you feel: calm, steady, present.', 'When you are ready, gently open your eyes.'],
   },
   {
-    id: 'box', name: 'Box breathing', tag: 'Sama vritti', sub: 'Four counts in, hold, out, hold. Even and focusing; good before work or study.',
+    id: 'box', icon: 'box', name: 'Box breathing', tag: 'Sama vritti', sub: 'Four counts in, hold, out, hold. Even and focusing; good before work or study.',
     minutes: [3, 5, 8], def: 5, pattern: [['in', 4], ['hold', 4], ['out', 4], ['holdOut', 4]], holds: true,
     intro: ['Box breathing, sama vritti, means equal breath.',
       'Four counts breathing in, four counts holding, four counts breathing out, and four counts resting empty.',
@@ -30,7 +30,7 @@ export const BREATHWORK = [
     close: ['Release the counting, and let the breath return to its own rhythm.', 'Notice the steadiness you have created.', 'Gently open your eyes.'],
   },
   {
-    id: 'relax', name: '4-7-8 breath', tag: 'Relaxing breath', sub: 'In for four, hold for seven, a long sigh out for eight. Helps you unwind, or fall asleep.',
+    id: 'relax', icon: 'hourglass', name: '4-7-8 breath', tag: 'Relaxing breath', sub: 'In for four, hold for seven, a long sigh out for eight. Helps you unwind, or fall asleep.',
     minutes: [2, 4], def: 2, pattern: [['in', 4], ['hold', 7], ['out', 8]], holds: true,
     intro: ['The four, seven, eight breath helps the body settle.',
       'Breathe in quietly through the nose for four. Hold gently for seven. Then breathe out slowly through the mouth for eight, with a soft whoosh.',
@@ -40,7 +40,7 @@ export const BREATHWORK = [
     close: ['Return to your natural breath.', 'Feel the heaviness and warmth in the body.', 'Take your time, and open your eyes when you are ready.'],
   },
   {
-    id: 'nadi', name: 'Nadi shodhana', tag: 'Alternate-nostril breath', sub: 'Breathe through one side, then the other. Balancing and clearing.',
+    id: 'nadi', icon: 'nadi', name: 'Nadi shodhana', tag: 'Alternate-nostril breath', sub: 'Breathe through one side, then the other. Balancing and clearing.',
     minutes: [3, 5, 8], def: 5, pattern: [['inL', 4], ['outR', 6], ['inR', 4], ['outL', 6]],
     intro: ['Nadi shodhana, alternate-nostril breathing, brings balance and calm.',
       'Raise your right hand. The thumb closes the right nostril, and the ring finger closes the left. If you prefer, simply imagine the breath moving from side to side.',
@@ -50,7 +50,7 @@ export const BREATHWORK = [
     close: ['Release the hand, and breathe through both nostrils.', 'Notice the balance between left and right.', 'Gently open your eyes.'],
   },
   {
-    id: 'bhramari', name: 'Bhramari', tag: 'Humming-bee breath', sub: 'Breathe in, then hum softly on the long out-breath. Soothing and warm.',
+    id: 'bhramari', icon: 'hum', name: 'Bhramari', tag: 'Humming-bee breath', sub: 'Breathe in, then hum softly on the long out-breath. Soothing and warm.',
     minutes: [3, 5], def: 3, pattern: [['in', 4], ['hum', 8], ['rest', 2]],
     intro: ['Bhramari, the humming-bee breath, is soothing and warm.',
       'Close your lips gently, with the teeth slightly apart. On each out-breath, make a soft, steady hum, like a bee.',
@@ -60,7 +60,7 @@ export const BREATHWORK = [
     close: ['Let the humming go, and sit in the quiet it leaves behind.', 'Notice the stillness, and the warmth.', 'Gently open your eyes.'],
   },
   {
-    id: 'dirga', name: 'Three-part breath', tag: 'Dirga pranayama', sub: 'Fill the belly, ribs and chest, then empty from the top down. Deep and grounding.',
+    id: 'dirga', icon: 'layers', name: 'Three-part breath', tag: 'Dirga pranayama', sub: 'Fill the belly, ribs and chest, then empty from the top down. Deep and grounding.',
     minutes: [3, 5], def: 3, pattern: [['in', 6], ['out', 6]], words: { in: 'Belly, ribs, chest', out: 'Chest, ribs, belly' },
     intro: ['Dirga pranayama, the three-part breath, fills the body gently from the bottom up.',
       'As you breathe in, let the belly rise, then the ribs widen, then the chest lift a little.',
@@ -78,7 +78,7 @@ const BASE = (p) => p.startsWith('in') ? 'in' : p.startsWith('out') ? 'out' : p;
 // [seconds, text] lines; 'bowl' and 'om' events; `len` is the total length in seconds
 export const MEDITATIONS = [
   {
-    id: 'breath', name: 'Breath awareness', tag: 'Anapanasati', min: 5, len: 300, sub: 'Rest your attention on the natural breath. A simple, complete practice.',
+    id: 'breath', icon: 'breath', name: 'Breath awareness', tag: 'Anapanasati', min: 5, len: 300, sub: 'Rest your attention on the natural breath. A simple, complete practice.',
     lines: [[3, 'Welcome. Settle into your seat, and let your hands rest on your knees.'], [11, 'Close your eyes, or lower your gaze to the lamp in front of you.'],
       [18, 'Take one deep breath in, and let it go with a long sigh.'], [27, 'Once more. Breathe in, and let it go.'],
       [37, 'Now let the breath find its own natural rhythm. There is nothing to change.'], [48, 'Bring your attention to the tip of the nose, where the air enters and leaves.'],
@@ -89,7 +89,7 @@ export const MEDITATIONS = [
       [268, 'Begin to deepen the breath a little. Feel your seat, your hands, and the space around you.'], [283, 'Gently open your eyes, and carry this calm with you.']],
   },
   {
-    id: 'body', name: 'Body scan', tag: 'Relaxation', min: 8, len: 480, sub: 'Move slowly through the body, softening each part from head to toe.',
+    id: 'body', icon: 'body', name: 'Body scan', tag: 'Relaxation', min: 8, len: 480, sub: 'Move slowly through the body, softening each part from head to toe.',
     lines: [[3, 'Welcome. Let the body settle on the cushion, heavy and supported.'], [11, 'Close your eyes, and take a slow breath in, and a long breath out.'],
       [22, 'We will move our attention slowly through the body. Wherever it rests, let that place soften.'],
       [38, 'Begin at the crown of the head. Feel the scalp, and let it loosen.'], [55, 'The forehead smooths. The space between the eyebrows widens.'],
@@ -103,7 +103,7 @@ export const MEDITATIONS = [
       [448, 'Take a deeper breath. And when you are ready, gently open your eyes.']],
   },
   {
-    id: 'maitri', name: 'Loving-kindness', tag: 'Maitri', min: 7, len: 420, sub: 'Wish well to yourself, someone dear, someone neutral, and all beings.',
+    id: 'maitri', icon: 'heart', name: 'Loving-kindness', tag: 'Maitri', min: 7, len: 420, sub: 'Wish well to yourself, someone dear, someone neutral, and all beings.',
     lines: [[3, 'Welcome. Sit comfortably, and let the breath be easy.'], [11, 'Place a hand on your heart if you like, and feel its warmth.'],
       [22, 'We begin with ourselves. Silently, let these words arise.'], [32, 'May I be happy. May I be healthy. May I be peaceful. May I live with ease.'],
       [62, 'Let the words be gentle, like a kind voice speaking to a friend.'],
@@ -114,16 +114,55 @@ export const MEDITATIONS = [
       [340, 'Rest in this warmth for a few breaths.'], [395, 'Gently open your eyes, and carry this kindness into your day.']],
   },
   {
-    id: 'om', name: 'Om meditation', tag: 'Mantra', min: 6, len: 360, sub: 'Chant Om with the guide, then repeat it silently and rest in the stillness.',
-    lines: [[3, 'Welcome. Sit tall, with the shoulders soft and the hands resting on the knees.'], [11, 'Close your eyes. Take a slow breath in, and a long breath out.'],
-      [22, 'Om is said in three parts: ah, oh, and mm. Then comes the silence that follows.'], [34, 'We will chant together three times. Breathe in, and join the sound.'],
-      [70, 'Now chant silently, in your own time. Let each Om ride on the out-breath.'], [130, 'Feel the hum in the chest, the throat and the head, even without a sound.'],
-      [190, 'Let the mantra become softer and softer, until only the silence remains.'], [250, 'Rest in that silence. If thoughts come, return to one quiet Om.'],
-      [310, 'Let us chant once more, aloud, together.'], [338, 'Sit for a moment in the stillness. Then gently open your eyes.']],
-    oms: [42, 51, 60, 318],
+    id: 'om', icon: 'om', name: 'Om chanting', tag: 'Mantra', min: 10, len: 600, sub: 'Chant Om with the guide, then repeat it silently and rest in the stillness it leaves.',
+    lines: [[3, 'Welcome. Sit tall, with the shoulders soft and the hands resting on the knees.'], [12, 'Close your eyes. Take a slow breath in, and a long breath out.'],
+      [22, 'Om is said in three parts: ah, rising from the belly; oh, through the chest; and mm, humming in the head. Then comes the silence that follows.'],
+      [42, 'We will chant together. Breathe in, and join the sound.'], [127, 'Let each Om be a little softer than the one before.'],
+      [170, 'Now chant on your own, in your own time. Let each Om ride on the out-breath. I will stay quiet.'],
+      [260, 'Feel the hum in the chest, the throat and the head.'], [330, 'Let the sound become silent. Repeat Om only in the mind.'],
+      [420, 'Rest in the silence between the thoughts.'], [498, 'Let us chant three more times, together.'],
+      [546, 'Sit for a moment in the stillness that remains.'], [578, 'Gently open your eyes.']],
+    oms: [50, 61, 72, 83, 94, 105, 116, 134, 145, 156, 506, 517, 528],
   },
   {
-    id: 'trataka', name: 'Diya gazing', tag: 'Trataka', min: 5, len: 300, view: 'flame', sub: 'Gaze softly at the lamp, then close your eyes and hold its light within.',
+    id: 'stress', icon: 'leaf', name: 'Stress release', tag: 'Letting go', min: 10, len: 600, sub: 'Sighing breaths, releasing tension from the body, and making room around what weighs on you.',
+    lines: [[3, 'Welcome. Whatever brought you here, you can set it down for these few minutes.'], [13, 'Let your hands rest, and let your eyes close or soften.'],
+      [22, 'Let us begin with a sighing breath. Breathe in through the nose, take a little extra sip of air at the top, and then sigh it all out through the mouth.'],
+      [42, 'Again. In, a little more, and sigh it out.'], [54, 'Once more. In, a little more, and let it all go.'],
+      [68, 'Now let the breath settle, and make each out-breath a little longer than the in-breath.'],
+      [96, 'Notice where you are holding tension. The jaw, the shoulders, the hands, the belly.'],
+      [116, 'Let us release it. Lift the shoulders up toward the ears, hold for a moment, and let them drop.'], [134, 'Again. Lift, hold, and let go.'],
+      [150, 'Make gentle fists with your hands, squeeze, and slowly open the fingers.'], [168, 'Scrunch the face, and release it. Let the forehead smooth and the jaw hang loose.'],
+      [190, 'Now bring to mind what is weighing on you, just lightly. Name it to yourself in one or two words.'],
+      [214, 'Notice where you feel it in the body. Perhaps a tightness, a heaviness, a flutter.'], [238, 'Breathe gently toward that place, as if the breath could make room around it.'],
+      [264, 'You do not need to solve anything right now. Let it be there, held in a wider space.'],
+      [302, 'Picture each out-breath carrying a little of the tension away, like a stream carrying leaves.'], [342, 'Breathing in, I calm the body. Breathing out, I let go.'],
+      [402, 'Rest in this calm. Feel the cushion beneath you, solid and steady.'], [470, 'Remind yourself: I can come back to this breath whenever I need it.'],
+      [530, 'Begin to deepen the breath. Stretch the fingers, and roll the shoulders.'], [560, 'When you are ready, open your eyes, and move gently into the rest of your day.']],
+  },
+  {
+    id: 'sleep', icon: 'moon', name: 'Sleep meditation', tag: 'Yoga nidra', min: 15, len: 900, sleep: true, sub: 'A slow journey through the body and a countdown of breaths, to drift toward sleep. Best lying down.',
+    lines: [[3, 'Welcome. This practice is made for rest. If you can, listen lying down, in bed, with the lights low.'], [16, 'Let the body be completely still and comfortable. Let the eyes close.'],
+      [27, 'Take a long breath in, and a long, slow breath out. Let the body grow heavy.'], [41, 'There is nothing you need to do now. The day is done.'],
+      [57, 'Set a small intention for your rest. Perhaps: may I sleep deeply, and wake refreshed.'],
+      [82, 'Now we will travel through the body, resting the attention briefly in each place. Simply feel each part as it is named.'],
+      [102, 'The right hand. The thumb, the first finger, the second, the third, the little finger. The palm, the back of the hand, the wrist.'],
+      [126, 'The forearm, the elbow, the upper arm, the shoulder. The whole right arm, heavy and warm.'],
+      [150, 'The left hand. The thumb, the first finger, the second, the third, the little finger. The palm, the back of the hand, the wrist.'],
+      [174, 'The forearm, the elbow, the upper arm, the shoulder. The whole left arm, heavy and warm.'],
+      [198, 'The right foot. The toes, the sole, the heel. The ankle, the calf, the knee, the thigh. The whole right leg, heavy.'],
+      [224, 'The left foot. The toes, the sole, the heel. The ankle, the calf, the knee, the thigh. The whole left leg, heavy.'],
+      [250, 'The hips, the lower back, the middle back, the shoulders. The belly, the chest, the throat.'],
+      [274, 'The face. The jaw, the lips, the cheeks, the eyes, the forehead. The whole head, soft and still.'], [302, 'The whole body, heavy, warm and at rest.'],
+      [334, 'Now count the breaths backwards, slowly, from twenty seven. Breathing in, twenty seven. Breathing out, twenty seven.'],
+      [358, 'Breathing in, twenty six. Breathing out, twenty six. Continue on your own. If you lose count, simply begin again. There is no hurry.'],
+      [446, 'Let the counting fade if it wants to. Let the breath breathe itself.'],
+      [526, 'Imagine lying beside a calm lake at night. The water is still. The moon rests on it.'],
+      [586, 'With each breath you sink a little deeper, like a leaf settling slowly to the bed of the lake.'],
+      [656, 'Rest now. You are safe. You can let go completely.'], [764, 'Sleep well.']],
+  },
+  {
+    id: 'trataka', icon: 'flame', name: 'Diya gazing', tag: 'Trataka', min: 5, len: 300, view: 'flame', sub: 'Gaze softly at the lamp, then close your eyes and hold its light within.',
     lines: [[3, 'Welcome. Sit comfortably, facing the lamp.'], [10, 'Rest your gaze on the flame. Blink when you need to, and keep the eyes soft, not staring.'],
       [24, 'Notice its colour, its shape, the small dance of the light.'], [50, 'Let the mind be as steady as the flame.'],
       [80, 'Now close your eyes. See the after-image of the flame at the space between your eyebrows.'], [100, 'When it fades, simply rest there, in the quiet light within.'],
@@ -133,7 +172,7 @@ export const MEDITATIONS = [
 ];
 
 // ---------------------------------------------------------------- silent sitting
-export const TIMER = { id: 'timer', name: 'Silent sitting', tag: 'Dhyana', sub: 'Sit in silence with a bell at the start, between intervals, and at the end.', minutes: [5, 10, 15, 20], def: 10 };
+export const TIMER = { id: 'timer', icon: 'timer', name: 'Silent sitting', tag: 'Dhyana', sub: 'Sit in silence with a bell at the start, between intervals, and at the end.', minutes: [5, 10, 15, 20], def: 10 };
 
 // ---------------------------------------------------------------- spoken guidance
 export class Guide {
@@ -185,7 +224,9 @@ export class Session {
       E.push({ t: 0, type: 'bowl' });
       for (const [t, text] of this.def.lines) this._say(t, text);
       for (const t of this.def.oms || []) E.push({ t, type: 'om', dur: 7.5 });
-      const end = this.def.len - 6; E.push({ t: end, type: 'bowl' }, { t: end + 2.5, type: 'bowl', s: 0.8 }, { t: end + 5, type: 'bowl', s: 0.6 }, { t: this.def.len, type: 'end' });
+      const end = this.def.len - 6;
+      if (this.def.sleep) E.push({ t: end, type: 'bowl', s: 0.3 }, { t: this.def.len, type: 'end' });
+      else E.push({ t: end, type: 'bowl' }, { t: end + 2.5, type: 'bowl', s: 0.8 }, { t: end + 5, type: 'bowl', s: 0.6 }, { t: this.def.len, type: 'end' });
       return;
     }
     if (this.kind === 'timer') {
@@ -253,6 +294,16 @@ export class Session {
     }
   }
   get remaining() { return Math.max(0, this.total - this.elapsed); }
+  // jump back or forward; the guide picks up at the next line and the breath at the next phase
+  seek(delta) {
+    const t = Math.max(0, Math.min(this.total - 1, this.elapsed + delta));
+    this.guide?.cancel(); this.elapsed = t;
+    this.i = this.events.findIndex(e => e.t > t); if (this.i < 0) this.i = this.events.length;
+    const done = this.events.slice(0, this.i);
+    this._phase = [...done].reverse().find(e => e.type === 'phase') || null;
+    const line = [...done].reverse().find(e => e.type === 'say' && !e.tip);
+    if (line) this.guide?.onCaption?.(line.text);
+  }
 }
 
 // ---------------------------------------------------------------- practice log (this device only)

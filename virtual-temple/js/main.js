@@ -86,7 +86,7 @@ async function boot() {
   world.scene.add(me.avatar.root);
   playerRing = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.68, 48), new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffc861').multiplyScalar(2.2), transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending }));
   playerRing.rotation.x = -Math.PI / 2; world.scene.add(playerRing);
-  if (/[?&]debug\b/.test(location.search)) window.__vt = { app, me, world, hall, directory, cam, input, settings, audio, preview, refreshCreator, hut: { state: hutState, guide, enter: enterHut, leave: leaveHut, start: startSession, end: endSession } }; // local testing hook
+  if (/[?&]debug\b/.test(location.search)) window.__vt = { app, me, world, hall, directory, cam, input, settings, audio, preview, refreshCreator, hut: { state: hutState, guide, model: HUT, enter: enterHut, leave: leaveHut, start: startSession, end: endSession } }; // local testing hook
   setMode('welcome');
   $('loading').style.opacity = '0'; setTimeout(() => $('loading').remove(), 900);
   last = performance.now(); requestAnimationFrame(loop);
@@ -365,7 +365,7 @@ function buildLabels() {
     const el = document.createElement('div'); el.className = 'wlabel'; el.innerHTML = `<i class="ico">${ICONS[T.icon]}</i><div><b>${T.short}</b><em>Temple</em><span></span></div>`;
     el.addEventListener('click', () => goTo(T.id)); root.appendChild(el); labelEls[T.id] = el;
   }
-  { const el = document.createElement('div'); el.className = 'wlabel'; el.innerHTML = `<i class="ico">${meditatorSVG('lbl', { full: false })}</i><div><b>Meditation</b><em>hut</em><span>Breathwork · guided meditation</span></div>`;
+  { const el = document.createElement('div'); el.className = 'wlabel'; el.innerHTML = `<i class="ico">${meditatorSVG('lbl', { full: false })}</i><div><b>Meditation</b><em>hut</em><span>${(world.hutSitters || []).length} / ${HUT.capacity} seats · breathe & meditate</span></div>`;
     el.addEventListener('click', () => goTo('hut')); root.appendChild(el); labelEls.hut = el; }
   labelEls.me = document.createElement('div'); labelEls.me.className = 'nlabel me'; root.appendChild(labelEls.me);
   labelEls.sims = [];
@@ -635,16 +635,34 @@ function drawMap() {
 
 // ---------------------------------------------------------------- meditation hut
 const guide = new Guide();
-const hutState = { view: 'vista', session: null, def: null, kind: null, tab: 'breathe', mins: {}, voiceOff: false, paused: false, wake: null, rec: null, ui: {} };
+const hutState = { view: 'altar', session: null, def: null, kind: null, tab: 'breathe', sel: { breathe: 'calm', meditate: 'breath', sit: 'timer' }, mins: {}, voiceOff: false, paused: false, wake: null, rec: null, ui: {}, pop: null };
 const HUT_ZONE = { entrance: 0, courtyard: 0, corridor: 0, dome: 0.15, garden: 0.9, ganesha: 0, shiva: 0, krishna: 0 };
-const VIEW_NAMES = { vista: 'Looking out over the gardens', face: 'Facing your devotee', flame: 'Looking at the lamp' };
+const VIEW_NAMES = { altar: 'Facing the altar', face: 'Facing your devotee', wide: 'The whole hut', flame: 'Looking at the lamp', focus: 'Focus: the breathing figure' };
+// line icons for the practice tiles
+const P_ICONS = {
+  lotus: '<path d="M16 7c-3 4-3 9 0 13 3-4 3-9 0-13zM16 20c-4-1-8-4-9.5-9 4.5 0 7.5 3 9.5 9zM16 20c4-1 8-4 9.5-9-4.5 0-7.5 3-9.5 9zM6 23c4 3 16 3 20 0"/>',
+  box: '<rect x="8" y="8" width="16" height="16" rx="2"/><path d="M8 4.5h16M27.5 8v16M24 27.5H8M4.5 24V8"/>',
+  hourglass: '<path d="M9 5h14M9 27h14M10 5c0 6 12 8 12 11s-12 5-12 11M22 5c0 6-12 8-12 11s12 5 12 11"/>',
+  nadi: '<path d="M11 6v20M21 6v20M11 11l-4 4 4 4M21 21l4-4-4-4"/>',
+  hum: '<path d="M5 16h2M10 11v10M14 7v18M18 10v12M22 13v6M27 16h-2"/>',
+  layers: '<path d="M6 24h20M8 19h16M10 14h12M16 5v5M13 8l3-3 3 3"/>',
+  breath: '<path d="M5 12h14a4 4 0 1 0-4-4M5 17h19a4 4 0 1 1-4 4M5 22h8"/>',
+  body: '<circle cx="16" cy="6" r="2.6"/><path d="M16 9v9M10 13h12M12 27l4-9 4 9"/>',
+  heart: '<path d="M16 26s-9-5.6-9-12.2A5 5 0 0 1 16 10a5 5 0 0 1 9 3.8C25 20.4 16 26 16 26z"/>',
+  om: '<circle cx="16" cy="6.5" r="2.6"/><path d="M16 10c-3 0-5 2-5 5v4h10v-4c0-3-2-5-5-5zM11 17l-5 5h20l-5-5M9 25h14"/>',
+  leaf: '<path d="M7 25c0-10 7-17 18-18 0 11-7 18-18 18zM7 25l10-10"/>',
+  moon: '<path d="M25 19.5A10 10 0 1 1 13 6a8 8 0 0 0 12 13.5z"/>',
+  flame: '<path d="M16 4c4 5 7 8 7 13a7 7 0 0 1-14 0c0-3 1.5-5.5 3-7 0 3 1.5 4.5 3 4.5-1.5-4 0-7.5 1-10.5z"/>',
+  timer: '<circle cx="16" cy="17" r="10"/><path d="M16 11v6l4 3M12 3h8"/>',
+};
+const pIcon = (k) => `<svg viewBox="0 0 32 32" aria-hidden="true">${P_ICONS[k] || P_ICONS.lotus}</svg>`;
 function enterHut() {
   if (app.mode !== 'world') return;
   input.auto = []; app.arriveShrine = null; closeAllPanels(); startAudioOnce();
   fadeThrough(() => {
     setMode('hut');
     const av = me.avatar; av.root.position.copy(HUT.seat.pos); av.root.rotation.y = HUT.seat.rotY; av.setState('meditate'); av.breath = null;
-    hutState.view = 'vista'; cam.hutSnap = true; if (playerRing) playerRing.visible = false;
+    hutState.view = 'altar'; cam.hutSnap = true; if (playerRing) playerRing.visible = false;
     showHutPanel();
     if (audio.ctx) audio.applyZone(HUT_ZONE, 1.2);
   });
@@ -656,39 +674,48 @@ function leaveHut() {
     const av = me.avatar; av.setState('idle'); av.breath = null;
     av.root.position.copy(HUT.entrance); av.root.rotation.y = HUT.rot;
     if (playerRing) playerRing.visible = true;
-    $('doneCard').hidden = true;
+    $('doneCard').hidden = true; $('hutUI').classList.remove('insession');
     setMode('world');
     cam.tYaw = cam.yaw = HUT.rot + Math.PI - 0.7; cam.tDist = cam.dist = cam.eff = 10; cam.tPitch = cam.pitch = 0.3; snapCamera();
   });
 }
 function showHutPanel() {
-  $('sessionUI').hidden = true; $('doneCard').hidden = true; $('hutPanel').hidden = false;
+  $('sessionUI').hidden = true; $('doneCard').hidden = true; $('hutPanel').hidden = false; $('hutUI').classList.remove('insession');
+  if (hutState.view === 'focus' || hutState.view === 'flame') hutState.view = 'altar';
   renderHutPanel();
 }
 function selectHutTab(tab) {
   hutState.tab = tab;
   for (const [id, t] of [['Breathe', 'breathe'], ['Meditate', 'meditate'], ['Sit', 'sit']]) { $('tab' + id).setAttribute('aria-selected', String(t === tab)); $('list' + id).hidden = t !== tab; }
+  renderDetail();
 }
+const practiceDef = (kind, id) => kind === 'breath' ? BREATHWORK.find(d => d.id === id) : kind === 'meditation' ? MEDITATIONS.find(d => d.id === id) : TIMER;
+const TAB_KIND = { breathe: 'breath', meditate: 'meditation', sit: 'timer' };
 function renderHutPanel() {
-  const card = (kind, d) => {
-    const opts = kind === 'meditation' ? [d.min] : d.minutes, chosen = hutState.mins[d.id] ?? (kind === 'meditation' ? d.min : d.def);
-    const pat = kind === 'breath' ? d.pattern.map(p => p[1]).join(' · ') + ' s' : kind === 'meditation' ? `${d.min} min · guided` : 'bells only';
-    const mins = kind === 'meditation' ? '' : `<span class="mins" role="group" aria-label="Minutes">${opts.map(m => `<button data-id="${d.id}" data-min="${m}" aria-pressed="${m === chosen}">${m} min</button>`).join('')}</span>`;
-    return `<div class="pcard"><div class="h"><b>${d.name}</b><i>${d.tag}</i><span class="pat">${pat}</span></div><p>${d.sub}</p>
-      <div class="go">${mins}<button class="btn small primary start" data-start="${kind}:${d.id}">Begin</button></div></div>`;
-  };
-  $('listBreathe').innerHTML = BREATHWORK.map(d => card('breath', d)).join('');
-  $('listMeditate').innerHTML = MEDITATIONS.map(d => card('meditation', d)).join('');
-  $('listSit').innerHTML = card('timer', TIMER);
-  for (const b of $('hutPanel').querySelectorAll('[data-min]')) b.onclick = () => { hutState.mins[b.dataset.id] = +b.dataset.min; renderHutPanel(); audio.uiTap(); };
-  for (const b of $('hutPanel').querySelectorAll('[data-start]')) b.onclick = () => { const [kind, id] = b.dataset.start.split(':'); startSession(kind, id); };
+  const tile = (kind, d, tab) => { const mins = hutState.mins[d.id] ?? (kind === 'meditation' ? d.min : d.def);
+    return `<button class="tile" role="radio" aria-checked="${hutState.sel[tab] === d.id}" data-tab="${tab}" data-id="${d.id}">${pIcon(d.icon)}<b>${d.name}</b><small>${mins} min</small></button>`; };
+  $('listBreathe').innerHTML = BREATHWORK.map(d => tile('breath', d, 'breathe')).join('');
+  $('listMeditate').innerHTML = MEDITATIONS.map(d => tile('meditation', d, 'meditate')).join('');
+  $('listSit').innerHTML = tile('timer', TIMER, 'sit');
+  for (const b of $('hutPanel').querySelectorAll('.tile')) b.onclick = () => { hutState.sel[b.dataset.tab] = b.dataset.id; audio.uiTap(); renderHutPanel(); };
   selectHutTab(hutState.tab);
   $('voiceMode').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === settings.guideMode)));
   $('bgMode').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.b === settings.practiceBg)));
   $('tTones').setAttribute('aria-checked', String(settings.breathTones));
   renderVoices();
+  const taken = (world.hutSitters || []).length + 1;
+  $('hutSeats').textContent = `${taken} of ${HUT.capacity} seats taken; the others are simulated.`;
   const st = PracticeLog.summary();
   $('practiceStats').textContent = st.total ? `Today ${st.today} min · this week ${st.week} min in ${st.weekSessions} session${st.weekSessions === 1 ? '' : 's'}${st.streak > 1 ? ` · ${st.streak}-day streak` : ''}` : 'Your practice is kept on this device only.';
+}
+function renderDetail() {
+  const tab = hutState.tab, kind = TAB_KIND[tab], d = practiceDef(kind, hutState.sel[tab]); if (!d) return;
+  const opts = kind === 'meditation' ? [] : d.minutes, chosen = hutState.mins[d.id] ?? (kind === 'meditation' ? d.min : d.def);
+  const pat = kind === 'breath' ? d.pattern.map(p => p[1]).join(' · ') + ' s' : kind === 'meditation' ? `${d.min} min · guided` : 'bells only';
+  const mins = opts.length ? `<span class="mins" role="group" aria-label="Minutes">${opts.map(m => `<button data-min="${m}" aria-pressed="${m === chosen}">${m} min</button>`).join('')}</span>` : '';
+  $('pDetail').innerHTML = `<div class="h"><b>${d.name}</b><i>${d.tag}</i><span class="pat">${pat}</span></div><p>${d.sub}</p><div class="go">${mins}<button class="btn small primary start" id="pBegin">Begin</button></div>`;
+  for (const b of $('pDetail').querySelectorAll('[data-min]')) b.onclick = () => { hutState.mins[d.id] = +b.dataset.min; audio.uiTap(); renderHutPanel(); };
+  $('pBegin').onclick = () => startSession(kind, d.id);
 }
 function renderVoices() {
   const sel = $('voicePick'), vs = guide.voices();
@@ -699,53 +726,66 @@ function renderVoices() {
   sel.disabled = !vs.length;
   $('voiceNote').textContent = 'Voices come from your device. Ones marked Natural, Neural or Enhanced, or English (India), usually sound calmest.';
 }
+function sessionBg() { return settings.practiceBg === 'auto' ? (hutState.kind === 'breath' ? 'nature' : 'music') : settings.practiceBg; }
+function applySessionMix() {
+  const bg = sessionBg(), lvl = hutState.musicLevel ?? 0.28;
+  audio.setSessionMix({ music: bg === 'music' ? 'meditation' : null, musicLevel: lvl, ambience: bg === 'silence' ? 0.1 : bg === 'music' ? 0.45 : 0.8 });
+}
 function startSession(kind, id) {
-  const def = kind === 'breath' ? BREATHWORK.find(d => d.id === id) : kind === 'meditation' ? MEDITATIONS.find(d => d.id === id) : TIMER;
-  if (!def) return;
+  const def = practiceDef(kind, id); if (!def) return;
   startAudioOnce(); guide.unlock();
-  guide.voiceURI = settings.voiceURI || null; guide.volume = Math.max(0.25, settings.master / 100); guide.muted = settings.muted || hutState.voiceOff;
+  guide.voiceURI = settings.voiceURI || null; guide.volume = hutState.voiceVol ?? Math.max(0.25, settings.master / 100); guide.muted = settings.muted || hutState.voiceOff;
   guide.onCaption = showCaption;
   const minutes = hutState.mins[def.id] ?? (kind === 'meditation' ? def.min : def.def);
   const recorded = audio.manifest?.guided?.[def.id] || null;
   const S = new Session(kind, def, { minutes, voice: settings.guideMode, tones: settings.breathTones, audio, guide, recorded });
   S.onEnd = finishSession;
   Object.assign(hutState, { session: S, def, kind, paused: false, ui: {} });
-  const bg = settings.practiceBg === 'auto' ? (kind === 'breath' ? 'nature' : 'music') : settings.practiceBg;
-  audio.setSessionMix({ music: bg === 'music' ? 'meditation' : null, musicLevel: 0.28, ambience: bg === 'silence' ? 0.1 : bg === 'music' ? 0.45 : 0.8 });
+  applySessionMix();
   if (recorded) { hutState.rec = new Audio(recorded); hutState.rec.play().catch(() => {}); }
-  $('hutPanel').hidden = true; $('doneCard').hidden = true; $('sessionUI').hidden = false;
-  $('sTitle').textContent = def.name; $('orb').classList.toggle('calm', kind !== 'breath'); $('orb').hidden = def.view === 'flame'; $('sessionUI').classList.toggle('noorb', def.view === 'flame');
-  $('sPause').querySelector('span').textContent = 'Pause'; $('sCaption').textContent = ''; $('sCaption').classList.add('dim');
-  if (def.view) { hutState.view = def.view; }
+  $('hutPanel').hidden = true; $('doneCard').hidden = true; $('sessionUI').hidden = false; $('hutUI').classList.add('insession'); closeSessionPop();
+  $('sHead').textContent = kind === 'breath' ? 'Breathwork in progress' : kind === 'timer' ? 'Silent sitting' : 'Meditation in progress';
+  $('sTitle').textContent = `${def.name} · ${def.tag}`;
+  $('orb').classList.toggle('calm', kind !== 'breath');
+  setPauseIcon(false); $('sCaption').textContent = ''; $('sCaption').classList.add('dim'); $('sleepDim').style.opacity = 0;
+  hutState.view = def.view || (hutState.view === 'flame' ? 'altar' : hutState.view);
   requestWake();
   S.start();
+}
+function setPauseIcon(paused) {
+  $('sPause').innerHTML = paused ? '<svg viewBox="0 0 24 24"><path d="M8 5l11 7-11 7z"/></svg>' : '<svg viewBox="0 0 24 24"><path d="M9 5v14M15 5v14"/></svg>';
+  $('sPause').setAttribute('aria-label', paused ? 'Resume' : 'Pause');
 }
 function togglePause() {
   const S = hutState.session; if (!S) return;
   hutState.paused = !hutState.paused;
   if (hutState.paused) { S.pause(); hutState.rec?.pause(); } else { S.resume(); hutState.rec?.play().catch(() => {}); }
-  $('sPause').querySelector('span').textContent = hutState.paused ? 'Resume' : 'Pause';
-  $('sPause').querySelector('svg').innerHTML = hutState.paused ? '<path d="M8 5l11 7-11 7z"/>' : '<path d="M9 5v14M15 5v14"/>';
+  setPauseIcon(hutState.paused);
   me.avatar.breath = null;
+}
+function seekSession(d) {
+  const S = hutState.session; if (!S) return;
+  S.seek(d); if (hutState.rec) try { hutState.rec.currentTime = Math.max(0, hutState.rec.currentTime + d); } catch (e) {}
+  toast(d < 0 ? 'Back 15 seconds' : 'Forward 15 seconds', 1200);
 }
 function endSession(silent = false) {
   const S = hutState.session; if (!S) return;
   S.stop(); hutState.rec?.pause(); hutState.rec = null;
   if (S.elapsed > 60) PracticeLog.add({ kind: hutState.kind, id: hutState.def.id, minutes: S.elapsed / 60, partial: true });
-  hutState.session = null; me.avatar.breath = null; releaseWake();
-  audio.clearSessionMix();
-  if (hutState.view === 'flame') hutState.view = 'vista';
+  hutState.session = null; me.avatar.breath = null; releaseWake(); closeSessionPop();
+  audio.clearSessionMix(); HUT.breath = null;
   if (!silent) showHutPanel();
 }
 function finishSession() {
   const S = hutState.session, def = hutState.def; if (!S) return;
   PracticeLog.add({ kind: hutState.kind, id: def.id, minutes: S.total / 60 });
-  hutState.session = null; hutState.rec = null; me.avatar.breath = null; releaseWake();
-  setTimeout(() => { if (!hutState.session) audio.clearSessionMix(); }, 4000);   // let the last bowl ring out
-  if (hutState.view === 'flame') hutState.view = 'vista';
+  hutState.session = null; hutState.rec = null; me.avatar.breath = null; releaseWake(); closeSessionPop();
+  setTimeout(() => { if (!hutState.session) audio.clearSessionMix(); }, def.sleep ? 12000 : 4000);   // let the last bowl (or the music) ring out
+  if (hutState.view === 'flame' || hutState.view === 'focus') hutState.view = 'altar';
+  HUT.breath = null;
   const st = PracticeLog.summary(), mins = Math.round(S.total / 60);
-  $('sessionUI').hidden = true; $('doneCard').hidden = false;
-  $('doneTitle').textContent = ['Well done', 'Beautifully done', 'Peace be with you'][Math.floor(Math.random() * 3)];
+  $('sessionUI').hidden = true; $('doneCard').hidden = false; $('hutUI').classList.remove('insession');
+  $('doneTitle').textContent = def.sleep ? 'Sleep well' : ['Well done', 'Beautifully done', 'Peace be with you'][Math.floor(Math.random() * 3)];
   $('doneSub').textContent = `${mins} minute${mins === 1 ? '' : 's'} of ${def.name.toLowerCase()}${S.kind === 'breath' && S.cycles ? `, ${S.cycles} breaths` : ''}. Today: ${st.today} min${st.streak > 1 ? ` · ${st.streak}-day streak` : ''}.`;
   hutState.again = [hutState.kind, def.id];
 }
@@ -756,18 +796,69 @@ function showCaption(text) {
 async function requestWake() { try { hutState.wake = await navigator.wakeLock?.request('screen'); } catch (e) {} }
 function releaseWake() { try { hutState.wake?.release(); } catch (e) {} hutState.wake = null; }
 const fmt = (sec) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
+// pop-ups from the player bar: background sound, and volume and voice
+function closeSessionPop() { hutState.pop = null; $('sPop').hidden = true; $('sMusic').setAttribute('aria-expanded', 'false'); $('sVol').setAttribute('aria-expanded', 'false'); }
+function openSessionPop(which) {
+  if (hutState.pop === which) { closeSessionPop(); return; }
+  hutState.pop = which; const pop = $('sPop'); pop.hidden = false;
+  $('sMusic').setAttribute('aria-expanded', String(which === 'music')); $('sVol').setAttribute('aria-expanded', String(which === 'vol'));
+  if (which === 'music') {
+    const bg = sessionBg(), np = audio.nowPlaying;
+    pop.innerHTML = `<h3>Background</h3>` + [['music', 'Soft music', 'Calm meditation music, low under the voice'], ['nature', 'Nature', 'The stream and birds, or crickets at night'], ['silence', 'Silence', 'Only the voice, tones and bowls']]
+      .map(([id, l, sub]) => `<button class="opt" data-bg="${id}" aria-pressed="${bg === id}"><b>${l}</b><br><small class="note">${sub}</small></button>`).join('') +
+      (bg === 'music' && np ? `<div class="setrow"><span class="note">♪ ${escapeHtml(np.title)} · ${escapeHtml(np.artist)}</span><button class="btn small" id="popNext">Next</button></div>` : '');
+    pop.querySelectorAll('[data-bg]').forEach(b => b.onclick = () => { settings.practiceBg = b.dataset.bg; persist(); applySessionMix(); hutState.pop = null; openSessionPop('music'); });
+    const nx = pop.querySelector('#popNext'); if (nx) nx.onclick = () => { audio.skipTrack(); setTimeout(() => { hutState.pop = null; openSessionPop('music'); }, 200); };
+  } else {
+    const vv = Math.round((hutState.voiceVol ?? guide.volume) * 100), mv = Math.round((hutState.musicLevel ?? 0.28) / 0.6 * 100);
+    pop.innerHTML = `<h3>Volume</h3>
+      <div class="setrow"><span>Voice guide</span><button class="toggle" id="popVoice" role="switch" aria-checked="${!hutState.voiceOff}" aria-label="Voice guide"></button></div>
+      <div class="setrow"><span>Voice volume</span><span>${vv}</span><input type="range" id="popVoiceVol" min="10" max="100" value="${vv}"></div>
+      <div class="setrow"><span>Background volume</span><span>${mv}</span><input type="range" id="popMusicVol" min="0" max="100" value="${mv}"></div>
+      <div class="setrow"><span>Breath tones</span><button class="toggle" id="popTones" role="switch" aria-checked="${settings.breathTones}" aria-label="Breath tones"></button></div>`;
+    $('popVoice').onclick = () => { hutState.voiceOff = !hutState.voiceOff; guide.muted = hutState.voiceOff || settings.muted; if (hutState.voiceOff) guide.cancel(); hutState.pop = null; openSessionPop('vol'); };
+    $('popVoiceVol').oninput = (e) => { hutState.voiceVol = guide.volume = +e.target.value / 100; e.target.previousElementSibling.textContent = e.target.value; };
+    $('popMusicVol').oninput = (e) => { hutState.musicLevel = +e.target.value / 100 * 0.6; e.target.previousElementSibling.textContent = e.target.value; if (audio.session) { audio.session.musicLevel = hutState.musicLevel; audio.session.ambience = (sessionBg() === 'silence' ? 0.1 : 0.45) * (0.4 + hutState.musicLevel / 0.6 * 1.2); audio.applyZone(audio.zone, 0.3); } };
+    $('popTones').onclick = () => { settings.breathTones = !settings.breathTones; persist(); if (hutState.session) hutState.session.tones = settings.breathTones; hutState.pop = null; openSessionPop('vol'); };
+  }
+}
+// a glowing waveform under the scene: the sound that is playing, with the breath underneath it
+function drawWave(t) {
+  const c = $('sWave'), w = c.clientWidth, h = c.clientHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+  if (!w) return;
+  if (c.width !== Math.round(w * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
+  if (!hutState.an && audio.ctx && audio.out) { hutState.an = audio.ctx.createAnalyser(); hutState.an.fftSize = 256; hutState.an.smoothingTimeConstant = 0.82; audio.out.connect(hutState.an); hutState.waveData = new Uint8Array(hutState.an.frequencyBinCount); }
+  const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
+  if (hutState.an) hutState.an.getByteFrequencyData(hutState.waveData);
+  const S = hutState.session, fill = S ? S.state.fill : 0.5, N = Math.max(24, Math.floor(w / 9)), bw = w / N;
+  const grad = g.createLinearGradient(0, 0, w, 0); grad.addColorStop(0, 'rgba(255,190,90,0)'); grad.addColorStop(0.2, 'rgba(255,200,110,.85)'); grad.addColorStop(0.5, 'rgba(255,236,190,1)'); grad.addColorStop(0.8, 'rgba(255,200,110,.85)'); grad.addColorStop(1, 'rgba(255,190,90,0)');
+  g.fillStyle = grad; g.shadowColor = 'rgba(255,170,70,.8)'; g.shadowBlur = 10;
+  for (let i = 0; i < N; i++) {
+    const d = Math.abs(i - (N - 1) / 2) / (N / 2), bin = 2 + Math.floor(d * 40), a = hutState.waveData ? hutState.waveData[bin] / 255 : 0;
+    const base = hutState.paused ? 0.06 : (0.1 + 0.22 * fill) * (1 - d * 0.7) + 0.05 * Math.sin(t * 2.6 + i * 0.55) * (1 - d);
+    const amp = Math.max(0.04, base, a * (1 - d * 0.35) * 1.1) * h * 0.92, x = i * bw + bw * 0.3;
+    g.beginPath(); g.roundRect ? g.roundRect(x, (h - amp) / 2, bw * 0.4, amp, bw * 0.2) : g.rect(x, (h - amp) / 2, bw * 0.4, amp); g.fill();
+  }
+}
 function updateSessionUI() {
   const S = hutState.session, u = hutState.ui; if (!S) return;
-  const st = S.state;
-  if (!hutState.visual) hutState.visual = new MeditatorVisual($('mediWrap'), { reducedMotion: settings.reducedMotion });
-  hutState.visual.reduced = settings.reducedMotion;
-  hutState.visual.update(hutState.paused ? 0.5 : st.fill, app.time, { hold: st.phase === 'hold' });
-  const label = S.kind === 'breath' ? (hutState.paused ? 'Paused' : st.label) : (hutState.paused ? 'Paused' : hutState.def.tag);
-  const count = S.kind === 'breath' ? (st.left ? String(st.left) : '') : fmt(S.remaining);
-  if (u.label !== label) { u.label = label; $('oPhase').textContent = label; }
-  if (u.count !== count) { u.count = count; $('oCount').textContent = count; }
-  const left = fmt(S.remaining) + ' left';
-  if (u.left !== left) { u.left = left; $('sTime').textContent = left; $('sBar').style.width = (100 * S.elapsed / S.total).toFixed(1) + '%'; }
+  const st = S.state, focus = hutState.view === 'focus';
+  $('orb').hidden = !focus; $('sessionUI').classList.toggle('noorb', !focus);
+  if (focus) {
+    if (!hutState.visual) hutState.visual = new MeditatorVisual($('mediWrap'), { reducedMotion: settings.reducedMotion });
+    hutState.visual.reduced = settings.reducedMotion;
+    hutState.visual.update(hutState.paused ? 0.5 : st.fill, app.time, { hold: st.phase === 'hold' });
+  }
+  const breathing = S.kind === 'breath' && st.phase !== 'intro' && st.phase !== 'close';
+  const label = hutState.paused ? 'Paused' : S.kind === 'breath' ? st.label : hutState.def.tag;
+  const count = S.kind === 'breath' ? (st.left ? String(st.left) : '') : '';
+  if (u.label !== label) { u.label = label; $('oPhase').textContent = label; $('sPhaseLabel').textContent = label; }
+  if (u.count !== count) { u.count = count; $('oCount').textContent = S.kind === 'breath' ? count : fmt(S.remaining); $('sPhaseCount').textContent = count; }
+  $('sPhase').classList.toggle('off', focus || !(breathing || hutState.paused));
+  const left = fmt(S.remaining);
+  if (u.left !== left) { u.left = left; $('sTime').textContent = left; $('sBar').style.width = (100 * S.elapsed / S.total).toFixed(1) + '%'; if (S.kind !== 'breath') $('oCount').textContent = left; }
+  if (hutState.def.sleep) $('sleepDim').style.opacity = (Math.max(0, Math.min(1, (S.elapsed - (S.total - 330)) / 240)) * 0.72).toFixed(3);
+  drawWave(app.time);
 }
 function bindHut() {
   $('mediWrap').innerHTML = meditatorSVG('sess'); $('hutMark').innerHTML = meditatorSVG('hm', { full: false });
@@ -781,30 +872,32 @@ function bindHut() {
   $('voiceTest').onclick = () => { guide.voiceURI = settings.voiceURI || null; guide.volume = Math.max(0.25, settings.master / 100); guide.muted = false; guide.cancel(); guide.say('Breathe in, slowly. And let it go.', { caption: false }); };
   if (guide.ok && 'speechSynthesis' in window) speechSynthesis.addEventListener?.('voiceschanged', () => { if (app.mode === 'hut' && !$('hutPanel').hidden) renderVoices(); });
   $('sPause').onclick = togglePause;
-  $('sEnd').onclick = () => endSession();
-  $('sVoice').onclick = () => { hutState.voiceOff = !hutState.voiceOff; guide.muted = hutState.voiceOff || settings.muted; if (hutState.voiceOff) guide.cancel(); $('sVoice').setAttribute('aria-pressed', String(hutState.voiceOff)); $('sVoice').setAttribute('aria-label', hutState.voiceOff ? 'Turn the voice back on' : 'Mute the voice'); toast(hutState.voiceOff ? 'Voice off; captions and tones continue' : 'Voice on', 2000); };
-  $('hutView').onclick = () => {
-    const order = ['vista', 'face'].concat(hutState.def?.view === 'flame' && hutState.session ? ['flame'] : []);
+  $('sBack').onclick = () => endSession();
+  $('sPrev').onclick = () => seekSession(-15); $('sNext').onclick = () => seekSession(15);
+  $('sMusic').onclick = () => openSessionPop('music'); $('sVol').onclick = () => openSessionPop('vol');
+  const cycleView = (inSession) => {
+    const order = ['altar', 'face', 'wide'].concat(inSession ? ['focus'] : []).concat(hutState.def?.view === 'flame' && hutState.session ? ['flame'] : []);
     hutState.view = order[(order.indexOf(hutState.view) + 1) % order.length]; toast(VIEW_NAMES[hutState.view], 1600);
   };
+  $('hutView').onclick = () => cycleView(false); $('sView').onclick = () => cycleView(true);
   $('doneAgain').onclick = () => { const [k, id] = hutState.again || []; if (k) startSession(k, id); };
   $('doneMore').onclick = showHutPanel;
   $('doneLeave').onclick = leaveHut;
 }
 function updateHut(dt, t, ctx) {
   const av = me.avatar, S = hutState.session;
-  if (S && !hutState.paused) { S.update(dt); const breathing = S.kind === 'breath' && S.state.phase !== 'intro' && S.state.phase !== 'close'; av.breath = breathing ? S.state.fill : null; av.mudra = breathing && hutState.def.id === 'nadi' ? 'nadi' : null; }
+  if (S && !hutState.paused) { S.update(dt); const breathing = S.kind === 'breath' && S.state.phase !== 'intro' && S.state.phase !== 'close'; av.breath = breathing ? S.state.fill : null; av.mudra = breathing && hutState.def.id === 'nadi' ? 'nadi' : null; HUT.breath = S.state.fill; }
   else if (!S) av.mudra = null;
   if (S) updateSessionUI();
   av.update(dt, t);
-  const V = HUT.views[hutState.view] || HUT.views.vista, drift = settings.reducedMotion ? 0 : Math.sin(t * 0.06) * 0.16;
+  const vk = hutState.view === 'focus' ? 'altar' : hutState.view, V = HUT.views[vk] || HUT.views.altar, drift = settings.reducedMotion ? 0 : Math.sin(t * 0.06) * 0.16;
   const want = HUT.toWorld(V.pos[0] + drift, V.pos[1] + (settings.reducedMotion ? 0 : Math.sin(t * 0.045) * 0.04), V.pos[2]), look = HUT.toWorld(...V.look);
   const k = cam.hutSnap ? 1 : 1 - Math.exp(-dt * 1.4); cam.hutSnap = false;
   camera.position.lerp(want, k); cam.target.lerp(look, k); camera.lookAt(cam.target);
-  const fov = hutState.view === 'flame' ? 34 : hutState.view === 'face' ? 38 : 50; camera.fov += (fov - camera.fov) * k;
+  const fov = V.fov || 46; camera.fov += (fov - camera.fov) * k;
   world.update(dt, t, av.root.position, ctx);
   if (world.hutSmoke) world.hutSmoke.enabled = settings.incense;
-  if (audio.ctx) { if (Math.floor(t) !== app.hutTick) { app.hutTick = Math.floor(t); audio.applyZone(HUT_ZONE, 1); } audio.setListener(av.root.position.clone().setY(av.root.position.y + 0.95), HUT.toWorld(0, 0, 1).sub(HUT.pos).normalize()); }
+  if (audio.ctx) { if (Math.floor(t) !== app.hutTick) { app.hutTick = Math.floor(t); audio.applyZone(HUT_ZONE, 1); } audio.setListener(av.root.position.clone().setY(av.root.position.y + 0.95), HUT.toWorld(0, 0, -1).sub(HUT.pos).normalize()); }
   camera.updateProjectionMatrix();
   post.tilt.amount = 0; renderer.toneMappingExposure = world.tod.exposure;
   post.finalMat.uniforms.uVignette.value = S ? 0.55 : 0.42; post.finalMat.uniforms.uWarm.value = 0.16 + world.evening * 0.2; post.bloom.strength = Q.bloom; post.bloom.threshold = 1.4;

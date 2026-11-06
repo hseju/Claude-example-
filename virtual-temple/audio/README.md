@@ -20,4 +20,4 @@
 
 Add a track by dropping an MP3 into `audio/music/` and adding an entry to a playlist. Keep the licence and attribution in `CREDITS.md`.
 
-* `guided` (optional): recorded narration for the meditation hut, by session id, e.g. `"guided": { "breath": "audio/guided/breath-awareness.mp3" }`. When a recording exists it plays instead of the device voice; breath tones, bowls and the breathing light carry on. Session ids: `calm`, `box`, `relax`, `nadi`, `bhramari`, `dirga` (breathwork), `breath`, `body`, `maitri`, `om`, `trataka` (meditations), `timer`.
+* `guided` (optional): recorded narration for the meditation hut, by session id, e.g. `"guided": { "breath": "audio/guided/breath-awareness.mp3" }`. When a recording exists it plays instead of the device voice; breath tones, bowls and the breathing light carry on. Session ids: `calm`, `box`, `relax`, `nadi`, `bhramari`, `dirga` (breathwork), `breath`, `body`, `maitri`, `om`, `stress`, `sleep`, `trataka` (meditations), `timer`.

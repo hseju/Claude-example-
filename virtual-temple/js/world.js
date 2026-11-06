@@ -23,7 +23,7 @@ const EDGES = [['spawn', 'gateOut'], ['gateOut', 'gateIn'], ['gateIn', 's1'], ['
   ['cW', 'w1'], ['w1', 'ganesha'], ['cE', 'e1'], ['e1', 'krishna'], ['cN', 'n1'], ['n1', 'shiva'],
   ['cSW', 'gSW'], ['cNW', 'gNW'], ['cSE', 'gSE'], ['cNE', 'gNE'], ['gSW', 'w1'], ['gNW', 'w1'], ['gSE', 'e1'], ['gNE', 'e1']];
 // the meditation hut sits off the south-west garden walk
-NODES.hut = [HUT.entrance.x, HUT.entrance.z]; EDGES.push(['gSW', 'hut']);
+NODES.hut = [HUT.entrance.x, HUT.entrance.z]; NODES.hutPath = [HUT.pathEnd.x, HUT.pathEnd.z]; EDGES.push(['gSW', 'hutPath'], ['hutPath', 'hut']);
 
 const TOD_PRESETS = {
   morning: { sky: '#7fb2e2', mid: '#f2cdbf', hor: '#ffe3bd', sun: '#ffd39b', sunI: 2.4, hemi: 0.85, ground: '#6b5a3a', elev: 14, az: 18, fogNear: 80, fogFar: 600, lamps: 0.8, stars: 0, mist: 0.75, warm: 0.22, night: 0, exposure: 1.05, cloud: '#fff1e6' },
@@ -609,13 +609,15 @@ export class World {
 
   // two simulated devotees meditating in the hut
   _hutSitters() {
+    // simulated devotees meditating on the ring of cushions, turned toward the altar
     this.hutSitters = [];
-    if (this.quality.level === 'low') return;
-    HUT.sitters.forEach((seat, i) => {
-      const cfg = randomConfig(Math.random(), { presentation: i ? 'masc' : 'fem' });
+    const n = this.quality.level === 'low' ? 2 : this.quality.level === 'medium' ? 3 : 5;
+    HUT.sitterSeats.slice(0, n).forEach((deg, i) => {
+      const seat = HUT.ring.find(s => s.deg === deg); if (!seat) return;
+      const cfg = randomConfig(Math.random(), { presentation: i % 2 ? 'masc' : 'fem' });
       Object.assign(cfg, { carry: 'none', age: cfg.age === 'child' ? 'adult' : cfg.age, glasses: false });
-      const a = new Avatar(cfg, { simulated: true, shadows: true });
-      a.root.position.copy(seat.pos).setY(seat.pos.y - 0.012); a.root.rotation.y = seat.rotY; a.setState('meditate'); this.scene.add(a.root);
+      const a = new Avatar(cfg, { simulated: true, shadows: this.quality.level !== 'low' });
+      a.root.position.copy(seat.pos); a.root.rotation.y = seat.rotY; a.setState('meditate'); this.scene.add(a.root);
       this.hutSitters.push(a);
     });
   }
