@@ -47,19 +47,21 @@ export class Scenery {
       const a = i / segA * Math.PI * 2, r = r0 + (r1 - r0) * j / segR, h = heightFn(r, a);
       pos.push(Math.cos(a) * r, h, Math.sin(a) * r); colorFn(c, h, r, a); col.push(c.r, c.g, c.b);
     }
-    for (let j = 0; j < segR; j++) for (let i = 0; i < segA; i++) { const a = j * (segA + 1) + i, b = a + 1, d = a + segA + 1, e = d + 1; idx.push(a, d, b, b, d, e); }
+    for (let j = 0; j < segR; j++) for (let i = 0; i < segA; i++) { const a = j * (segA + 1) + i, b = a + 1, d = a + segA + 1, e = d + 1; idx.push(a, b, d, b, e, d); }   // wound so the surface faces up (it was upside down, so the hills were culled from above)
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setIndex(idx); g.computeVertexNormals();
     return g;
   }
   _mountains() {
     const low = this.quality.level === 'low';
     // near range: forested ridges with rocky cliffs where the waterfalls drop
-    this.nearHeight = (r, a) => {
+    this.nearHeight = (r, a, cliff = false) => {   // cliff: the height before the gorge is carved (the top of a waterfall)
       const rise = smooth(92, 150, r) * (1 - smooth(185, 215, r) * 0.35);
       const south = 0.45 + 0.55 * smooth(0.3, 1.4, Math.abs(dAng(a, Math.PI / 2)));      // lower toward the gate side
       let h = (22 + 58 * ridged(a * 3.2 + 4, r * 0.012, 5)) * (0.55 + 0.6 * fbm(a * 5, r * 0.03, 3)) * south;
       for (const fa of FALLS) h += 46 * Math.exp(-Math.pow(dAng(a, fa) / 0.11, 2)) * smooth(100, 135, r);
-      return rise * h - 2;
+      // a gorge in front of each cliff, so the waterfall drops all the way to its pool in plain view
+      let gorge = 0; FALLS.forEach((fa, fi) => { const rTop = 128 + fi * 6, w = fi === 0 ? 0.085 : 0.065; gorge = Math.max(gorge, Math.exp(-Math.pow(dAng(a, fa) / w, 2)) * (1 - smooth(rTop - 5, rTop + 2, r))); });
+      return rise * h * (1 - (cliff ? 0 : gorge) * 0.94) - 2;
     };
     const greens = [new THREE.Color('#3f6a33'), new THREE.Color('#2f5a2c'), new THREE.Color('#58803e')], rock = new THREE.Color('#8a7a66'), tmp = new THREE.Color();
     const near = this._ring(92, 215, low ? 140 : 220, low ? 14 : 22, this.nearHeight, (c, h, r, a) => {
@@ -118,7 +120,7 @@ export class Scenery {
     const mistPts = [], mistSeed = [];
     FALLS.forEach((fa, fi) => {
       const rTop = 128 + fi * 6, rBase = 112 + fi * 4;
-      const top = this.nearHeight(rTop, fa), height = Math.max(40, top - 1), width = fi === 0 ? 16 : 11;
+      const top = this.nearHeight(rTop, fa, true), height = Math.max(40, top - 1), width = fi === 0 ? 16 : 11;
       const dir = new THREE.Vector3(Math.cos(fa), 0, Math.sin(fa));
       // a weathered rock buttress behind the fall, mossy toward the top
       const rg = new THREE.IcosahedronGeometry(1, 4), rp = rg.attributes.position, rc = [], cc = new THREE.Color();
@@ -165,8 +167,10 @@ export class Scenery {
   // ------------------------------------------------------------ a palace on the hill
   // Framed between the two northern waterfalls when you look up the main approach: an ivory palace on a terrace,
   // with domed pavilions, a tall tower, rows of warmly lit windows and a soft halo above it at dusk.
+  // the height a building on the hills must stand at to be seen from the campus over the ridges in front of it
+  ridgeAbove(r, a) { let top = this.nearHeight(r, a); for (let rr = 100; rr < r; rr += 4) { const k = (rr - 30) / (r - 30); top = Math.max(top, this.nearHeight(rr, a) / k - 4); } return Math.min(top, this.nearHeight(r, a) + 30); }
   _palace() {
-    const a = PALACE_A, r = 172, h = this.nearHeight(r, a), g = new THREE.Group();
+    const a = PALACE_A, r = 172, h = this.ridgeAbove(r, a), g = new THREE.Group();
     g.position.set(Math.cos(a) * r, h + 2, Math.sin(a) * r); g.rotation.y = Math.atan2(-g.position.x, -g.position.z); this.group.add(g);
     const ivory = new THREE.MeshStandardMaterial({ color: '#f4e6cc', roughness: 0.8 }), gold = new THREE.MeshStandardMaterial({ color: '#e6b85c', metalness: 0.6, roughness: 0.4 });
     const glow = this.palaceGlow = new THREE.MeshStandardMaterial({ color: '#ffd59a', emissive: '#ffb050', emissiveIntensity: 1.6 });
@@ -214,7 +218,7 @@ export class Scenery {
   _hillTemples() {
     const ivory = new THREE.MeshStandardMaterial({ color: '#f1e1c6', roughness: 0.8 }), gold = new THREE.MeshStandardMaterial({ color: '#e6b85c', metalness: 0.6, roughness: 0.4 });
     for (const [a, r, sc] of HILL_TEMPLES) {
-      const h = this.nearHeight(r, a), g = new THREE.Group(); g.position.set(Math.cos(a) * r, h + 1, Math.sin(a) * r); g.rotation.y = Math.atan2(-g.position.x, -g.position.z); g.scale.setScalar(sc * 1.4); this.group.add(g);
+      const h = this.ridgeAbove(r, a), g = new THREE.Group(); g.position.set(Math.cos(a) * r, h + 1, Math.sin(a) * r); g.rotation.y = Math.atan2(-g.position.x, -g.position.z); g.scale.setScalar(sc * 1.4); this.group.add(g);
       const box = (w, hh, d, x, y, z, m = ivory) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, hh, d), m); b.position.set(x, y + hh / 2, z); g.add(b); };
       box(24, 4, 18, 0, -3, 0); box(25, 0.6, 19, 0, 1, 0, gold);
       for (let k = 0; k < 4; k++) box(6 - k * 0.6, 0.5, 1.2, 0, -3 + k * 1, 9.2 + k * 0.4);                     // steps up to the terrace
