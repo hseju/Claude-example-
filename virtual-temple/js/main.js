@@ -390,17 +390,17 @@ function positionLabels() {
   if (app.mode === 'world') {
     for (const T of Object.values(TEMPLES)) { const d = T.entrance.distanceTo(me.avatar.root.position); project(T.labelPos, labelEls[T.id]); labelEls[T.id].style.opacity = d < 6 ? '0.35' : '1'; }
     { const d = HUT.entrance.distanceTo(me.avatar.root.position); project(HUT.labelPos, labelEls.hut); labelEls.hut.style.opacity = d < 6 ? '0.35' : '1'; }
-    const nm = me.config.name || 'You'; if (labelEls.me.dataset.n !== nm) { labelEls.me.dataset.n = nm; labelEls.me.innerHTML = `<i>${escapeHtml(nm[0].toUpperCase())}</i>${escapeHtml(nm)}`; } project(me.avatar.root.position, labelEls.me, 2.05); if ((cam.close || 0) > 0.55) labelEls.me.style.display = 'none';
+    const nm = me.config.name || 'You'; if (labelEls.me.dataset.n !== nm) { labelEls.me.dataset.n = nm; labelEls.me.innerHTML = `<i>${escapeHtml(nm[0].toUpperCase())}</i>${escapeHtml(nm)}`; } project(me.avatar.root.position, labelEls.me, 1.55); if ((cam.close || 0) > 0.55) labelEls.me.style.display = 'none';
     labelEls.sims.forEach(e => (e.style.display = 'none'));
   } else if (app.mode === 'hall') {
     for (const T of Object.values(TEMPLES)) labelEls[T.id].style.display = 'none';
     labelEls.hut.style.display = 'none';
-    project(me.avatar.root.position, labelEls.me, 2.0);
+    project(me.avatar.root.position, labelEls.me, 1.5);
     if (app.camMode === 'prayer' || app.camMode === 'darshan' || app.camMode === 'aarti') labelEls.me.style.display = 'none';
     // show a quiet "simulated" tag over other devotees while choosing a place
     const occ = [...hall.occupants.values()];
     while (labelEls.sims.length < occ.length) { const e = document.createElement('div'); e.className = 'nlabel sim'; e.textContent = 'simulated'; $('labels').appendChild(e); labelEls.sims.push(e); }
-    labelEls.sims.forEach((e, i) => { if (i < occ.length && app.hallState === 'select') { e.textContent = `${occ[i].config.name} · simulated`; project(occ[i].root.position, e, 1.95); } else e.style.display = 'none'; });
+    labelEls.sims.forEach((e, i) => { if (i < occ.length && app.hallState === 'select') { e.textContent = `${occ[i].config.name} · simulated`; project(occ[i].root.position, e, 1.45); } else e.style.display = 'none'; });
   }
 }
 
@@ -472,7 +472,7 @@ function bindInput() {
   joy.addEventListener('pointerup', jend); joy.addEventListener('pointercancel', jend);
 }
 function pinchDist() { const a = [...input.pointers.values()]; return a.length < 2 ? 0 : Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y); }
-function zoom(d) { if (app.mode === 'creator') { preview.dist = THREE.MathUtils.clamp((preview.dist || 4.4) + d * 0.25, 1.1, 5); return; } cam.tDist = THREE.MathUtils.clamp(cam.tDist + d * Math.max(0.25, cam.tDist / 22), 2.4, 44); }
+function zoom(d) { if (app.mode === 'creator') { preview.dist = THREE.MathUtils.clamp((preview.dist || 4.4) + d * 0.25, 1.1, 5); return; } cam.tDist = THREE.MathUtils.clamp(cam.tDist + d * Math.max(0.25, cam.tDist / 22), 2.1, 44); }
 const ray = new THREE.Raycaster(), occRay = new THREE.Raycaster();
 function tap(x, y) {
   ray.setFromCamera(new THREE.Vector2(x / innerWidth * 2 - 1, -(y / innerHeight) * 2 + 1), camera);
@@ -548,7 +548,7 @@ function bindUI() {
   $('enterBtn').addEventListener('click', () => { const T = nearShrine(); if (T) enterTemple(T.id); else if (nearHut()) enterHut(); });
   bindHut();
   $('pranamBtn').addEventListener('click', worldPranam);
-  $('closeBtn').addEventListener('click', () => { const near = cam.tDist < 6; if (!near) cam.farDist = cam.tDist; cam.tDist = near ? (cam.farDist || 27) : 3.2; if (!near) cam.tYaw = me.avatar.root.rotation.y + Math.PI; $('closeBtn').setAttribute('aria-pressed', String(!near)); });
+  $('closeBtn').addEventListener('click', () => { const near = cam.tDist < 6; if (!near) cam.farDist = cam.tDist; cam.tDist = near ? (cam.farDist || 27) : 2.9; if (!near) cam.tYaw = me.avatar.root.rotation.y + Math.PI; $('closeBtn').setAttribute('aria-pressed', String(!near)); });
   document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => goTo(b.dataset.go)));
   $('mapCanvas').addEventListener('click', (e) => {
     const r = e.target.getBoundingClientRect(); const x = (e.clientX - r.left) / r.width * 100 - 50, z = (e.clientY - r.top) / r.height * 100 - 50;
@@ -672,6 +672,7 @@ function leaveHut() {
   endSession(true);
   fadeThrough(() => {
     const av = me.avatar; av.setState('idle'); av.breath = null; av.root.visible = true;
+    camera.clearViewOffset(); cam.hutLift = 0;
     av.root.position.copy(HUT.entrance); av.root.rotation.y = HUT.rot;
     if (playerRing) playerRing.visible = true;
     $('doneCard').hidden = true; $('hutUI').classList.remove('insession');
@@ -897,6 +898,11 @@ function updateHut(dt, t, ctx) {
   const k = cam.hutSnap ? 1 : 1 - Math.exp(-dt * 1.4); cam.hutSnap = false;
   camera.position.lerp(want, k); cam.target.lerp(look, k); camera.lookAt(cam.target);
   const fov = (V.fov || 46) * (camera.aspect < 1 && pov ? 1.25 : 1); camera.fov += (fov - camera.fov) * k;
+  // on a portrait screen the practice panel covers the lower part: lift the picture into the space above it
+  const lift = innerWidth < innerHeight && !S && !$('hutPanel').hidden ? V.lift ?? 0.28 : 0;
+  cam.hutLift = (cam.hutLift || 0) + (lift - (cam.hutLift || 0)) * (cam.hutLift === undefined ? 1 : Math.max(k, 0.08));
+  // (setViewOffset also sets the aspect from its full size, so it gets the real screen size)
+  if (cam.hutLift > 0.002) camera.setViewOffset(innerWidth, innerHeight, 0, innerHeight * cam.hutLift, innerWidth, innerHeight); else camera.clearViewOffset();
   world.update(dt, t, av.root.position, ctx);
   if (world.hutSmoke) world.hutSmoke.enabled = settings.incense;
   if (audio.ctx) { if (Math.floor(t) !== app.hutTick) { app.hutTick = Math.floor(t); audio.applyZone(HUT_ZONE, 1); } audio.setListener(av.root.position.clone().setY(av.root.position.y + 0.95), HUT.toWorld(0, 0, -1).sub(HUT.pos).normalize()); }
@@ -917,8 +923,9 @@ function loop(now) {
     preview.avatar.update(dt, t); if (!input.drag) preview.avatar.root.rotation.y += dt * (settings.reducedMotion ? 0 : 0.35);
     const narrow = innerWidth < 720;
     camera.fov = 30;
-    const pd = preview.dist || 4.4, zk = THREE.MathUtils.clamp((4.4 - pd) / 3.3, 0, 1), lookY = 0.92 + zk * 0.7;
-    if (narrow) { camera.position.set(0, 1.4 + zk * 0.25, 8 * pd / 4.4); camera.lookAt(0, -0.2 + zk * 1.55, 0); } else { camera.position.set(0.95 * pd / 4.4, 1.25 + zk * 0.35, pd); camera.lookAt(0.95 * pd / 4.4, lookY, 0); }
+    // framed for a devotee about 1.3 m tall; zooming in ends on the face
+    const pd = preview.dist || 4.4, zk = THREE.MathUtils.clamp((4.4 - pd) / 3.3, 0, 1), D = pd * 0.84 + zk * 0.6;
+    if (narrow) { camera.position.set(0, 1.0 + zk * 0.1, 7.4 * D / 4.4); camera.lookAt(0, -0.12 + zk * 0.67, 0); } else { camera.position.set(0.216 * D, 0.95 + zk * 0.15, D); camera.lookAt(0.216 * D, 0.68 + zk * 0.34, 0); }
     camera.updateProjectionMatrix(); post.tilt.amount = 0; post.bloom.strength = 0; post.finalMat.uniforms.uVignette.value = 0.5; post.render(preview.scene, camera); return;
   }
   if (app.mode === 'hall') { updateHall(dt, t, ctx); positionLabels(); return; }
@@ -983,7 +990,7 @@ function updateWorld(dt, t, ctx) {
     if (app.mode === 'welcome') { zone.entrance = 0.6; zone.courtyard = 0.6; }
     if (Math.floor(t * 4) !== app.zoneTick) { app.zoneTick = Math.floor(t * 4); audio.applyZone(zone, 0.8); }
     const fwd = tmp.set(p.x - camera.position.x, 0, p.z - camera.position.z).normalize();
-    audio.setListener(p.clone().setY(1.6), fwd);
+    audio.setListener(p.clone().setY(1.1), fwd);
   }
   // camera
   const lerp = 1 - Math.exp(-dt * (settings.reducedMotion ? 14 : 6));
@@ -999,7 +1006,7 @@ function updateWorld(dt, t, ctx) {
     cam.yaw += (cam.tYaw - cam.yaw) * lerp; cam.pitch += (cam.tPitch - cam.pitch) * lerp; cam.dist += (cam.tDist - cam.dist) * lerp;
     cam.close = clamp01((10 - cam.dist) / 7);
     const right = new THREE.Vector3(Math.cos(cam.yaw), 0, -Math.sin(cam.yaw));
-    const focus = p.clone().add(new THREE.Vector3(0, 1.5 - cam.close * 0.05, 0)).addScaledVector(right, cam.close * 0.32);
+    const focus = p.clone().add(new THREE.Vector3(0, 1.05 - cam.close * 0.05, 0)).addScaledVector(right, cam.close * 0.26);
     cam.target.lerp(focus, 1 - Math.exp(-dt * 8));
     // portrait screens get a little more distance; temples and the gateway pull the camera in rather than hide you
     let want = cam.dist * (camera.aspect < 1 ? 1 + (1 - camera.aspect) * 0.6 * (1 - cam.close) : 1);

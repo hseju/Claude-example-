@@ -34,7 +34,7 @@ HUT.sitterSeats = [65, -65, 125, -147, -95];
 HUT.views = {
   altar: { pos: [0, 2.32, 3.5], look: [0, 1.92, -3.2], fov: 46 },
   pov: { pos: [0, 1.52, 0.5], look: [0, 1.9, -3.2], fov: 52 },   // your own eyes, from the centre cushion: used while practising
-  face: { pos: [0.55, 1.7, -1.35], look: [0, 1.62, 1.6], fov: 40 },
+  face: { pos: [0.6, 1.55, -1.75], look: [0, 1.15, 1.6], fov: 40, lift: 0.31 },   // lift: how far a portrait screen raises the picture above the panel
   wide: { pos: [1.7, 2.7, 2.2], look: [-0.7, 0.95, -1.5], fov: 58 },
   flame: { pos: [0.02, 1.42, 0.2], look: [0, FLOOR + 0.36, -2.47], fov: 30 },
 };

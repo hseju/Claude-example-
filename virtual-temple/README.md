@@ -21,7 +21,7 @@ Opening `index.html` straight from disk (`file://`) does not work, because brows
 | Area | Status |
 | --- | --- |
 | Miniature campus at golden hour: ivory-and-gold temples with shikharas, domed mandapas and rooftop chhatris; gateway with swinging brass bells; courtyard fountain, lotus ponds and kunds with pavilions; carved balustrades, lamp posts and rangoli; flowering trees, a brass Nandi, peacocks, hills and a waterfall; diyas, bunting, birds; tilt-shift and bloom | Working |
-| Devotees: rigged characters (27-bone skeleton with eyes, lids, brows, jaw and mouth corners; one skinned mesh each, smoothly weighted across shoulders, elbows, wrists, waist, knees and neck). Faces blink, glance around, smile, close their eyes in prayer and chant during aarti. Hair: short, wavy, bun, braid, ponytail, long open, curly, top knot, shikha, receding; head coverings: safa turban or Gandhi topi. with sculpted bodies by gender, build and age; faces with eyes, lids, brows, nose, lips and ears; fingers; bare feet. Saree with pleats, zari border and pallu; kurta with collar, placket and churidar; dhoti with angavastram, sacred thread and mala; salwar kameez with dupatta. Bangles, earrings, mangalsutra, anklets, bindi, tilak or tripundra, moustache or beard, glasses; elders with walking sticks, devotees carrying puja thalis, children walking with a parent | Working |
+| Devotees: cute, rounded characters about two and a half heads tall, so a person reads at a glance from skin tone, hair, attire, marks and jewellery rather than a detailed face. Each is one skinned mesh on a 27-bone skeleton (eyes, lids, brows, jaw and mouth corners included), smoothly weighted across shoulders, elbows, wrists, waist, knees and neck. Faces have big shiny eyes, rosy cheeks and a small smile; they blink, glance around, close into happy curves in prayer and open to chant during aarti. Mitten hands and bare feet. Hair: short, wavy, bun with jasmine, braid, ponytail, long open, curly, top knot, shikha, receding; head coverings: safa turban or Gandhi topi; hairlines are soft-edged. Saree with pleats, zari border and pallu; kurta with collar, placket and churidar; dhoti with gold border, front pleats and angavastram; salwar kameez with dupatta. Bangles, earrings, mangalsutra, anklets, bindi, tilak or tripundra, moustache or beard, glasses; elders with walking sticks, devotees carrying lit puja thalis, children walking with a parent | Working |
 | Avatar creator: name, gender (male or female), attire, colour, skin tone, hair, head covering, build, age, facial hair, forehead mark, glasses, jewellery; scroll or pinch to look closely | Working |
 | Movement: WASD/arrows, click or tap to walk, on-screen joystick on touch screens, drag to orbit, wheel/pinch zoom from overview down to a close over-the-shoulder view (also a Close view button), map with shrine destinations, collisions | Working |
 | Simulated devotees walking between shrines and pausing in namaste | Working, labelled as simulated |
@@ -63,7 +63,7 @@ js/scenery.js       mountains, waterfalls, river, clouds, mist, bird flocks, but
 js/flora.js         trees (neem, gulmohar, bougainvillea, jacaranda, ashoka, coconut palm), flower beds and hedges, grass, lotus ponds, urli bowls
 js/dome.js          prayer hall: shell, per-deity sanctum, 12 spots, offerings, aarti choreography
 js/architecture.js  shared pieces: pillars, bells (pendulum + clapper), diyas, lamp stands, shikhara
-js/avatar.js        rigged devotees: body, face, garments, jewellery, props, and their poses (walk, namaste, bow, offer, ring, aarti, seated meditation with a lap-drape morph)
+js/avatar.js        cute rigged devotees: body, face, hair, garments, jewellery, props, and their poses (walk, namaste, bow, offer, ring, aarti, priest's lamp, seated meditation with a lap-drape morph)
 js/hut.js           the meditation hut: building, furnishings, path and pond, seats, camera views, the breathing altar
 js/practice.js      breathwork and guided meditation: catalogue, scripts, session timeline, spoken guide, practice log
 js/meditator.js     the meditator silhouette (SVG): aura, rays, lotus seat, chakras and motes that follow the breath
@@ -73,6 +73,8 @@ js/audio.js         Web Audio graph, zones and time-of-day mixes, music stations
 js/presence.js      hall capacity rules and the local simulation
 js/profile.js       auth providers, profiles and settings storage
 ```
+
+The poses that must land somewhere exact (palms together at the heart, palms up on the knees when seated, the right hand at the nose for nadi shodhana, the offering and the bell pull, the priest's joined hands round the aarti lamp) were solved numerically against the devotee skeleton: a small forward-kinematics search in Node that places the hands and folded legs where they belong without passing through the round body. The angles are stored in `js/avatar.js` as plain numbers, so nothing is solved at run time. Seated garments fall over the folded legs through a morph target built from the same leg positions.
 
 ### Multiplayer path
 

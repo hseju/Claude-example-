@@ -187,8 +187,8 @@ export class PrayerHall {
     this.altarLights = [sanct, fill, fill.target, lampL]; this.sanct = sanct; this.fill = fill; this.lampLight = lampL;
     for (const L of this.altarLights) this.scene.add(L);
     // aarti lamp (panch-pradip) hidden until the ceremony
-    this.aartiLamp = new THREE.Group(); const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.14, 0.03, 20), brass); this.aartiLamp.add(plate);
-    const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.025, 0.25, 8), brass); handle.position.y = -0.13; this.aartiLamp.add(handle);
+    this.aartiLamp = new THREE.Group(); const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.09, 0.022, 20), brass); this.aartiLamp.add(plate);
+    const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.018, 0.1, 8), brass); handle.position.y = -0.06; this.aartiLamp.add(handle);
     this.aartiLamp.visible = false; this.scene.add(this.aartiLamp);
     this.aartiFlames = []; for (let i = 0; i < 5; i++) this.aartiFlames.push(this.flames.add(new THREE.Vector3(0, -50, 0), 0.4));
     this.aartiLight = new THREE.PointLight('#ffb15a', 0, 6, 1.6); this.scene.add(this.aartiLight);
@@ -379,9 +379,9 @@ export class PrayerHall {
     if (mode === 'walk') return { pos: player.clone().add(new THREE.Vector3(0, 3.2, 4.8)), target: player.clone().add(new THREE.Vector3(0, 0.8, -3)), fov: 50 };
     if (mode === 'aarti') { const a = Math.sin(t * 0.06) * 0.5; return { pos: new THREE.Vector3(Math.sin(a) * 9, 4.4 + Math.sin(t * 0.09) * 0.4, 9.0 + Math.cos(a) * 0.6), target: new THREE.Vector3(0, 1.4, -4.2), fov: 50 }; }
     if (mode === 'darshan') return { pos: new THREE.Vector3(0, 1.75, -4.4), target: ALTAR_FOCUS.clone(), fov: 38 };
-    // prayer: eye level just behind the devotee's shoulder, framing the sanctum
-    const side = player.x >= 0 ? 0.55 : -0.55;
-    return { pos: player.clone().add(new THREE.Vector3(side, 1.62, 1.55)), target: new THREE.Vector3(player.x * 0.2, 1.75, -8.4), fov: 44 };
+    // prayer: over the devotee's shoulder, framing the sanctum, with your devotee in the lower corner
+    const side = player.x >= 0 ? 1.0 : -1.0;
+    return { pos: player.clone().add(new THREE.Vector3(side, 1.85, 3.0)), target: new THREE.Vector3(player.x * 0.2 + side * 0.5, 1.7, -8.4), fov: 44 };
   }
 
   update(dt, t, ctx) {
@@ -425,10 +425,10 @@ export class PrayerHall {
       const active = k > 10 && k < A.dur - 9;
       const lampOn = smooth(9, 11, k) * (1 - smooth(A.dur - 9, A.dur - 7, k));
       this.priest.lampAngle = (this.priest.lampAngle || 0) + dt * (active ? 2.3 : 0.4);
-      const ang = this.priest.lampAngle, c = new THREE.Vector3(0.9, 1.85, -7.05);
-      const lp = c.clone().add(new THREE.Vector3(Math.cos(-ang) * 0.38, Math.sin(-ang) * 0.38, 0));
-      this.aartiLamp.position.copy(lp); this.aartiLamp.rotation.x = Math.PI / 2 - 0.3;
-      this.aartiFlames.forEach((f, i) => { const a2 = i / 5 * Math.PI * 2; this.flames.set(f, lp.clone().add(new THREE.Vector3(Math.cos(a2) * 0.1, 0.06 + Math.sin(a2) * 0.0, Math.sin(a2) * 0.1)), 0.38 * lampOn); });
+      // the lamp rides just above the priest's joined hands, which circle before the deity
+      const ang = this.priest.lampAngle, lp = this.priest.handWorld(1).add(this.priest.handWorld(-1)).multiplyScalar(0.5).add(new THREE.Vector3(0, 0.1, 0));
+      this.aartiLamp.position.copy(lp); this.aartiLamp.rotation.set(0.12, 0, 0);
+      this.aartiFlames.forEach((f, i) => { const a2 = i / 5 * Math.PI * 2; this.flames.set(f, lp.clone().add(new THREE.Vector3(Math.cos(a2) * 0.065, 0.04, Math.sin(a2) * 0.065)), 0.26 * lampOn); });
       this.aartiLight.position.copy(lp); this.aartiLight.intensity = 4.5 * lampOn;
       // devotees follow the ceremony together
       const all = [...this.occupants.values()]; if (ctx.player) all.push(ctx.player);

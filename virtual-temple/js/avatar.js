@@ -1,15 +1,14 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 
-// Devotees: rigged, detailed characters built in code.
+// Devotees: cute, rigged characters built in code.
 //
-// Each devotee is one SkinnedMesh on an 18-bone skeleton (hips, spine, chest, neck, head, arms
-// with elbows and wrists, legs with knees and ankles), drawn in 2-4 draw calls. The body has
-// sculpted proportions per presentation, build and age; the face has eyes with irises and
-// catchlights, lids, brows, nose, lips and ears; hands have fingers; feet are bare as in a temple.
-// Clothing is draped from real garment parts: saree with front pleats, zari border and a pallu
-// over the shoulder; kurta with collar, placket and churidar; dhoti with pleats, angavastram and
-// sacred thread; salwar kameez with dupatta. Jewellery, forehead marks, facial hair, glasses,
-// puja thalis and walking sticks add individuality.
+// Each devotee is about two and a half heads tall: a big round head with shiny eyes, rosy cheeks and a small smile,
+// a rounded body, short limbs, mitten hands and bare feet. A person reads from skin tone, hair, attire, marks and
+// jewellery rather than from a detailed face. Each is one SkinnedMesh on a 27-bone skeleton (hips, spine, chest, neck,
+// head, arms with elbows and wrists, legs with knees and ankles, eyes, lids, brows, jaw and mouth corners), drawn in
+// 2-4 draw calls. Clothing: saree with pleats, zari border and a pallu over the shoulder; kurta with collar, placket and
+// churidar; dhoti with gold border, front pleats and angavastram; salwar kameez with dupatta. Jewellery, forehead
+// marks, facial hair, glasses, puja thalis and walking sticks add individuality.
 
 export const SKIN_TONES = ['#f1c9a5', '#e0ac7e', '#c68b5e', '#a8714a', '#8a5636', '#5f3a24'];
 export const HAIR_COLORS = ['#1b1512', '#3a271c', '#5b3a24', '#8a8580', '#e2ded6'];
@@ -187,24 +186,37 @@ function shell(prof, { seg = 40, sz = 0.72, sx = 1, pleats = 0, pleatFront = 0.5
   g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setIndex(idx); g.computeVertexNormals(); return g;
 }
 
-// ------------------------------------------------------------------ seated meditation (sukhasana)
-// The hips drop by SEAT onto a cushion; legs cross with each foot under the opposite knee; hands rest
-// palms-up on the thighs. Angles were solved numerically against this skeleton (see README).
-export const SEAT = 0.65;
+
+// ------------------------------------------------------------------ proportions
+// A cute devotee: about two and a half heads tall, a big round head with shiny eyes and rosy cheeks, a small
+// rounded body, short limbs and mitten hands. Identity comes from skin tone, hair, attire, marks and jewellery.
+const HC = 1.02, HR = [0.285, 0.262, 0.255];   // head centre and radii
+// hair and beard caps share the head's grid, so where they meet the skin the line is smooth
+const HSEG = [56, 40];
+const surfZ = (x, y) => HR[2] * Math.sqrt(Math.max(0, 1 - (x / HR[0]) ** 2 - ((y - HC) / HR[1]) ** 2));
+const THIGH = 0.165;
+
+// ------------------------------------------------------------------ poses solved against this skeleton (see README)
+export const SEAT = 0.19;   // the hips come down onto a cushion
 const SIT = {
-  thL: [-2.45, 0.965, 1.286], knL: [2.19, 0, 0], anL: [0.757, -0.078, -0.023],
-  thR: [-2.248, -0.866, -1.167], knR: [2.399, 0, 0], anR: [0.663, 0.169, 0.05],
-  shL: [-0.048, -0.327, 0.223], elL: [-0.52, 1.237, 0], wrL: [-0.297, 0.796, -0.511],
-  shR: [-0.046, 0.316, -0.222], elR: [-0.525, -1.183, 0], wrR: [-0.313, -0.83, 0.486],
+  thL: [-2.341, 1.174, 1.417], knL: [1.559, 0, 0], anL: [0.832, -0.036, -0.009],
+  thR: [-1.917, -1.069, -1.071], knR: [1.87, 0, 0], anR: [0.687, 0.128, 0.035],
+  shL: [-0.327, 1.049, 0.067], elL: [0, 0.12, 0], wrL: [-0.096, 0.542, -0.911],
+  shR: [-0.315, -0.806, -0.058], elR: [0, -0.671, 0], wrR: [-0.046, -0.235, 0.94],
 };
-// nadi shodhana: the right hand comes up to the nose (thumb and ring finger at the nostrils)
-const SIT_NADI = { ...SIT, shR: [-0.912, 0.762, 0.082], elR: [-2.311, -1.405, 0], wrR: [-0.316, -0.982, 0.038] };
+const SIT_NADI = { ...SIT, shR: [-1.473, 0.649, 0.02], elR: [-1.069, 0.735, 0], wrR: [0.163, 0.369, -0.577] };
+const NAMASTE = { shL: [-1.047, -0.92, -0.418], elL: [-0.792, -0.056, 0], wrL: [-0.903, -0.534, 0.774], shR: [-1.049, 0.924, 0.42], elR: [-0.79, 0.159, 0], wrR: [-0.838, 0.48, -0.882] };
+const OFFER = { shL: [-0.241, 1.188, -0.875], elL: [0, 0.187, 0], wrL: [-0.128, -0.013, -0.379], shR: [-0.894, 0.579, 0.213], elR: [-0.547, -1.12, 0], wrR: [-0.367, -0.685, -0.08] };
+const RING = { shR: [-2.301, 0.003, 0.191], elR: [-0.294, 0.03, 0], wrR: [-0.208, 0.058, -0.159] };
+const PRIEST = { shL: [-1.154, -0.681, -0.226], elL: [-0.915, 1.295, 0], wrL: [-0.661, 0.354, 0.624], shR: [-1.148, 0.676, 0.225], elR: [-0.917, -1.259, 0], wrR: [-0.658, -0.38, -0.639] };
+const blendPose = (a, b, k) => { const o = {}; for (const n of new Set([...Object.keys(a), ...Object.keys(b)])) { const p = a[n] || [0, 0, 0], q = b[n] || [0, 0, 0]; o[n] = p.map((v, i) => v + (q[i] - v) * k); } return o; };
+
 // where the folded legs and the cushion are once seated (root space, floor at 0): capsules [a, b, radius a, radius b]
 const LAP = [
-  [[0.088, 0.25, 0], [0.326, 0.131, 0.325], 0.085, 0.058], [[0.326, 0.131, 0.325], [-0.073, 0.088, 0.267], 0.052, 0.04], [[-0.073, 0.088, 0.267], [-0.22, 0.05, 0.32], 0.035, 0.025],
-  [[-0.088, 0.25, 0], [-0.346, 0.127, 0.308], 0.085, 0.058], [[-0.346, 0.127, 0.308], [0.037, 0.09, 0.181], 0.052, 0.04], [[0.037, 0.09, 0.181], [0.187, 0.05, 0.223], 0.035, 0.025],
+  [[0.075, 0.21, 0], [0.146, 0.12, 0.119], 0.066, 0.056], [[0.146, 0.12, 0.119], [-0.006, 0.081, 0.155], 0.05, 0.045], [[-0.006, 0.081, 0.155], [-0.075, 0.04, 0.208], 0.04, 0.03],
+  [[-0.075, 0.21, 0], [-0.152, 0.12, 0.115], 0.066, 0.056], [[-0.152, 0.12, 0.115], [0.003, 0.085, 0.097], 0.05, 0.045], [[0.003, 0.085, 0.097], [0.08, 0.04, 0.136], 0.04, 0.03],
 ];
-const CUSHION = { x: 0, z: -0.03, r: 0.27, y: 0.15 };
+const CUSHION = { x: 0, z: -0.02, r: 0.27, y: 0.15 };
 function lapHeight(x, z, extra = 0) {
   let h = Math.hypot(x - CUSHION.x, z - CUSHION.z) < CUSHION.r ? CUSHION.y : -1;
   for (const [a, b, ra, rb] of LAP) {
@@ -215,293 +227,251 @@ function lapHeight(x, z, extra = 0) {
   }
   return h;
 }
-const smax = (a, b, k = 0.03) => { const h = Math.max(0, Math.min(1, 0.5 + 0.5 * (a - b) / k)); return b + (a - b) * h + k * h * (1 - h); };
-// cloth below `top` (bind-space y) falls outward over the lap: `hem` is its lowest bind y, `reach(theta)` the
-// radius it spreads to, `lift` how far it rides above the legs. Returns a morph delta in bind space.
-function lapDrape(top, hem, reach, lift = 0.022, minY = 0.012, legExtra = 0) {
+const smax = (a, b, k = 0.02) => { const h = Math.max(0, Math.min(1, 0.5 + 0.5 * (a - b) / k)); return b + (a - b) * h + k * h * (1 - h); };
+// cloth below `top` falls outward over the lap: a morph delta in bind space
+function lapDrape(top, hem, reach, lift = 0.016, minY = 0.01, legExtra = 0) {
   return (x, y, z) => {
     if (y >= top) return null;
     const t = Math.min(1, (top - y) / (top - hem)), th = Math.atan2(x, z), r0 = Math.hypot(x, z);
     const R = Math.max(r0, reach(th)), r = r0 + (R - r0) * Math.pow(t, 0.75);
     const nx = r0 > 1e-4 ? x / r0 : Math.sin(th), nz = r0 > 1e-4 ? z / r0 : Math.cos(th);
-    const px = nx * r, pz = nz * r;
-    const yTop = top - SEAT, fall = yTop - (yTop - minY) * Math.pow(t, 1.7);
+    const px = nx * r, pz = nz * r, yTop = top - SEAT, fall = yTop - (yTop - minY) * Math.pow(t, 1.6);
     const under = lapHeight(px, pz, legExtra), py = under > -1 ? smax(fall, under + lift) : Math.max(minY, fall);
     return [px - x, py + SEAT - y, pz - z];
   };
 }
-const lobes = (th, base, k) => base + k * Math.max(Math.pow(Math.max(0, Math.cos(th - 0.8)), 1.5), Math.pow(Math.max(0, Math.cos(th + 0.8)), 1.5));
+const lobes = (th, base, k) => base + k * Math.max(Math.pow(Math.max(0, Math.cos(th - 0.75)), 1.5), Math.pow(Math.max(0, Math.cos(th + 0.75)), 1.5));
 
 // ------------------------------------------------------------------ the figure
 const BONES = ['root', 'hips', 'spine', 'chest', 'neck', 'head', 'shL', 'elL', 'wrL', 'shR', 'elR', 'wrR', 'thL', 'knL', 'anL', 'thR', 'knR', 'anR', 'eyeL', 'eyeR', 'lidL', 'lidR', 'browL', 'browR', 'jaw', 'mouthL', 'mouthR'];
 const BI = Object.fromEntries(BONES.map((n, i) => [n, i]));
-const PARENT = { hips: 'root', spine: 'hips', chest: 'spine', neck: 'chest', head: 'neck', shL: 'chest', elL: 'shL', wrL: 'elL', shR: 'chest', elR: 'shR', wrR: 'elR', thL: 'hips', knL: 'thL', anL: 'knL', thR: 'hips', knR: 'thR', anR: 'knR', eyeL: 'head', eyeR: 'head', lidL: 'head', lidR: 'head', browL: 'head', browR: 'head', jaw: 'head', mouthL: 'jaw', mouthR: 'jaw' };
+// the mouth corners hang from the head, so opening the mouth (the jaw's scale) leaves the smile alone
+const PARENT = { hips: 'root', spine: 'hips', chest: 'spine', neck: 'chest', head: 'neck', shL: 'chest', elL: 'shL', wrL: 'elL', shR: 'chest', elR: 'shR', wrR: 'elR', thL: 'hips', knL: 'thL', anL: 'knL', thR: 'hips', knR: 'thR', anR: 'knR', eyeL: 'head', eyeR: 'head', lidL: 'head', lidR: 'head', browL: 'head', browR: 'head', jaw: 'head', mouthL: 'head', mouthR: 'head' };
+const mix = (a, b, k) => new THREE.Color(a).lerp(new THREE.Color(b), k);
 
 function buildFigure(cfg) {
-  const fem = cfg.presentation === 'fem', masc = cfg.presentation === 'masc', elder = cfg.age === 'elder';
-  const bw = { slim: 0.9, average: 1, broad: 1.14 }[cfg.build] || 1;
-  const sw = (fem ? 0.172 : 0.195) * (0.94 + (bw - 1) * 0.6);
+  const fem = cfg.presentation === 'fem', masc = !fem, elder = cfg.age === 'elder';
+  const bw = { slim: 0.92, average: 1, broad: 1.1 }[cfg.build] || 1, lb = (k) => k * bw;
+  const sw = 0.148 * (0.96 + (bw - 1) * 0.5);
+  const ey = 0.995, ex = 0.098, eyeZ = surfZ(ex, ey) - 0.004, mouthZ = surfZ(0, 0.92) - 0.002;
   const J = {
-    root: [0, 0, 0], hips: [0, 0.94, 0], spine: [0, 1.06, 0], chest: [0, 1.24, 0], neck: [0, 1.42, 0], head: [0, 1.5, 0],
-    shL: [sw, 1.395, -0.01], elL: [sw + 0.01, 1.105, -0.01], wrL: [sw + 0.012, 0.855, 0], shR: [-sw, 1.395, -0.01], elR: [-sw - 0.01, 1.105, -0.01], wrR: [-sw - 0.012, 0.855, 0],
-    thL: [0.088, 0.9, 0], knL: [0.09, 0.48, 0.01], anL: [0.09, 0.075, -0.01], thR: [-0.088, 0.9, 0], knR: [-0.09, 0.48, 0.01], anR: [-0.09, 0.075, -0.01],
+    root: [0, 0, 0], hips: [0, 0.42, 0], spine: [0, 0.5, 0], chest: [0, 0.6, 0], neck: [0, 0.73, 0], head: [0, 0.77, 0],
+    shL: [sw, 0.69, 0], elL: [sw + 0.005, 0.565, 0], wrL: [sw + 0.01, 0.44, 0.005], shR: [-sw, 0.69, 0], elR: [-sw - 0.005, 0.565, 0], wrR: [-sw - 0.01, 0.44, 0.005],
+    thL: [0.075, 0.4, 0], knL: [0.077, 0.235, 0.008], anL: [0.077, 0.075, -0.004], thR: [-0.075, 0.4, 0], knR: [-0.077, 0.235, 0.008], anR: [-0.077, 0.075, -0.004],
+    eyeL: [ex, ey, eyeZ], eyeR: [-ex, ey, eyeZ], lidL: [ex, ey, eyeZ], lidR: [-ex, ey, eyeZ],
+    browL: [ex, 1.072, surfZ(ex, 1.072)], browR: [-ex, 1.072, surfZ(ex, 1.072)], jaw: [0, 0.92, mouthZ], mouthL: [0.034, 0.936, surfZ(0.034, 0.936)], mouthR: [-0.034, 0.936, surfZ(0.034, 0.936)],
   };
-  { const h = [0, 1.6, 0.006], f = (x, y, z) => [h[0] + x, h[1] + y, h[2] + z];
-    Object.assign(J, { eyeL: f(0.034, 0.012, 0.087), eyeR: f(-0.034, 0.012, 0.087), lidL: f(0.034, 0.012, 0.087), lidR: f(-0.034, 0.012, 0.087),
-      browL: f(0.034, 0.036, 0.094), browR: f(-0.034, 0.036, 0.094), jaw: f(0, -0.022, 0.01), mouthL: f(0.021, -0.054, 0.092), mouthR: f(-0.021, -0.054, 0.092) }); }
-  // smooth skin weights across the joints
   const W = {
-    torso: (x, y) => y < 1.0 ? [[BI.hips, 1]] : y < 1.1 ? [[BI.hips, 1 - sstep(1.0, 1.1, y)], [BI.spine, sstep(1.0, 1.1, y)]] : y < 1.2 ? [[BI.spine, 1 - sstep(1.1, 1.2, y)], [BI.chest, sstep(1.1, 1.2, y)]] : [[BI.chest, 1]],
-    neck: (x, y) => [[BI.chest, 1 - sstep(1.43, 1.5, y)], [BI.neck, sstep(1.43, 1.5, y) * (1 - sstep(1.5, 1.53, y))], [BI.head, sstep(1.5, 1.53, y)]],
+    torso: (x, y) => { const a = sstep(J.hips[1] - 0.03, J.spine[1] + 0.03, y), b = sstep(J.spine[1] + 0.02, J.chest[1] + 0.05, y); return [[BI.hips, 1 - a], [BI.spine, a * (1 - b)], [BI.chest, a * b]]; },
+    neck: (x, y) => { const k = sstep(J.neck[1] - 0.01, J.head[1] + 0.02, y); return [[BI.chest, 1 - k], [BI.neck, k]]; },
     arm: (side) => { const sh = BI['sh' + side], el = BI['el' + side], wr = BI['wr' + side], yS = J['sh' + side][1], yE = J['el' + side][1], yW = J['wr' + side][1];
-      return (x, y) => { if (y > yE + 0.05) { const c = sstep(yS - 0.03, yS + 0.05, y) * 0.55; return [[sh, 1 - c], [BI.chest, c]]; }
-        if (y > yE - 0.05) { const t = sstep(yE - 0.05, yE + 0.05, y); return [[el, 1 - t], [sh, t]]; }
-        if (y > yW + 0.025) return [[el, 1]]; const t = sstep(yW - 0.015, yW + 0.025, y); return [[wr, 1 - t], [el, t]]; }; },
+      return (x, y) => { if (y > yE + 0.035) { const c = sstep(yS - 0.02, yS + 0.04, y) * 0.5; return [[sh, 1 - c], [BI.chest, c]]; }
+        if (y > yE - 0.035) { const t = sstep(yE - 0.035, yE + 0.035, y); return [[el, 1 - t], [sh, t]]; }
+        if (y > yW + 0.02) return [[el, 1]]; const t = sstep(yW - 0.01, yW + 0.02, y); return [[wr, 1 - t], [el, t]]; }; },
     leg: (side) => { const th = BI['th' + side], kn = BI['kn' + side], an = BI['an' + side], yT = J['th' + side][1], yK = J['kn' + side][1], yA = J['an' + side][1];
-      return (x, y) => { if (y > yK + 0.06) { const c = sstep(yT - 0.06, yT + 0.04, y) * 0.6; return [[th, 1 - c], [BI.hips, c]]; }
-        if (y > yK - 0.06) { const t = sstep(yK - 0.06, yK + 0.06, y); return [[kn, 1 - t], [th, t]]; }
-        if (y > yA + 0.04) return [[kn, 1]]; const t = sstep(yA - 0.01, yA + 0.04, y); return [[an, 1 - t], [kn, t]]; }; },
+      return (x, y) => { if (y > yK + 0.035) { const c = sstep(yT - 0.04, yT + 0.03, y) * 0.6; return [[th, 1 - c], [BI.hips, c]]; }
+        if (y > yK - 0.035) { const t = sstep(yK - 0.035, yK + 0.035, y); return [[kn, 1 - t], [th, t]]; }
+        if (y > yA + 0.025) return [[kn, 1]]; const t = sstep(yA - 0.008, yA + 0.025, y); return [[an, 1 - t], [kn, t]]; }; },
   };
   const P = new Parts(), skin = cfg.skin, hairC = cfg.hairColor;
-  const hairShade = (c, x, y, z) => c.multiplyScalar(0.85 + 0.25 * Math.abs(Math.sin(x * 260 + z * 120)));
-
-  const cloth = CLOTH_COLORS.find(c => c.id === cfg.color) || CLOTH_COLORS[0];
+  const cloth = CLOTH_COLORS.find(c => c.id === cfg.color) || CLOTH_COLORS[0], base = cloth.base, accent = cloth.accent;
+  const gold = '#e2b555', silver = '#d9dade', ink = '#2a1a14';
   const at = (g, j) => g.translate(J[j][0], J[j][1], J[j][2]);
-  const skinShade = (c, x, y, z) => c.multiplyScalar(0.96 + Math.sin(x * 40 + y * 30) * 0.02);
-  const gold = '#e0b04f', silver = '#d9dade', glassCols = ['#b3121b', '#1f7a3a', '#2a4fb0', '#e2a72c'];
-
-  // ---- torso (pelvis rides the hips, chest rides the chest bone)
-  const tProf = fem ? [[0.155, 0.86], [0.172, 0.94], [0.165, 1.0], [0.132, 1.08], [0.128, 1.12], [0.148, 1.2], [0.156, 1.28], [0.162, 1.35], [0.145, 1.41], [0.07, 1.455]]
-    : [[0.148, 0.86], [0.156, 0.94], [0.15, 1.0], [0.142, 1.08], [0.15, 1.16], [0.172, 1.24], [0.182, 1.32], [0.18, 1.38], [0.15, 1.425], [0.072, 1.462]];
-  const tp = tProf.map(([r, y]) => [r * bw, y]);
-  const torsoShade = (c, x, y, z) => { if (!fem && z > 0.06 && y > 1.2 && y < 1.26) c.multiplyScalar(0.9); if (z > 0.08 && Math.abs(x) < 0.006 && y > 1.0 && y < 1.2) c.multiplyScalar(0.92); };
-  const bust = (g, amp = 0.03) => {
-    if (!fem) return g;
-    const p = g.attributes.position;
-    for (let i = 0; i < p.count; i++) {
-      const x = p.getX(i), y = p.getY(i), z = p.getZ(i); if (z <= 0) continue;
-      const dy = y - 1.238, wy = dy < 0 ? 0.056 : 0.042;
-      const k = Math.exp(-(((Math.abs(x) - 0.066 * bw) / 0.048) ** 2) - (dy / wy) ** 2) * Math.min(1, z / 0.05);
-      p.setZ(i, z + amp * bw * k);
-    }
-    g.computeVertexNormals(); return g;
+  // bind space -> a pose, for a point carried rigidly by `bone`
+  const posedFrame = (pose, bone) => {
+    const o = {}; for (const n of BONES) { o[n] = new THREE.Object3D(); if (n !== 'root') { const p = J[PARENT[n]], j = J[n]; o[n].position.set(j[0] - p[0], j[1] - p[1], j[2] - p[2]); o[PARENT[n]].add(o[n]); } if (pose[n]) o[n].rotation.set(...pose[n]); }
+    o.root.updateMatrixWorld(true); return o[bone].matrixWorld.clone().multiply(new THREE.Matrix4().makeTranslation(-J[bone][0], -J[bone][1], -J[bone][2]));
   };
-  P.add(bust(lathe(dense(tp, 0.014), 32).scale(1, 1, 0.68)), BI.chest, skin, MAT.body, torsoShade, W.torso);
-  if (!fem && cfg.outfit === 'dhoti') for (const s of [-1, 1]) P.add(ell(0.07, 1.0 * bw, 0.5, 0.24, s * 0.06 * bw, 1.255, 0.09), BI.chest, skin, MAT.body, null, W.torso); // pectorals, shown on a bare chest
-  P.add(new THREE.CylinderGeometry(masc ? 0.05 : 0.045, masc ? 0.058 : 0.052, 0.13, 14, 4).translate(0, 1.475, 0.0), BI.neck, skin, MAT.body, null, W.neck);
-  // ---- head
-  const H = new V(0, 1.6, 0.006), head = [];
-  const skull = new THREE.SphereGeometry(1, 30, 22), sp = skull.attributes.position;
-  for (let i = 0; i < sp.count; i++) {
-    let x = sp.getX(i), y = sp.getY(i), z = sp.getZ(i);
-    if (y < -0.2) x *= 1 - (-y - 0.2) * 0.38;                               // jaw tapers to the chin
-    if (z > 0.55 && y < -0.55) z += 0.06;                                    // chin
-    if (z > 0.6 && y > -0.1 && y < 0.25 && Math.abs(x) > 0.28) z -= 0.05;    // eye sockets
-    if (z > 0.7 && Math.abs(x) > 0.42 && y > -0.45 && y < -0.05) { x *= 1.02; z += 0.02; } // cheekbones
-    sp.setXYZ(i, x * 0.092, y * 0.112, z * 0.102);
-  }
-  skull.computeVertexNormals();
-  const jawW = (x, y, z) => { const yr = y - H.y, zr = z - H.z, t = zr > -0.04 ? sstep(-0.042, -0.078, yr) : 0; return [[BI.head, 1 - t], [BI.jaw, t]]; };
-  const lipW = (lower) => (x, y, z) => { const xr = x - H.x, c = sstep(0.006, 0.02, Math.abs(xr)), base = lower ? BI.jaw : BI.head; return [[base, 1 - c], [xr > 0 ? BI.mouthL : BI.mouthR, c]]; };
-  head.push([skull, skin, MAT.body, (c, x, y, z) => { if (z > 0.06 && Math.abs(x) > 0.035 && y < -0.005 && y > -0.05) c.lerp(new THREE.Color('#d8746a'), 0.12); }, jawW]);
-  head.push([new THREE.CircleGeometry(0.012, 14).scale(1.5, 0.55, 1).translate(0, -0.0548, 0.0885), '#3a1414', MAT.body, null, jawW]);   // inside of the mouth
-  for (const s of [-1, 1]) {
-    const eB = s > 0 ? BI.eyeL : BI.eyeR, lB = s > 0 ? BI.lidL : BI.lidR, bB = s > 0 ? BI.browL : BI.browR;
-    head.push([ell(0.0135, 1, 0.62, 0.55, s * 0.034, 0.012, 0.087), '#f6f2ea', MAT.body, null, null, eB]);                // eye white
-    // upper eyelid: a thin cap over the eye that closes to blink and to pray
-    const lid = new THREE.SphereGeometry(0.0142, 16, 8, 0, Math.PI * 2, 0, Math.PI * 0.36); lid.scale(1.08, 0.7, 0.66); lid.translate(s * 0.034, 0.012, 0.087);
-    head.push([lid, darken(skin, 0.9), MAT.body, null, null, lB]);
-    const iris = new THREE.CircleGeometry(0.0074, 16).translate(s * 0.034, 0.012, 0.0948); head.push([iris, '#3a2416', MAT.body, (c, x, y) => { if (Math.hypot(x - s * 0.034, y - 0.012) < 0.0034) c.set('#0e0805'); }, null, eB]);
-    head.push([new THREE.CircleGeometry(0.0017, 6).translate(s * 0.034 + 0.002, 0.0145, 0.0952), '#ffffff', MAT.body, null, null, eB]);       // catchlight
-    head.push([tubeOf([new V(s * 0.034 - 0.0145, 0.014, 0.0905), new V(s * 0.034, 0.0205, 0.0955), new V(s * 0.034 + 0.0145, 0.014, 0.0905)], fem ? 0.0021 : 0.0014, 10, 4), '#1a1210', MAT.body, null, null, lB]); // lash line (kajal)
-    head.push([tubeOf([new V(s * 0.034 - 0.017, 0.031, 0.093), new V(s * 0.036, 0.038, 0.0975), new V(s * 0.034 + 0.018, 0.033, 0.091)], masc ? 0.0036 : 0.0026, 10, 4), elder && cfg.hairColor === HAIR_COLORS[4] ? '#bdb8ad' : hairC, MAT.body, null, null, bB]); // brow
-    head.push([ell(0.024, 0.32, 1, 0.62, s * 0.091, 0.0, -0.006), skin]);                                       // ear
-    head.push([ell(0.0056, 1.1, 0.9, 1, s * 0.0092, -0.028, 0.0985), darken(skin, 0.94)]);                      // nose wing
-  }
-  head.push([ell(0.0085, 0.7, 2.1, 0.85, 0, -0.006, 0.0975), skin], [ell(0.0088, 1, 0.92, 1, 0, -0.0255, 0.1035), skin]);  // nose bridge and tip
-  const lip = new THREE.Color(skin).lerp(new THREE.Color(fem ? '#a8323f' : '#8a4038'), fem ? 0.55 : 0.4);
-  head.push([ell(0.0105, 2.1, 0.42, 0.62, 0, -0.05, 0.093), lip, MAT.body, null, lipW(false)], [ell(0.0105, 1.9, 0.55, 0.7, 0, -0.0595, 0.0905), lip.clone().multiplyScalar(1.06), MAT.body, null, lipW(true)]);
-  head.push([tubeOf([new V(-0.02, -0.0545, 0.093), new V(0, -0.0545, 0.0985), new V(0.02, -0.0545, 0.093)], 0.0011, 8, 3), darken(lip, 0.55), MAT.body, null, lipW(false)]);  // mouth line
-  // forehead marks
-  const fz = (y) => 0.102 * Math.sqrt(Math.max(0, 1 - (y / 0.112) ** 2)) + 0.0012;
-  if (cfg.mark === 'bindi') head.push([new THREE.CircleGeometry(fem ? 0.0058 : 0.004, 14).translate(0, 0.036, fz(0.036)), '#b3121b']);
-  if (cfg.mark === 'tilak') { for (const s of [-1, 1]) head.push([new THREE.BoxGeometry(0.0032, 0.04, 0.002).translate(s * 0.0075, 0.052, fz(0.05)), '#f4efe4']); head.push([new THREE.BoxGeometry(0.0028, 0.034, 0.002).translate(0, 0.05, fz(0.05) + 0.0005), '#d01f1f']); }
-  if (cfg.mark === 'tripundra') { for (const y of [0.043, 0.053, 0.063]) head.push([new THREE.BoxGeometry(0.052, 0.0034, 0.002).translate(0, y, fz(y)), '#f1ede2']); head.push([new THREE.CircleGeometry(0.0042, 10).translate(0, 0.053, fz(0.053) + 0.001), '#c4161c']); }
-  // facial hair
-  const fh = cfg.hairColor;
-  if (!fem && cfg.facial !== 'none') head.push([tubeOf([new V(-0.026, -0.044, 0.094), new V(-0.012, -0.04, 0.103), new V(0, -0.0405, 0.105), new V(0.012, -0.04, 0.103), new V(0.026, -0.044, 0.094)], 0.0042, 14, 5), fh, MAT.body, null, lipW(false)]);
-  if (!fem && cfg.facial === 'beard') { const b = new THREE.SphereGeometry(1, 28, 16, -Math.PI * 0.62, Math.PI * 1.24, Math.PI * 0.56, Math.PI * 0.38), bp = b.attributes.position; for (let i = 0; i < bp.count; i++) { const x = bp.getX(i), y = bp.getY(i), z = bp.getZ(i); const k = (Math.abs(x) < 0.3 && y > -0.62 && z > 0.6) ? 0.9 : 1; bp.setXYZ(i, x * 0.097 * k, y * 0.118 * k, z * 0.108 * k); } b.computeVertexNormals(); b.translate(0, -0.004, 0.003); head.push([b, fh, MAT.body, hairShade, jawW]); }
-  if (cfg.glasses) { for (const s of [-1, 1]) { head.push([torus(0.017, 0.0016, s * 0.034, 0.012, 0.1, 0, 20), '#2a2622', MAT.metal]); head.push([new THREE.BoxGeometry(0.003, 0.003, 0.09).translate(s * 0.052, 0.016, 0.055), '#2a2622', MAT.metal]); } head.push([new THREE.BoxGeometry(0.016, 0.0025, 0.003).translate(0, 0.016, 0.1), '#2a2622', MAT.metal]); }
-  // hair
-  const cap = (k = 1.06) => {
-    const g = new THREE.SphereGeometry(1, 34, 22, 0, Math.PI * 2, 0, Math.PI * 0.8), p = g.attributes.position;
-    for (let i = 0; i < p.count; i++) {
-      let x = p.getX(i); const y = p.getY(i), z = p.getZ(i); let s = k;
-      if ((z > 0.12 && y < 0.62 - z * 0.14) || (Math.abs(x) > 0.55 && y < 0.05 && z > -0.45) || y < -0.62) s = 0.72;   // tucked inside the head
-      if (y < -0.2) x *= 1 - (-y - 0.2) * 0.38;                                                                   // follow the jaw taper
-      p.setXYZ(i, x * 0.092 * s, y * 0.112 * s, z * 0.102 * s);
-    }
-    g.computeVertexNormals(); return g;
-  };
-  if (cfg.hair !== 'bald') head.push([cap(cfg.hair === 'cropped' ? 1.025 : 1.06), cfg.hair === 'cropped' ? new THREE.Color(hairC).lerp(new THREE.Color(skin), 0.25) : hairC, MAT.body, hairShade]);
-  if (cfg.hair === 'short') head.push([ell(0.09, 1.04, 0.6, 1.08, 0, 0.068, 0.0), hairC, MAT.body, hairShade], [ell(0.03, 1.4, 0.7, 1, 0.015, 0.088, 0.06), hairC]);
-  if (cfg.hair === 'wavy') { head.push([ell(0.1, 1.08, 0.95, 0.72, 0, -0.03, -0.05), hairC, MAT.body, hairShade]); for (const s of [-1, 1]) head.push([ell(0.03, 1, 2.4, 1.5, s * 0.084, -0.05, -0.01), hairC, MAT.body, hairShade]); for (let i = 0; i < 9; i++) { const a = Math.PI + (i / 8 - 0.5) * 2.4; head.push([ell(0.018, 1, 1, 1, Math.sin(a) * 0.082, -0.115, Math.cos(a) * 0.065), hairC]); } }
-  if (cfg.hair === 'bun') { head.push([torus(0.033, 0.021, 0, -0.04, -0.103, 0, 18), hairC, MAT.body, hairShade], [ell(0.03, 1, 1, 0.8, 0, -0.04, -0.11), hairC]); for (let i = 0; i < 18; i++) { const a = i / 18 * Math.PI * 2; head.push([ell(0.0075, 1, 1, 1, Math.cos(a) * 0.055, -0.04 + Math.sin(a) * 0.055, -0.112), '#fbf8ef']); } }
-  if (cfg.hair === 'cropped') head.push([tubeOf([new V(0, 0.1, -0.06), new V(0, 0.115, -0.09), new V(0, 0.095, -0.115)], 0.009, 8, 5), hairC], [ell(0.012, 1, 1, 1, 0, 0.094, -0.118), hairC]);
-  if (cfg.hair === 'bald') head.push([(() => { const g = new THREE.TorusGeometry(0.094, 0.02, 6, 24, Math.PI * 1.25); g.rotateX(Math.PI / 2); g.rotateY(Math.PI * 0.375 + Math.PI); g.scale(1, 1, 1.1); g.translate(0, -0.012, 0); return g; })(), hairC, MAT.body, hairShade]);
-  if (cfg.hair === 'ponytail') {
-    head.push([torus(0.017, 0.0065, 0, -0.005, -0.104, 0, 12), cfg.jewellery === 'festive' ? '#c4161c' : darken(hairC, 0.7)]);
-    [[0, -0.01, -0.113, 0.024], [0, -0.05, -0.128, 0.022], [0, -0.09, -0.135, 0.019], [0, -0.13, -0.136, 0.016], [0, -0.17, -0.132, 0.012], [0, -0.2, -0.127, 0.008]]
-      .forEach(([x, y, z, r]) => head.push([ell(r, 1, 1.5, 0.9, x, y, z), hairC, MAT.body, hairShade]));
-  }
-  if (cfg.hair === 'open') {
-    const sheet = ribbon([new V(0, 0.075, -0.07), new V(0, 0.02, -0.113), new V(0, -0.08, -0.122), new V(0, -0.2, -0.128), new V(0, -0.34, -0.136)], (u) => 0.17 + u * 0.08, { segs: 24, across: 8, fold: 0.006, folds: 5, lift: 0.004 });
-    head.push([sheet, hairC, MAT.body, hairShade, (x, y) => [[BI.head, sstep(H.y - 0.24, H.y - 0.1, y)], [BI.chest, 1 - sstep(H.y - 0.24, H.y - 0.1, y)]]]);
-    for (const s2 of [-1, 1]) head.push([ell(0.03, 0.9, 2.6, 1.3, s2 * 0.08, -0.07, -0.035), hairC, MAT.body, hairShade]);
-  }
-  if (cfg.hair === 'curly') for (let i = 0; i < 90; i++) {
-    const y = 1 - (i / 89) * 1.3, r = Math.sqrt(Math.max(0, 1 - y * y)), a = i * 2.39996, x = Math.cos(a) * r, z = Math.sin(a) * r;
-    if ((z > 0.12 && y < 0.62 - z * 0.14) || (Math.abs(x) > 0.55 && y < 0.05 && z > -0.45) || y < -0.5) continue;
-    head.push([ell(0.0155, 1, 1, 1, x * 0.1, y * 0.12, z * 0.11), hairC, MAT.body, hairShade]);
-  }
-  if (cfg.hair === 'topknot') head.push([ell(0.028, 1, 0.9, 1, 0, 0.118, -0.03), hairC, MAT.body, hairShade], [torus(0.02, 0.005, 0, 0.1, -0.03, Math.PI / 2, 12), darken(hairC, 0.6)]);
-  // head coverings: a wrapped safa, or a white Gandhi topi
-  if (cfg.headwear === 'turban') {
-    const tc = ['#e8731c', '#c4161c', '#f2b631', '#d6336c', '#2f8f5b'][Math.abs((cfg.name || 'x').charCodeAt(0) + cfg.color.length) % 5];
-    for (let i = 0; i < 6; i++) { const g = new THREE.TorusGeometry(0.098 - i * 0.004, 0.02, 8, 30); g.rotateX(Math.PI / 2 + (i % 2 ? 0.16 : -0.12)); g.rotateZ(i % 2 ? 0.08 : -0.08); g.scale(1, 1, 1.1); g.translate(0, 0.035 + i * 0.016, -0.005); head.push([g, darken(tc, 0.85 + (i % 3) * 0.08)]); }
-    head.push([new THREE.SphereGeometry(0.09, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.55, 1.1).translate(0, 0.11, -0.005), tc]);
-    head.push([ribbon([new V(0, 0.06, -0.11), new V(0, -0.05, -0.125), new V(0, -0.2, -0.132)], () => 0.07, { segs: 10, across: 4, fold: 0.004, folds: 2, lift: 0.004 }), tc]);
-  }
-  if (cfg.headwear === 'topi') {
-    head.push([new THREE.SphereGeometry(1, 24, 10, 0, Math.PI * 2, 0, Math.PI / 2).scale(0.1, 0.055, 0.118).translate(0, 0.07, -0.004), '#f6f3ea']);
-    head.push([new THREE.BoxGeometry(0.004, 0.012, 0.21).translate(0, 0.126, -0.004), '#e8e3d6'], [torus(0.101, 0.006, 0, 0.072, -0.004, Math.PI / 2, 28).scale(1, 1, 1.15), '#efebe0']);
-  }
-  if (fem && (cfg.hair === 'bun' || cfg.hair === 'braid')) head.push([new THREE.BoxGeometry(0.003, 0.002, 0.07).translate(0, 0.113, 0.02).rotateX(-0.25), cfg.jewellery === 'festive' ? '#c4161c' : darken(hairC, 0.6)]); // parting / sindoor
-  // earrings and nose stud
-  if (fem) for (const s of [-1, 1]) { head.push([ell(0.0085, 1, 0.8, 1, s * 0.094, -0.03, 0.0), gold, MAT.metal]); head.push([new THREE.SphereGeometry(0.009, 10, 6, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2).translate(s * 0.094, -0.042, 0), gold, MAT.metal]); head.push([ell(0.003, 1, 1, 1, s * 0.094, -0.054, 0), '#c4161c', MAT.metal]); }
-  if (fem && cfg.jewellery === 'festive') head.push([ell(0.0028, 1, 1, 1, 0.0125, -0.026, 0.106), gold, MAT.metal]);
-  for (const [g, c, m = MAT.body, sh, w, bone = BI.head] of head) P.add(g, bone, c, m, sh || undefined, w || undefined).translate(H.x, H.y, H.z);
-  // braid hangs down the back, following the chest
-  if (cfg.hair === 'braid') { for (let i = 0; i < 11; i++) { const y = 1.53 - i * 0.05, r = 0.026 - i * 0.0012; for (const s of [-1, 1]) P.add(ell(r, 1, 1.25, 0.8, s * 0.007 * (i % 2 ? 1 : -1), y + s * 0.012, -0.112 - Math.min(i, 3) * 0.008), BI.chest, hairC, MAT.body, hairShade); }
-    P.add(new THREE.ConeGeometry(0.014, 0.07, 8).rotateX(Math.PI).translate(0, 0.94, -0.135), BI.chest, '#c4161c'); P.add(ell(0.01, 1, 1, 1, 0, 0.98, -0.135), BI.chest, gold, MAT.metal); }
-
-  // ---- limb profiles (radius, offset below the shoulder / hip joint)
-  const ARM = [[0.021, -0.545], [0.025, -0.5], [0.031, -0.4], [0.034, -0.32], [0.034, -0.27], [0.041, -0.19], [0.047, -0.09], [0.05, -0.02], [0.047, 0.012], [0.032, 0.036], [0.008, 0.046]].map(([r, y]) => [r > 0.02 ? r * bw : r, y]);
-  const LEG = [[0.03, -0.83], [0.033, -0.78], [0.044, -0.64], [0.05, -0.55], [0.049, -0.47], [0.052, -0.42], [0.058, -0.36], [0.074, -0.16], [0.084, -0.05], [0.078, 0.03], [0.03, 0.065]].map(([r, y]) => [r > 0.035 ? r * bw : r, y]);
-  const radAt = (prof, y) => { for (let i = 0; i < prof.length - 1; i++) { const [r0, y0] = prof[i], [r1, y1] = prof[i + 1]; if (y >= y0 && y <= y1) return r0 + (r1 - r0) * (y - y0) / (y1 - y0); } return prof[prof.length - 1][0]; };
-  // a garment tube over a limb, from `from` to `to` below the joint, `extra` looser than the skin
+  const radAt = (prof, y) => { for (let i = 0; i < prof.length - 1; i++) { const [r0, y0] = prof[i], [r1, y1] = prof[i + 1]; if ((y >= y0 && y <= y1) || (y <= y0 && y >= y1)) return r0 + (r1 - r0) * (y - y0) / ((y1 - y0) || 1); } return prof[prof.length - 1][0]; };
   const over = (prof, from, to, extra, steps = 9, flare = 0) => { const out = []; for (let i = 0; i <= steps; i++) { const y = from + (to - from) * i / steps; out.push([radAt(prof, y) + extra + flare * Math.pow(1 - i / steps, 2), y]); } return out; };
-  // ---- arms and hands
-  for (const side of ['L', 'R']) {
-    const s = side === 'L' ? 1 : -1, sh = 'sh' + side, el = 'el' + side, wr = 'wr' + side;
-    // one continuous arm, weighted across shoulder, elbow and wrist so it bends smoothly
-    P.add(at(lathe(ARM, 16), sh), BI[sh], skin, MAT.body, skinShade, W.arm(side));
-    // hand: palm faces the body in the rest pose; fingers, thumb, henna on the palm for festive dress
-    const hand = [];
-    const henna = fem && cfg.jewellery === 'festive';
-    hand.push([ell(1, 0.017, 0.046, 0.035, 0, -0.046, 0), (c, x, y, z) => { if (henna && (x - J[wr][0]) * s < -0.004 && Math.sin(y * 420) * Math.sin(z * 380) > 0.1) c.lerp(new THREE.Color('#8a3a1c'), 0.6); }]);
-    [-0.024, -0.008, 0.008, 0.024].forEach((fz2, k) => { const len = [0.044, 0.052, 0.055, 0.05][k]; const f = new THREE.CapsuleGeometry(0.0072, len, 3, 6); f.rotateX(0.12); f.translate(0, -0.088 - len / 2, fz2 * 0.95); hand.push([f]); });
-    const th = new THREE.CapsuleGeometry(0.008, 0.035, 3, 6); th.rotateX(-0.6); th.rotateZ(s * 0.3); th.translate(-s * 0.006, -0.055, 0.035); hand.push([th]);
-    for (const [g, shade] of hand) P.add(at(g, wr), BI[wr], skin, MAT.body, shade);
-    // bangles, kada or a sacred kalava thread
-    if (fem) { const n = cfg.jewellery === 'festive' ? 8 : 4; for (let i = 0; i < n; i++) { const isGold = i % 2 === 0; P.add(at(torus(0.03, 0.0035, 0, -0.205 + i * 0.006, 0), el), BI[el], isGold ? gold : glassCols[(i >> 1) % 4], isGold ? MAT.metal : MAT.body); } }
-    else if (s < 0) P.add(at(torus(0.029, 0.004, 0, -0.21, 0), el), BI[el], silver, MAT.metal);
-    else P.add(at(torus(0.028, 0.0025, 0, -0.215, 0), el), BI[el], '#c4161c');
+  // a small piece laid on the head's surface, turned to face out along the surface normal
+  const onHead = (geo, x, y, lift = 0) => { const z = surfZ(x, y), n = new V(x / HR[0] ** 2, (y - HC) / HR[1] ** 2, z / HR[2] ** 2).normalize(); geo.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new V(0, 0, 1), n)); geo.translate(x + n.x * lift, y + n.y * lift, z + n.z * lift); return geo; };
+  const disc = (rx, ry, rz) => { const g = new THREE.SphereGeometry(1, 14, 10); g.scale(rx, ry, rz); return g; };
+  const tubeOnFace = (pts, r, lift = 0.003) => tubeOf(pts.map(([x, y]) => { const z = surfZ(x, y), n = new V(x / HR[0] ** 2, (y - HC) / HR[1] ** 2, z / HR[2] ** 2).normalize(); return new V(x + n.x * lift, y + n.y * lift, z + n.z * lift); }), r, 14, 5);
+
+  // ---- the head: round, with small ears and a button nose
+  const head = new THREE.SphereGeometry(1, ...HSEG); head.scale(HR[0], HR[1], HR[2]); head.translate(0, HC, 0);
+  P.add(head, BI.head, skin, MAT.body, (c, x, y) => c.multiplyScalar(0.97 + 0.05 * (y - HC) / HR[1]));
+  for (const s of [1, -1]) P.add(ell(1, 0.04, 0.054, 0.03, s * 0.28, 0.995, -0.01), BI.head, darken(skin, 0.95));
+  P.add(onHead(disc(0.017, 0.013, 0.012), 0, 0.962, -0.002), BI.head, darken(skin, 0.9));
+  // eyes: big and dark with catchlights; closed, they become gentle curves (the lid bones)
+  for (const [s, side] of [[1, 'L'], [-1, 'R']]) {
+    const x = s * ex;
+    P.add(ell(1, 0.036, 0.045, 0.018, x, ey, eyeZ), BI['eye' + side], ink);
+    P.add(ell(1, 0.012, 0.012, 0.008, x + 0.012, ey + 0.017, eyeZ + 0.013), BI['eye' + side], '#ffffff');
+    P.add(ell(1, 0.006, 0.006, 0.005, x - 0.012, ey - 0.015, eyeZ + 0.012), BI['eye' + side], '#ffffff');
+    P.add(tubeOf([new V(x - 0.034, ey + 0.004, eyeZ + 0.012), new V(x, ey - 0.012, eyeZ + 0.019), new V(x + 0.034, ey + 0.004, eyeZ + 0.012)], 0.0062, 12, 5), BI['lid' + side], ink);
+    const browC = hairC === HAIR_COLORS[4] || hairC === HAIR_COLORS[3] ? darken(hairC, 0.7) : darken(hairC, 0.95);
+    P.add(tubeOnFace([[x - 0.03, 1.07], [x, 1.079], [x + 0.03, 1.07]], 0.0058), BI['brow' + side], browC);
+    P.add(onHead(disc(0.042, 0.025, 0.005), s * 0.163, 0.94, -0.001), BI.head, mix(skin, '#ff8a80', 0.5));
   }
-  // ---- legs and bare feet
-  for (const side of ['L', 'R']) {
-    const s = side === 'L' ? 1 : -1, th = 'th' + side, kn = 'kn' + side, an = 'an' + side;
-    P.add(at(lathe(LEG, 16), th), BI[th], skin, MAT.body, skinShade, W.leg(side));
-    const alta = fem && cfg.jewellery === 'festive';
-    const footShade = (c, x, y, z) => { if (alta && y < J[an][1] - 0.058) c.set('#b3121b'); };
-    P.add(at(ell(1, 0.04, 0.028, 0.1, 0, -0.04, 0.045), an), BI[an], skin, MAT.body, footShade);
-    P.add(at(ell(0.03, 1, 0.9, 1.1, 0, -0.04, -0.03), an), BI[an], skin, MAT.body, footShade);
-    [0.022, 0.011, 0, -0.011, -0.021].forEach((tx, k) => P.add(at(ell(k === 0 ? 0.0105 : 0.008, 1, 0.85, 1.2, tx * s, -0.058, 0.142 - k * 0.006), an), BI[an], skin, MAT.body, footShade));
-    if (fem) { P.add(at(torus(0.036, 0.0035, 0, -0.005, 0), an), BI[an], silver, MAT.metal); for (let i = 0; i < 7; i++) { const a = i / 7 * Math.PI * 2; P.add(at(ell(0.004, 1, 1, 1, Math.cos(a) * 0.038, -0.013, Math.sin(a) * 0.038), an), BI[an], silver, MAT.metal); }
-      P.add(at(torus(0.0085, 0.0018, s * 0.011, -0.058, 0.142, Math.PI / 2 - 0.3, 10), an), BI[an], silver, MAT.metal); }
+  // a small smile (the corners lift with the mouth bones) and an open mouth that appears when chanting
+  const smile = tubeOnFace([[-0.034, 0.936], [-0.017, 0.926], [0, 0.923], [0.017, 0.926], [0.034, 0.936]], 0.0054, 0.0025);
+  P.add(smile, BI.head, '#7a2c22', MAT.body, null, (x) => x > 0.01 ? [[BI.mouthL, sstep(0.01, 0.034, x)], [BI.head, 1 - sstep(0.01, 0.034, x)]] : x < -0.01 ? [[BI.mouthR, sstep(0.01, 0.034, -x)], [BI.head, 1 - sstep(0.01, 0.034, -x)]] : [[BI.head, 1]]);
+  P.add(ell(1, 0.022, 0.027, 0.008, 0, 0.92, mouthZ), BI.jaw, '#5a1e16');
+  P.add(ell(1, 0.012, 0.008, 0.005, 0, 0.911, mouthZ + 0.004), BI.jaw, '#e8796b');
+  // forehead marks
+  if (cfg.mark === 'bindi') P.add(onHead(disc(0.016, 0.016, 0.004), 0, 1.103, 0.001), BI.head, '#c8102e');
+  if (cfg.mark === 'tilak') { P.add(tubeOnFace([[-0.018, 1.13], [-0.009, 1.096], [0, 1.089], [0.009, 1.096], [0.018, 1.13]], 0.0045), BI.head, '#f3efe6'); P.add(tubeOnFace([[0, 1.125], [0, 1.097]], 0.004, 0.006), BI.head, '#e8481e'); }
+  if (cfg.mark === 'tripundra') { for (const y of [1.145, 1.128, 1.111]) P.add(tubeOnFace([[-0.065, y + 0.004], [-0.03, y], [0, y - 0.001], [0.03, y], [0.065, y + 0.004]], 0.0038), BI.head, '#f3efe6'); P.add(onHead(disc(0.011, 0.011, 0.003), 0, 1.128, 0.005), BI.head, '#c8102e'); }
+  // glasses
+  if (cfg.glasses) {
+    for (const s of [1, -1]) { P.add(torus(0.05, 0.0055, s * ex, ey, eyeZ + 0.034, 0, 26), BI.head, '#4a3020'); P.add(tubeOf([new V(s * (ex + 0.05), ey + 0.01, eyeZ + 0.03), new V(s * 0.24, ey + 0.02, 0.12), new V(s * 0.28, ey + 0.01, 0.0)], 0.0045, 8, 4), BI.head, '#4a3020'); }
+    P.add(tubeOf([new V(-0.048, ey + 0.008, eyeZ + 0.036), new V(0, ey + 0.016, eyeZ + 0.042), new V(0.048, ey + 0.008, eyeZ + 0.036)], 0.005, 8, 4), BI.head, '#4a3020');
+  }
+  // earrings
+  if (fem) for (const s of [1, -1]) {
+    P.add(ell(1, 0.014, 0.014, 0.014, s * 0.288, 0.935, 0.0), BI.head, gold, MAT.metal);
+    if (cfg.jewellery === 'festive') { const c = new THREE.ConeGeometry(0.022, 0.034, 10); c.translate(s * 0.288, 0.905, 0); P.add(c, BI.head, gold, MAT.metal); }
   }
 
-  // ---- garments
-  const base = cloth.base, accent = cloth.accent, lb = (k) => k * bw;
-  const neckline = (g, depth) => { const p = g.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i); if (z <= 0.02) continue;
-    const yb = 1.455 - depth + 4 * x * x, w = sstep(yb - 0.005, yb + 0.005, y) * Math.min(1, (z - 0.02) / 0.03); if (w > 0) p.setXYZ(i, x * (1 - 0.06 * w), y, z * (1 - 0.22 * w)); } g.computeVertexNormals(); return g; };
-  const sleeve = (side, len, color, mat = MAT.body) => {
-    const sh = 'sh' + side, el = 'el' + side;
-    const prof = over(ARM, -len, 0.03, 0.009, 12, len > 0.3 ? 0.006 : 0.003).concat([[radAt(ARM, 0.04) + 0.008, 0.042], [0.012 + 0.006, 0.052], [0.002, 0.056]]);
-    P.add(at(lathe(prof, 16), sh), BI[sh], color, mat, null, W.arm(side));
-    const hemR = prof[0][0] + 0.002, hem = at(torus(hemR, 0.005, 0, -len, 0, Math.PI / 2, 18), sh);
-    P.add(hem, BI[sh], accent, MAT.body, null, W.arm(side));
+  // ---- hair: a cap that follows a hairline; extra pieces for each style
+  const hairShade = (c, x, y, z) => c.multiplyScalar(0.86 + 0.14 * Math.sin(x * 70 + z * 40 + y * 9));
+  const covered = cfg.headwear === 'turban' || cfg.headwear === 'topi';
+  // region(nx, ny, nz) > 0 inside the hair. Outside, the cap sinks just under the skin, and the thickness tapers across the
+  // edge, so the hairline is where two smooth surfaces cross: a clean curve rather than the steps of the mesh grid
+  const cap = (scale, region0, bump = 0) => {
+    const region = covered ? (x, y, z) => Math.min(region0(x, y, z), 0.3 - y) : region0;
+    // the region's value divided by its slope: roughly the distance to the hairline, so the taper is even all round
+    const dist = (x, y, z) => { const e = 0.01, v = region(x, y, z), gx = (region(x + e, y, z) - region(x - e, y, z)) / (2 * e), gy = (region(x, y + e, z) - region(x, y - e, z)) / (2 * e), gz = (region(x, y, z + e) - region(x, y, z - e)) / (2 * e), dot = gx * x + gy * y + gz * z;
+      return v / Math.max(0.3, Math.hypot(gx - dot * x, gy - dot * y, gz - dot * z)); };
+    const g = new THREE.SphereGeometry(1, ...HSEG), p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+      const nx = p.getX(i), ny = p.getY(i), nz = p.getZ(i), m = sstep(-0.1, 0.16, dist(nx, ny, nz));
+      let k = 0.975 + (scale - 0.975) * m; if (bump) k += m * bump * Math.max(0, Math.sin(nx * 17) * Math.sin(ny * 15) * Math.sin(nz * 16));
+      p.setXYZ(i, nx * HR[0] * k, HC + ny * HR[1] * k, nz * HR[2] * k);
+    }
+    g.computeVertexNormals(); P.add(g, BI.head, hairC, MAT.body, hairShade);
   };
-  if (cfg.outfit === 'saree') {
-    // blouse with a scooped neck and short sleeves
-    const blouse = shell(dense([[lb(0.135), 1.1], [lb(0.155), 1.2], [lb(0.165), 1.28], [lb(0.17), 1.35], [lb(0.152), 1.41], [0.076, 1.455]], 0.007), { sz: 0.7, seg: 48 });
-    neckline(blouse, 0.085); P.add(bust(blouse, 0.032), BI.chest, accent, MAT.body, null, W.torso);
-    sleeve('L', 0.13, accent); sleeve('R', 0.13, accent);
-    // skirt with front pleats, tucked at the waist, zari border at the hem
-    const skirt = shell(dense([[lb(0.255), 0.06], [lb(0.225), 0.3], [lb(0.205), 0.6], [lb(0.195), 0.85], [lb(0.18), 0.95], [lb(0.15), 1.04], [lb(0.14), 1.08]], 0.04), { sz: 0.82, pleats: 46, pleatFront: 0.5, hemWave: 0.006, seg: 56 });
-    P.add(skirt, BI.hips, '#ffffff', MAT.skirt, null, null, lapDrape(1.0, 0.06, (th) => lobes(th, 0.3, 0.3)));
-    P.add(torus(lb(0.148), 0.012, 0, 1.06, 0), BI.hips, base);
-    // the pallu: from the waist across the chest, over the left shoulder, falling down the back
-    const pallu = ribbon([new V(-0.1, 1.0, 0.13), new V(-0.03, 1.14, 0.168), new V(0.07, 1.29, 0.168), new V(0.16, 1.43, 0.03), new V(0.17, 1.37, -0.1), new V(0.14, 1.12, -0.16), new V(0.12, 0.7, -0.18)],
-      (u) => (u < 0.42 ? 0.2 - u * 0.15 : u < 0.55 ? 0.13 : 0.13 + (u - 0.55) * 0.42), { segs: 48, fold: 0.008, folds: 4 });
-    P.add(pallu, BI.chest, '#ffffff', MAT.ribbon);
-    // mangalsutra: black beads with a gold pendant
-    const ms = []; for (let i = 0; i <= 26; i++) { const a = -0.95 + i / 26 * 1.9; ms.push(new V(Math.sin(a) * 0.075, 1.3 + Math.cos(a) * 0.1 - 0.02, Math.cos(a) * 0.06 + 0.035)); }
-    ms.forEach((p, i) => P.add(ell(0.0038, 1, 1, 1, p.x, p.y, p.z), BI.chest, i % 5 ? '#141414' : gold, i % 5 ? MAT.body : MAT.metal));
-    P.add(ell(0.009, 1, 1.3, 0.5, 0, 1.19, 0.1), BI.chest, gold, MAT.metal);
+  const hairline = (front) => (nx, ny, nz) => { const f = sstep(-0.15, 0.35, nz), s = sstep(0.55, 0.88, Math.abs(nx)); return ny - (f * (front(nx) * (1 - s) - 0.12 * s) + (1 - f) * -0.6); };
+  const st = cfg.hair;
+  if (st === 'bald') cap(1.03, (nx, ny, nz) => Math.min(ny + 0.42, 0.1 - ny - 0.25 * Math.max(0, nz + 0.6), -0.04 - nz));   // a fringe round the back, ear to ear
+  else if (st === 'cropped') cap(1.035, hairline((nx) => 0.5 - 0.2 * nx * nx));
+  else if (st === 'curly') cap(1.09, hairline((nx) => 0.45 - 0.25 * nx * nx + 0.05 * Math.sin(nx * 20)), 0.05);
+  else if (st === 'short' || st === 'topknot') cap(1.06, hairline((nx) => 0.42 - 0.18 * nx * nx + (nx > 0.08 && nx < 0.55 ? 0.06 : 0)));
+  else if (st === 'wavy') cap(1.07, hairline((nx) => 0.38 - 0.2 * nx * nx + 0.04 * Math.sin(nx * 14)), 0.015);
+  else cap(1.065, hairline((nx) => 0.34 - 0.1 * Math.abs(nx) + (Math.abs(nx) < 0.03 ? 0.25 : 0)));   // a centre parting for long hair
+  if (!covered) {
+    if (st === 'bun') {
+      P.add(ell(1, 0.1, 0.092, 0.09, 0, HC + 0.2, -0.15), BI.head, hairC, MAT.body, hairShade);
+      const u = new V(1, 0, 0), v = new V(0, 0.8, 0.6), c0 = new V(0, HC + 0.2, -0.15);
+      for (let i = 0; i < 13; i++) { const a = i / 13 * Math.PI * 2, p = c0.clone().addScaledVector(u, Math.cos(a) * 0.1).addScaledVector(v, Math.sin(a) * 0.1); P.add(ell(1, 0.017, 0.017, 0.017, p.x, p.y, p.z), BI.head, '#fffaf0'); }
+    }
+    if (st === 'topknot') { P.add(ell(1, 0.065, 0.06, 0.065, 0, HC + 0.272, -0.03), BI.head, hairC, MAT.body, hairShade); P.add(torus(0.042, 0.009, 0, HC + 0.235, -0.03, Math.PI / 2, 16), BI.head, darken(hairC, 0.7)); }
+    if (st === 'cropped') { const c = new THREE.ConeGeometry(0.022, 0.07, 8); c.rotateX(-0.6); c.translate(0, HC + 0.27, -0.11); P.add(c, BI.head, hairC, MAT.body); }
+    if (st === 'braid') {
+      const pts = [[-0.2, 0.92, -0.06], [-0.205, 0.84, 0.0], [-0.2, 0.76, 0.06], [-0.192, 0.69, 0.11], [-0.185, 0.62, 0.135], [-0.18, 0.55, 0.15], [-0.176, 0.49, 0.155]];
+      pts.forEach(([x, y, z], i) => P.add(ell(1, 0.045 - i * 0.003, 0.046, 0.04 - i * 0.002, x, y, z), y > 0.8 ? BI.head : BI.chest, hairC, MAT.body, hairShade));
+      const t = new THREE.ConeGeometry(0.03, 0.05, 8); t.rotateX(Math.PI); t.translate(-0.175, 0.44, 0.156); P.add(t, BI.chest, '#c8102e');
+    }
+    if (st === 'ponytail') {
+      P.add(ell(1, 0.045, 0.045, 0.045, 0, HC + 0.1, -0.262), BI.head, hairC, MAT.body, hairShade);
+      [[0, HC + 0.04, -0.3, 0.05], [0, 0.95, -0.31, 0.047], [0, 0.86, -0.29, 0.042], [0, 0.78, -0.26, 0.035]].forEach(([x, y, z, r]) => P.add(ell(1, r, 0.055, r, x, y, z), y > 0.85 ? BI.head : BI.chest, hairC, MAT.body, hairShade));
+    }
+    if (st === 'open') P.add(ell(1, 0.25, 0.27, 0.09, 0, 0.86, -0.17), BI.chest, hairC, MAT.body, hairShade);
   }
-  if (cfg.outfit === 'kurta' || cfg.outfit === 'salwar') {
-    const sal = cfg.outfit === 'salwar', hem = sal ? 0.4 : 0.5;
-    const chestR = fem ? 0.165 : 0.188;
-    const prof = [[lb(sal ? 0.24 : 0.21), hem], [lb(0.2), 0.7], [lb(fem ? 0.185 : 0.175), 0.92], [lb(fem ? 0.15 : 0.165), 1.06], [lb(fem ? 0.16 : 0.172), 1.16], [lb(chestR), 1.27], [lb(chestR + 0.01), 1.35], [lb(fem ? 0.158 : 0.164), 1.42], [lb(fem ? 0.122 : 0.13), 1.446], [0.076, 1.463]];   // clear of the shoulder slope
-    P.add(bust(shell(dense(prof, 0.014), { sz: 0.73, seg: 48, hemWave: 0.004 }), 0.033), BI.chest, '#ffffff', MAT.skirt, null, W.torso, lapDrape(1.0, hem, (th) => lobes(th, 0.24, sal ? 0.24 : 0.15), sal ? 0.03 : 0.02, 0.1, sal ? 0.045 : 0.008));
-    // mandarin collar, embroidered placket and buttons
-    P.add(new THREE.CylinderGeometry(masc ? 0.064 : 0.058, masc ? 0.068 : 0.062, 0.038, 18, 1, true).translate(0, 1.475, 0.002), BI.chest, base);
-    const frontZ = (y) => { for (let i = 0; i < prof.length - 1; i++) { const [r0, y0] = prof[i], [r1, y1] = prof[i + 1]; if (y >= y0 && y <= y1) return (r0 + (r1 - r0) * (y - y0) / (y1 - y0)) * 0.72 + 0.004; } return 0.1; };
-    P.add(tubeOf([1.45, 1.4, 1.34, 1.29, 1.25].map(y => new V(0, y, frontZ(y))), 0.0055, 12, 4), BI.chest, gold, MAT.metal);
-    for (let i = 0; i < 4; i++) { const y = 1.425 - i * 0.045; P.add(ell(0.0045, 1, 1, 0.6, 0, y, frontZ(y) + 0.004), BI.chest, accent, MAT.metal); }
-    sleeve('L', sal ? 0.43 : 0.52, base); sleeve('R', sal ? 0.43 : 0.52, base);
-    // churidar or salwar: gathered folds at the ankles
-    const leg = sal ? new THREE.Color(base).lerp(new THREE.Color('#ffffff'), 0.4) : new THREE.Color('#f1ebdf');
-    for (const side of ['L', 'R']) {
-      const th = 'th' + side, kn = 'kn' + side;
-      // one continuous trouser leg; salwar is cut wide and gathered at the ankle
-      const tr = over(LEG, -0.81, 0.07, sal ? 0.03 : 0.008, 16).map(([r, y]) => [sal ? r + 0.025 * Math.sin(Math.min(1, (y + 0.81) / 0.5) * Math.PI / 2) : r, y]);
-      P.add(at(lathe(tr, 16), th), BI[th], leg, MAT.body, (c, x, y) => c.multiplyScalar(0.92 + 0.08 * Math.sin(y * 90)), W.leg(side));
-      for (let i = 0; i < 6; i++) P.add(at(torus(radAt(LEG, -0.8 + i * 0.022) + 0.008 + (i % 2) * 0.004, 0.006, 0, -0.8 + i * 0.022, 0), th), BI[th], darken('#' + leg.getHexString(), 0.92 + (i % 2) * 0.08), MAT.body, null, W.leg(side));
-    }
-    if (sal) { // dupatta over both shoulders, falling behind
-      const d = ribbon([new V(0.15, 0.82, -0.17), new V(0.17, 1.22, -0.11), new V(0.165, 1.43, 0.0), new V(0.08, 1.33, 0.152), new V(0, 1.25, 0.175), new V(-0.08, 1.33, 0.152), new V(-0.165, 1.43, 0.0), new V(-0.17, 1.22, -0.11), new V(-0.15, 0.82, -0.17)],
-        (u) => 0.17 + Math.abs(u - 0.5) * 0.08, { segs: 60, fold: 0.007, folds: 3 });
-      P.add(d, BI.chest, '#ffffff', MAT.ribbon);
-    }
+  // headwear: a wrapped safa turban, or a white Gandhi topi
+  if (cfg.headwear === 'turban') {
+    const tc = cloth.id === 'ivory' ? '#e8731c' : base, tc2 = darken(tc, 0.82);
+    for (let i = 0; i < 4; i++) { const g = new THREE.TorusGeometry(0.262 - i * 0.022, 0.05, 10, 36); g.rotateX(Math.PI / 2 + (i % 2 ? 0.12 : -0.1)); g.scale(1, 1, 0.92); g.translate(0, HC + 0.085 + i * 0.045, -0.005); P.add(g, BI.head, i % 2 ? tc : tc2); }
+    P.add(ell(1, 0.22, 0.11, 0.21, 0, HC + 0.21, -0.005), BI.head, tc);
+    const tail = ell(1, 0.08, 0.12, 0.03, 0, 0, 0); tail.rotateZ(-0.6); tail.translate(-0.22, HC + 0.2, -0.13); P.add(tail, BI.head, tc2);
+    P.add(ell(1, 0.022, 0.022, 0.012, 0, HC + 0.16, 0.262), BI.head, gold, MAT.metal);
+  } else if (cfg.headwear === 'topi') {
+    const g = new THREE.SphereGeometry(1, 24, 14), p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) { const y = p.getY(i); p.setXYZ(i, p.getX(i) * 0.27, Math.max(0, y) * 0.11, p.getZ(i) * 0.2 * (1 - 0.55 * Math.max(0, y))); }
+    g.computeVertexNormals(); g.rotateX(-0.12); g.translate(0, HC + 0.19, -0.01); P.add(g, BI.head, '#f6f3ea');
+  }
+  // facial hair
+  if (masc && cfg.facial === 'moustache') for (const s of [1, -1]) { const m = onHead(disc(0.032, 0.012, 0.012), s * 0.022, 0.948, 0.002); P.add(m, BI.head, hairC); }
+  if (masc && cfg.facial === 'beard') {
+    const g = new THREE.SphereGeometry(1, ...HSEG), p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) { const nx = p.getX(i), ny = p.getY(i), nz = p.getZ(i), y = HC + ny * HR[1], x = nx * HR[0];
+      // along the jaw and chin, below the mouth in the middle and up to the cheeks at the sides
+      const yb = 0.905 + 0.045 * sstep(0.05, 0.19, Math.abs(x)), m = sstep(-0.01, 0.03, yb - y) * sstep(-0.25, 0.05, nz);
+      const k = 0.975 + (1.04 + 0.03 * Math.max(0, -ny - 0.7) - 0.975) * m; p.setXYZ(i, nx * HR[0] * k, HC + ny * HR[1] * k, nz * HR[2] * k); }
+    g.computeVertexNormals(); P.add(g, BI.head, hairC, MAT.body, hairShade);
+    for (const s of [1, -1]) P.add(onHead(disc(0.03, 0.011, 0.011), s * 0.021, 0.947, 0.004), BI.head, hairC);
+  }
+
+  // ---- the body: a rounded torso, short arms with mitten hands, short legs with bare feet
+  const tp = [[0.001, 0.38], [0.11, 0.385], [0.145, 0.42], [0.152, 0.5], [0.15, 0.58], [0.155, 0.65], [0.13, 0.715], [0.07, 0.745], [0.001, 0.75]].map(([r, y]) => [lb(r), y]);
+  P.add(lathe(tp, 28).scale(1, 1, 0.82), BI.chest, skin, MAT.body, null, W.torso);
+  P.add(new THREE.CylinderGeometry(0.05, 0.056, 0.1, 14).translate(0, 0.77, 0), BI.neck, darken(skin, 0.94), MAT.body, null, W.neck);
+  const ARM = [[0.001, 0.045], [0.036, 0.036], [0.05, 0.0], [0.049, -0.06], [0.046, -0.125], [0.044, -0.19], [0.04, -0.245], [0.001, -0.258]];
+  const LEGP = [[0.001, 0.04], [0.05, 0.026], [0.062, 0.0], [0.06, -0.08], [0.054, -0.165], [0.05, -0.25], [0.046, -0.315], [0.001, -0.33]];
+  for (const [s, side] of [[1, 'L'], [-1, 'R']]) {
+    P.add(at(lathe(ARM, 16), 'sh' + side), BI['sh' + side], skin, MAT.body, null, W.arm(side));
+    P.add(at(ell(1, 0.043, 0.058, 0.05, 0, -0.045, 0.004), 'wr' + side), BI['wr' + side], skin);
+    P.add(at(ell(1, 0.017, 0.027, 0.018, 0, -0.026, 0.042), 'wr' + side), BI['wr' + side], darken(skin, 0.97));
+    P.add(at(lathe(LEGP, 16), 'th' + side), BI['th' + side], skin, MAT.body, null, W.leg(side));
+    const alta = fem && cfg.jewellery === 'festive';
+    P.add(at(ell(1, 0.05, 0.035, 0.085, 0, -0.035, 0.035), 'an' + side), BI['an' + side], darken(skin, 0.93), MAT.body, (c, x, y) => { if (alta && y < J['an' + side][1] - 0.058) c.set('#b3121b'); });
+    if (fem) P.add(at(torus(0.05, 0.005, 0, -0.012, 0, Math.PI / 2, 18), 'an' + side), BI['an' + side], silver, MAT.metal);
+    // bangles near the wrist, or a kada / sacred thread
+    if (fem) { const n = cfg.jewellery === 'festive' ? 4 : 2; for (let i = 0; i < n; i++) P.add(at(torus(0.05, 0.0058, 0, -0.103 + i * 0.011, 0, Math.PI / 2, 18), 'el' + side), BI['el' + side], i % 2 ? ['#c8102e', '#1f7a3a', '#2a4fb0'][i % 3] : gold, i % 2 ? MAT.body : MAT.metal); }
+    else if (s < 0) P.add(at(torus(0.05, 0.007, 0, -0.105, 0, Math.PI / 2, 18), 'elR'), BI.elR, silver, MAT.metal);
+    else P.add(at(torus(0.048, 0.004, 0, -0.108, 0, Math.PI / 2, 18), 'elL'), BI.elL, '#c4161c');
+  }
+  // sleeves over the arms; trousers over the legs
+  const sleeve = (len, color) => { for (const side of ['L', 'R']) { const prof = over(ARM, -len, 0.03, 0.008, 10, 0.004).concat([[0.044, 0.04], [0.02, 0.05], [0.001, 0.053]]); P.add(at(lathe(prof, 16), 'sh' + side), BI['sh' + side], color, MAT.body, null, W.arm(side)); P.add(at(torus(radAt(ARM, -len) + 0.01, 0.006, 0, -len, 0, Math.PI / 2, 18), 'sh' + side), BI['sh' + side], accent, MAT.body, null, W.arm(side)); } };
+  const trousers = (color, puff) => { for (const side of ['L', 'R']) { const prof = over(LEGP, -0.31, 0.05, 0.008, 14).map(([r, y]) => [puff ? r + puff * Math.sin(Math.min(1, (y + 0.31) / 0.2) * Math.PI / 2) : r, y]); P.add(at(lathe(prof, 16), 'th' + side), BI['th' + side], color, MAT.body, (c, x, y) => c.multiplyScalar(0.93 + 0.07 * Math.sin(y * 120)), W.leg(side));
+    for (let i = 0; i < 3; i++) P.add(at(torus(radAt(LEGP, -0.3 + i * 0.016) + 0.01 + (puff ? 0.004 : 0), 0.006, 0, -0.3 + i * 0.016, 0, Math.PI / 2, 16), 'th' + side), BI['th' + side], darken(color, 0.9 + (i % 2) * 0.1), MAT.body, null, W.leg(side)); } };
+
+  // ---- clothes
+  const tunic = (hem, sal) => {
+    const prof = [[lb(sal ? 0.225 : 0.215), hem], [lb(0.2), 0.3], [lb(0.186), 0.4], [lb(0.176), 0.5], [lb(0.176), 0.6], [lb(0.178), 0.66], [lb(0.152), 0.72], [0.076, 0.762]];
+    P.add(shell(dense(prof, 0.02), { sz: 0.86, seg: 40, hemWave: 0.003 }), BI.chest, '#ffffff', MAT.skirt, null, W.torso, lapDrape(0.45, hem, (th) => lobes(th, 0.18, sal ? 0.15 : 0.12), 0.018, 0.17, sal ? 0.025 : 0.006));
+    P.add(new THREE.CylinderGeometry(0.06, 0.064, 0.032, 18, 1, true).translate(0, 0.772, 0.002), BI.chest, accent);
+  };
+  if (cfg.outfit === 'kurta') {
+    tunic(0.2, false); sleeve(0.235, base); trousers('#f4eee2', 0);
+    const fz = (y) => radAt([[0.176, 0.6], [0.178, 0.66], [0.152, 0.72], [0.076, 0.762]].map(([r, yy]) => [lb(r), yy]), y) * 0.86 + 0.003;
+    P.add(tubeOf([0.755, 0.72, 0.68, 0.64, 0.61].map(y => new V(0, y, fz(y))), 0.005, 10, 4), BI.chest, gold, MAT.metal);
+    for (const y of [0.735, 0.7, 0.665]) P.add(ell(1, 0.007, 0.007, 0.004, 0, y, fz(y) + 0.004), BI.chest, accent, MAT.metal);
+  }
+  if (cfg.outfit === 'salwar') {
+    tunic(0.22, true); sleeve(0.17, base); trousers(mix(base, '#ffffff', 0.55), 0.028);
+    P.add(ribbon([new V(0.13, 0.42, -0.17), new V(0.15, 0.62, -0.13), new V(0.158, 0.755, 0.0), new V(0.09, 0.66, 0.168), new V(0, 0.62, 0.188), new V(-0.09, 0.66, 0.168), new V(-0.158, 0.755, 0.0), new V(-0.15, 0.62, -0.13), new V(-0.13, 0.42, -0.17)],
+      () => 0.085, { segs: 60, fold: 0.005, folds: 3, lift: 0.01 }), BI.chest, accent, MAT.body);
+  }
+  if (cfg.outfit === 'saree') {
+    P.add(shell(dense([[lb(0.158), 0.5], [lb(0.16), 0.58], [lb(0.168), 0.65], [lb(0.142), 0.715], [0.075, 0.752]], 0.02), { sz: 0.86, seg: 36 }), BI.chest, accent, MAT.body, null, W.torso);
+    sleeve(0.07, accent);
+    const skirt = shell(dense([[lb(0.25), 0.02], [lb(0.235), 0.12], [lb(0.21), 0.28], [lb(0.185), 0.42], [lb(0.165), 0.5], [lb(0.158), 0.53]], 0.025), { sz: 0.86, pleats: 30, pleatFront: 0.55, hemWave: 0.004, seg: 48 });
+    P.add(skirt, BI.hips, '#ffffff', MAT.skirt, null, null, lapDrape(0.5, 0.02, (th) => lobes(th, 0.2, 0.16)));
+    P.add(torus(lb(0.166), 0.012, 0, 0.515, 0), BI.hips, base);
+    P.add(ribbon([new V(-0.12, 0.47, 0.15), new V(-0.04, 0.58, 0.168), new V(0.07, 0.68, 0.152), new V(0.155, 0.752, 0.0), new V(0.155, 0.68, -0.13), new V(0.135, 0.5, -0.16), new V(0.12, 0.34, -0.17)],
+      (u) => (u < 0.42 ? 0.13 - u * 0.08 : u < 0.55 ? 0.095 : 0.095 + (u - 0.55) * 0.2), { segs: 48, fold: 0.006, folds: 4 }), BI.chest, '#ffffff', MAT.ribbon);
+    const ms = []; for (let i = 0; i <= 18; i++) { const a = -0.95 + i / 18 * 1.9; ms.push(new V(Math.sin(a) * 0.07, 0.72 + Math.cos(a) * 0.05 - 0.05, Math.cos(a) * 0.075 + 0.07)); }
+    ms.forEach((p, i) => P.add(ell(0.0045, 1, 1, 1, p.x, p.y, p.z), BI.chest, i % 4 ? '#141414' : gold, i % 4 ? MAT.body : MAT.metal));
+    P.add(ell(1, 0.012, 0.016, 0.006, 0, 0.665, 0.152), BI.chest, gold, MAT.metal);
   }
   if (cfg.outfit === 'dhoti') {
-    // waist wrap with a rolled fold, loose drape around each leg, front pleats with a border
-    P.add(shell(dense([[lb(0.17), 0.8], [lb(0.172), 0.9], [lb(0.162), 1.0], [lb(0.15), 1.05]], 0.03), { sz: 0.78 }), BI.hips, '#ffffff', MAT.skirt, null, null, lapDrape(1.0, 0.8, (th) => lobes(th, 0.2, 0.08), 0.018, 0.12));
-    P.add(torus(lb(0.152), 0.016, 0, 1.045, 0), BI.hips, base);
-    for (const side of ['L', 'R']) {
-      const th = 'th' + side, kn = 'kn' + side;
-      // loose drape from the waist to mid-calf, bending with the knee
-      P.add(at(shell(over(LEG, -0.68, 0.06, 0.042, 14), { sz: 1, seg: 22, hemWave: 0.005 }), th), BI[th], '#ffffff', MAT.skirt, null, W.leg(side));
-    }
-    P.add(ribbon([new V(0, 1.02, 0.135), new V(0.005, 0.8, 0.16), new V(0, 0.5, 0.17)], (u) => 0.13 - u * 0.03, { segs: 20, fold: 0.012, folds: 5 }), BI.hips, '#ffffff', MAT.ribbon, null, null, lapDrape(1.0, 0.5, () => 0.42, 0.03, 0.06));
-    // angavastram around the neck, falling in front; the sacred thread and a rudraksha mala
-    P.add(ribbon([new V(0.11, 0.92, 0.15), new V(0.13, 1.22, 0.135), new V(0.16, 1.43, 0.02), new V(0, 1.45, -0.085), new V(-0.16, 1.43, 0.02), new V(-0.13, 1.22, 0.135), new V(-0.11, 0.92, 0.15)],
-      () => 0.13, { segs: 56, fold: 0.006, folds: 3, lift: 0.012 }), BI.chest, '#ffffff', MAT.ribbon);
-    P.add(tubeOf([new V(0.12, 1.41, 0.05), new V(0.03, 1.24, lb(0.125)), new V(-0.11, 1.05, lb(0.105)), new V(-lb(0.15), 1.03, -0.02), new V(-0.06, 1.12, -lb(0.115)), new V(0.1, 1.32, -0.09)], 0.0022, 40, 4, true), BI.chest, '#f6f2e6');
-    const mala = []; for (let i = 0; i <= 30; i++) { const a = -1.0 + i / 30 * 2.0; mala.push(new V(Math.sin(a) * 0.07, 1.31 + Math.cos(a) * 0.11 - 0.03, Math.cos(a) * 0.055 + 0.05)); }
-    mala.forEach((p, i) => P.add(ell(i === 15 ? 0.009 : 0.0058, 1, 1, 1, p.x, p.y, p.z), BI.chest, i === 15 ? '#7a3a1a' : '#5a2f1a'));
+    // seated, the dhoti wraps over the folded legs rather than falling to the floor between them
+    const dhotiLap = lapDrape(0.47, 0.1, (th) => lobes(th, 0.2, 0.15), 0.016, 0.1, 0.012);
+    P.add(shell(dense([[lb(0.165), 0.38], [lb(0.168), 0.5], [lb(0.17), 0.6], [lb(0.172), 0.66], [lb(0.148), 0.72], [0.075, 0.758]], 0.02), { sz: 0.86, seg: 36 }), BI.chest, '#f6efe0', MAT.body, null, W.torso);
+    sleeve(0.07, '#f6efe0');
+    P.add(shell(dense([[lb(0.19), 0.1], [lb(0.186), 0.25], [lb(0.18), 0.38], [lb(0.17), 0.47], [lb(0.163), 0.5]], 0.025), { sz: 0.86, seg: 40, hemWave: 0.003 }), BI.hips, '#fbf7ee', MAT.body, null, null, dhotiLap);
+    P.add(shell(dense([[lb(0.19) + 0.002, 0.1], [lb(0.188) + 0.002, 0.135]], 0.01), { sz: 0.86, seg: 40, hemWave: 0.003 }), BI.hips, gold, MAT.body, null, null, dhotiLap);   // gold border
+    P.add(ribbon([new V(0, 0.49, lb(0.163) * 0.86), new V(0.003, 0.3, lb(0.18) * 0.86), new V(0, 0.12, lb(0.188) * 0.86)], () => 0.05, { segs: 14, fold: 0.004, folds: 3, lift: 0.004 }), BI.hips, '#f1e8d6', MAT.body, null, null, dhotiLap);   // front pleats, lying on the dhoti
+    P.add(ribbon([new V(-0.13, 0.42, 0.165), new V(-0.04, 0.56, 0.17), new V(0.08, 0.68, 0.15), new V(0.155, 0.755, 0.0), new V(0.15, 0.66, -0.13), new V(0.13, 0.45, -0.165)], () => 0.08, { segs: 40, fold: 0.005, folds: 3, lift: 0.01 }), BI.chest, '#ffffff', MAT.ribbon);
+    if (cfg.jewellery === 'festive') { for (let i = 0; i <= 20; i++) { const a = -1.0 + i / 20 * 2.0; P.add(ell(0.0065, 1, 1, 1, Math.sin(a) * 0.075, 0.72 + Math.cos(a) * 0.06 - 0.07, Math.cos(a) * 0.08 + 0.065), BI.chest, i === 10 ? '#7a3a1a' : '#5a2f1a'); } }
   }
-  if (masc && cfg.jewellery === 'festive' && cfg.outfit !== 'dhoti') { for (let i = 0; i <= 20; i++) { const a = -0.9 + i / 20 * 1.8; P.add(ell(0.003, 1, 1, 1, Math.sin(a) * 0.062, 1.36 + Math.cos(a) * 0.08 - 0.02, Math.cos(a) * 0.05 + 0.06), BI.chest, gold, MAT.metal); } }
+  if (cfg.jewellery === 'festive' && cfg.outfit !== 'dhoti') for (let i = 0; i <= 16; i++) { const a = -0.9 + i / 16 * 1.8; P.add(ell(0.005, 1, 1, 1, Math.sin(a) * 0.068, 0.72 + Math.cos(a) * 0.055 - 0.055, Math.cos(a) * 0.075 + 0.072), BI.chest, gold, MAT.metal); }
+
   // ---- things carried: a puja thali with a lit diya, or a walking stick
   if (cfg.carry === 'thali') {
-    const w = J.wrL; const plate = new THREE.CylinderGeometry(0.1, 0.09, 0.012, 24); plate.translate(w[0], w[1] - 0.11, w[2] + 0.02); P.add(plate, BI.wrL, gold, MAT.metal);
-    for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; P.add(ell(0.014, 1, 0.7, 1, w[0] + Math.cos(a) * 0.065, w[1] - 0.098, w[2] + 0.02 + Math.sin(a) * 0.065), BI.wrL, i % 2 ? '#f2900f' : '#d21f26'); }
-    P.add(ell(0.018, 1, 0.5, 1, w[0], w[1] - 0.098, w[2] + 0.02), BI.wrL, '#a4532c');
-    P.add(new THREE.ConeGeometry(0.008, 0.03, 8).translate(w[0], w[1] - 0.078, w[2] + 0.02), BI.wrL, '#ffffff', MAT.glow);
+    // built level in the carrying pose, then taken back to the bind pose so it stays level in the hand
+    const M = posedFrame({ ...OFFER, shR: [0, 0, -0.3], elR: [-0.12, 0, 0], wrR: [0, 0, 0] }, 'wrL'), back = M.clone().invert();
+    const c = new V(J.wrL[0], J.wrL[1] - 0.045, J.wrL[2] + 0.004).applyMatrix4(M).add(new V(0, 0.05, 0));
+    const put = (g) => g.applyMatrix4(back);
+    P.add(put(new THREE.CylinderGeometry(0.075, 0.066, 0.01, 22).translate(c.x, c.y, c.z)), BI.wrL, gold, MAT.metal);
+    for (let i = 0; i < 7; i++) { const a = i / 7 * Math.PI * 2; P.add(put(ell(0.012, 1, 0.7, 1, c.x + Math.cos(a) * 0.047, c.y + 0.01, c.z + Math.sin(a) * 0.047)), BI.wrL, i % 2 ? '#f2900f' : '#d21f26'); }
+    P.add(put(ell(0.015, 1, 0.5, 1, c.x, c.y + 0.01, c.z)), BI.wrL, '#a4532c');
+    P.add(put(new THREE.ConeGeometry(0.007, 0.024, 8).translate(c.x, c.y + 0.027, c.z)), BI.wrL, '#ffffff', MAT.glow);
   }
-  if (cfg.carry === 'cane') { const w = J.wrR; P.add(new THREE.CylinderGeometry(0.009, 0.011, 0.86, 6).translate(w[0], w[1] - 0.48, w[2] + 0.04), BI.wrR, '#5a3a22'); P.add(torus(0.03, 0.009, w[0], w[1] - 0.05, w[2] + 0.015, 0, 10), BI.wrR, '#5a3a22'); }
+  if (cfg.carry === 'cane') { const w = J.wrR; P.add(new THREE.CylinderGeometry(0.008, 0.01, 0.44, 6).translate(w[0], w[1] - 0.25, w[2] + 0.03), BI.wrR, '#5a3a22'); P.add(torus(0.022, 0.008, w[0], w[1] - 0.03, w[2] + 0.012, 0, 10), BI.wrR, '#5a3a22'); }
 
   // ---- skeleton
   const bones = {}, list = [];
@@ -531,95 +501,96 @@ export class Avatar {
     mesh.add(F.bones.root); mesh.updateMatrixWorld(true);
     mesh.bind(new THREE.Skeleton(F.list));
     mesh.castShadow = this.shadows; mesh.receiveShadow = false; mesh.frustumCulled = false;
-    const height = (c.presentation === 'fem' ? 0.97 : c.presentation === 'masc' ? 1.04 : 1.0) * (c.age === 'elder' ? 0.97 : 1) * (c.age === 'child' ? 0.62 : 1);
+    const height = (c.presentation === 'fem' ? 0.97 : 1.02) * (c.age === 'elder' ? 0.96 : 1) * (c.age === 'child' ? 0.78 : 1);
     mesh.scale.setScalar(height);
-    if (c.age === 'child') F.bones.head.scale.setScalar(1.3);
+    if (c.age === 'child') F.bones.head.scale.setScalar(1.08);
     this.mesh = mesh; this.b = F.bones; this.root.add(mesh);
     this.rest = {}; for (const [n, b] of Object.entries(F.bones)) this.rest[n] = b.position.clone();
+    for (const n of ['lidL', 'lidR', 'jaw']) F.bones[n].scale.setScalar(0.001);
   }
   setConfig(c) { this.config = normalise({ ...DEFAULTS, ...c }); this.build(); }
   setState(s) { if (this.state !== s) { this.state = s; this.stateTime = 0; } }
 
   _targets(t) {
     const s = this.state, c = this.config, elder = c.age === 'elder';
-    const T = { sx: [0, 0], sz: [-0.07, 0.07], ex: [-0.14, -0.14], ez: [0, 0], wx: [0, 0], th: [0, 0], kn: [0.04, 0.04], an: [0, 0], spine: elder ? 0.1 : 0.0, chest: 0, neck: elder ? 0.08 : 0, headX: 0, headY: 0, hipY: 0, hipZ: 0, bob: 0 };
+    // arms hang a little away from the round body
+    const T = { sx: [0, 0], sz: [-0.3, 0.3], ex: [-0.12, -0.12], ez: [0, 0], wx: [0, 0], th: [0, 0], kn: [0.04, 0.04], an: [0, 0], spine: elder ? 0.08 : 0.0, chest: 0, neck: elder ? 0.06 : 0, headX: 0, headY: 0, headZ: 0, hipY: 0, hipZ: 0, bob: 0 };
     if (s === 'walk') {
-      const p = this.walkPhase, a = Math.min(1, this.speed / 2.2), stride = (c.outfit === 'saree' ? 0.4 : 0.55) * (elder ? 0.75 : 1);
+      const p = this.walkPhase, a = Math.min(1, this.speed / 2.2), stride = (c.outfit === 'saree' ? 0.42 : 0.55) * (elder ? 0.75 : 1);
       T.th = [Math.sin(p) * stride * a, -Math.sin(p) * stride * a];
-      T.kn = [0.08 + Math.max(0, -Math.cos(p)) * 0.85 * a, 0.08 + Math.max(0, Math.cos(p)) * 0.85 * a];
+      T.kn = [0.08 + Math.max(0, -Math.cos(p)) * 0.8 * a, 0.08 + Math.max(0, Math.cos(p)) * 0.8 * a];
       T.an = [-T.kn[0] * 0.25, -T.kn[1] * 0.25];
-      T.sx = [-Math.sin(p) * 0.42 * a, Math.sin(p) * 0.42 * a];
+      T.sx = [-Math.sin(p) * 0.5 * a, Math.sin(p) * 0.5 * a];
       T.ex = [-0.2 - Math.max(0, -Math.sin(p)) * 0.3, -0.2 - Math.max(0, Math.sin(p)) * 0.3];
-      T.bob = Math.abs(Math.cos(p)) * 0.022 * a; T.spine += 0.04 * a; T.hipY = Math.sin(p) * 0.07 * a; T.hipZ = Math.cos(p) * 0.025 * a;
-      T.headY = -T.hipY * 0.6;
+      T.bob = Math.abs(Math.cos(p)) * 0.018 * a; T.spine += 0.03 * a; T.hipY = Math.sin(p) * 0.08 * a; T.hipZ = Math.cos(p) * 0.03 * a;
+      T.headY = -T.hipY * 0.6; T.headZ = Math.cos(p) * 0.04 * a;   // a little waddle
     } else if (s === 'namaste' || s === 'bow' || s === 'aarti') {
-      // anjali mudra: palms pressed together before the heart
-      T.sx = [-0.5, -0.5]; T.sz = [0.38, -0.38]; T.ex = [-1.85, -1.85]; T.ez = [0.55, -0.55]; T.wx = [0.25, 0.25];
-      if (s === 'bow') { const k = Math.sin(Math.min(1, this.stateTime / 2.4) * Math.PI); T.spine += 0.28 * k; T.chest = 0.18 * k; T.neck = 0.2 * k; T.headX = 0.15 * k; T.kn = [0.1 * k, 0.1 * k]; }
-      if (s === 'aarti') { T.spine += 0.03 + Math.sin(t * 1.6 + this.seed) * 0.025; T.headX = 0.08; T.hipZ = Math.sin(t * 0.8 + this.seed) * 0.02; }
+      T.pose = NAMASTE;
+      if (s === 'bow') { const k = Math.sin(Math.min(1, this.stateTime / 2.4) * Math.PI); T.spine += 0.26 * k; T.chest = 0.16 * k; T.neck = 0.18 * k; T.headX = 0.14 * k; T.kn = [0.1 * k, 0.1 * k]; }
+      if (s === 'aarti') { T.spine += 0.03 + Math.sin(t * 1.6 + this.seed) * 0.025; T.headX = 0.06; T.hipZ = Math.sin(t * 0.8 + this.seed) * 0.02; T.headZ = Math.sin(t * 0.8 + this.seed) * 0.05; }
     } else if (s === 'offer') {
       const k = Math.sin(Math.min(1, this.stateTime / 1.6) * Math.PI);
-      T.sx = [-1.1 * k - 0.1, -1.1 * k - 0.1]; T.sz = [0.18, -0.18]; T.ex = [-0.4, -0.4]; T.wx = [-0.5 * k, -0.5 * k]; T.spine += 0.14 * k; T.headX = 0.15 * k;
+      T.pose = blendPose({ shL: [0, 0, 0.3], shR: [0, 0, -0.3], elL: [-0.12, 0, 0], elR: [-0.12, 0, 0] }, OFFER, k); T.spine += 0.12 * k; T.headX = 0.12 * k;
     } else if (s === 'ring') {
-      const k = Math.min(1, this.stateTime / 0.35), pull = Math.sin(this.stateTime * 9) * 0.15;
-      T.sx = [-2.7 * k + pull, -0.1]; T.sz = [-0.15, 0.08]; T.ex = [-0.25, -0.12]; T.headX = -0.25 * k;
+      const k = Math.min(1, this.stateTime / 0.35), pull = Math.sin(this.stateTime * 9) * 0.12;
+      T.pose = blendPose({ shR: [0, 0, -0.3], elR: [-0.12, 0, 0] }, RING, k); T.pose.shR = T.pose.shR.map((v, i) => i === 0 ? v + pull : v); T.headX = -0.22 * k;
+    } else if (s === 'aartiPriest') {
+      const a = this.lampAngle || 0;
+      const dx = Math.sin(a) * 0.3, dz = Math.cos(a) * 0.22;   // the joined hands draw circles with the lamp
+      T.pose = { ...PRIEST, shL: [PRIEST.shL[0] + dx, PRIEST.shL[1], PRIEST.shL[2] + dz], shR: [PRIEST.shR[0] + dx, PRIEST.shR[1], PRIEST.shR[2] + dz] }; T.headX = 0.08;
     } else if (s === 'meditate') {
       // sukhasana, palms up on the thighs; the chest rises and falls with the breath
       const br = this.breath ?? (0.5 + 0.5 * Math.sin(t * 0.6 + this.seed));
-      T.pose = this.mudra === 'nadi' ? SIT_NADI : SIT; T.seat = SEAT; T.spine = -0.01 * br; T.chest = -0.035 * br; T.neck = 0.05 + 0.03 * br; T.headX = 0.06;
-    } else if (s === 'aartiPriest') {
-      const a = this.lampAngle || 0;
-      T.sx = [-1.25 + Math.sin(a) * 0.35, -0.9]; T.sz = [0.1 + Math.cos(a) * 0.3, -0.3]; T.ex = [-0.6, -1.4]; T.ez = [0, -0.5]; T.headX = 0.1;
+      T.pose = this.mudra === 'nadi' ? SIT_NADI : SIT; T.seat = SEAT; T.spine = -0.01 * br; T.chest = -0.03 * br; T.neck = 0.04 + 0.02 * br; T.headX = 0.05;
     } else {
-      // idle: breathing, a gentle weight shift, looking around now and then
-      T.sx = [Math.sin(t * 0.8 + this.seed) * 0.03, -Math.sin(t * 0.8 + this.seed) * 0.03];
+      // idle: breathing, a gentle sway, looking around now and then
+      T.sx = [Math.sin(t * 0.8 + this.seed) * 0.04, -Math.sin(t * 0.8 + this.seed) * 0.04];
       T.chest = Math.sin(t * 1.3 + this.seed) * 0.012; T.hipZ = Math.sin(t * 0.35 + this.seed) * 0.02; T.kn = [0.04 + Math.max(0, Math.sin(t * 0.35 + this.seed)) * 0.06, 0.04 + Math.max(0, -Math.sin(t * 0.35 + this.seed)) * 0.06];
-      T.headY = Math.sin(t * 0.23 + this.seed * 3) * 0.35 * Math.max(0, Math.sin(t * 0.11 + this.seed)); T.bob = Math.sin(t * 1.3 + this.seed) * 0.003;
+      T.headY = Math.sin(t * 0.23 + this.seed * 3) * 0.35 * Math.max(0, Math.sin(t * 0.11 + this.seed)); T.headZ = Math.sin(t * 0.17 + this.seed) * 0.05; T.bob = Math.sin(t * 1.3 + this.seed) * 0.002;
     }
     // things carried change the arm pose while walking or standing
-    if (c.carry === 'thali' && (s === 'walk' || s === 'idle')) { T.sx[1] = -0.75; T.sz[1] = -0.05; T.ex[1] = -1.05; T.wx[1] = 1.1; }
-    if (c.carry === 'cane' && (s === 'walk' || s === 'idle')) { T.sx[0] = -0.25 + (s === 'walk' ? -Math.sin(this.walkPhase) * 0.15 : 0); T.ex[0] = -0.3; T.sz[0] = -0.12; }
+    if (c.carry === 'thali' && (s === 'walk' || s === 'idle')) T.pose = { ...(T.pose || {}), shL: OFFER.shL, elL: OFFER.elL, wrL: OFFER.wrL };
+    if (c.carry === 'cane' && (s === 'walk' || s === 'idle')) { T.sx[0] = -0.25 + (s === 'walk' ? -Math.sin(this.walkPhase) * 0.12 : 0); T.ex[0] = -0.3; T.wx[0] = 0.5; T.sz[0] = -0.3; }
     return T;
   }
 
   update(dt, t) {
     this.stateTime += dt;
-    if (this.state === 'walk') this.walkPhase += dt * (4 + this.speed * 2.6) * (this.config.age === 'elder' ? 0.85 : 1);
+    if (this.state === 'walk') this.walkPhase += dt * (5 + this.speed * 3) * (this.config.age === 'elder' ? 0.85 : 1);
     const T = this._targets(t), b = this.b;
     // sitting down and standing up are slower than everyday movement
-    const seated = this.state === 'meditate' || b.hips.position.y < this.rest.hips.y - 0.1;
+    const seated = this.state === 'meditate' || b.hips.position.y < this.rest.hips.y - 0.05;
     const k = 1 - Math.exp(-dt * (seated ? 3.2 : 12));
     const L = (o, prop, v) => { o[prop] += (v - o[prop]) * k; };
     const R = (bone, x, y = 0, z = 0) => { const r = b[bone].rotation, p = T.pose && T.pose[bone]; if (p) { x = p[0]; y = p[1]; z = p[2]; } L(r, 'x', x); L(r, 'y', y); L(r, 'z', z); };
     const arm = [['shR', 'elR', 'wrR'], ['shL', 'elL', 'wrL']];
     arm.forEach(([sh, el, wr], i) => { R(sh, T.sx[i], 0, T.sz[i]); R(el, T.ex[i], T.ez[i] * 0.6, T.ez[i] * 0.5); R(wr, T.wx[i]); });
     [['thR', 'knR', 'anR'], ['thL', 'knL', 'anL']].forEach(([th, kn, an], i) => { R(th, T.th[i] - T.kn[i] * 0.35); R(kn, T.kn[i]); R(an, T.an[i] + T.kn[i] * 0.25 - T.th[i] * 0.3); });
-    if (T.pose) { const sh = T.chest; b.shL.rotation.z += -sh * 0.4 * k; b.shR.rotation.z += sh * 0.4 * k; }   // shoulders lift a touch on the in-breath
     L(b.spine.rotation, 'x', T.spine); L(b.chest.rotation, 'x', T.chest); L(b.chest.rotation, 'y', -T.hipY * 0.8);
-    L(b.neck.rotation, 'x', T.neck); L(b.head.rotation, 'x', T.headX); L(b.head.rotation, 'y', T.headY);
+    L(b.neck.rotation, 'x', T.neck); L(b.head.rotation, 'x', T.headX); L(b.head.rotation, 'y', T.headY); L(b.head.rotation, 'z', T.headZ);
     L(b.hips.rotation, 'y', T.hipY); L(b.hips.rotation, 'z', T.hipZ);
-    // garments drape over the lap as the hips come down
     if (this.mesh.morphTargetInfluences) { const m = this.mesh.morphTargetInfluences; m[0] += ((T.seat ? 1 : 0) - m[0]) * Math.min(1, k * 2.2); }   // the cloth settles a little ahead of the legs
-    // the face: blinking, a wandering gaze, eyes closed in prayer, a gentle smile, chanting during aarti
+    // the face: blinking, a wandering gaze, happy closed eyes in prayer, a smile, chanting during aarti
     const st = this.state, prayer = (st === 'namaste' && this.stateTime > 1.2) || st === 'bow' || st === 'aarti' || (st === 'meditate' && this.stateTime > 1.5);
     this.blinkT = (this.blinkT ?? 1 + Math.random() * 3) - dt;
-    if (this.blinkT <= 0) { this.blinkT = 2.2 + Math.random() * 4; this.blinkLeft = 0.15; }
+    if (this.blinkT <= 0) { this.blinkT = 2.2 + Math.random() * 4; this.blinkLeft = 0.14; }
     if (this.blinkLeft > 0) this.blinkLeft -= dt;
-    const lidT = this.blinkLeft > 0 ? 1.0 : prayer ? 0.86 : st === 'walk' ? 0.12 : 0.06, lk = this.blinkLeft > 0 ? 0.65 : k * 0.6;
-    for (const l of [b.lidL, b.lidR]) l.rotation.x += (lidT - l.rotation.x) * lk;
-    if (!this.gazeT || t > this.gazeT) { this.gazeT = t + 1.2 + Math.random() * 3.5; this.gaze = [(Math.random() - 0.5) * 0.2, (Math.random() - 0.5) * 0.6]; }
-    for (const e of [b.eyeL, b.eyeR]) { L(e.rotation, 'x', prayer ? 0.3 : this.gaze[0]); L(e.rotation, 'y', prayer ? 0 : this.gaze[1] + T.headY * -0.4); }
-    const smile = st === 'offer' ? 1 : st === 'meditate' ? 0.4 : prayer ? 0.65 : st === 'walk' ? 0.3 : 0.45;
+    const open = prayer ? 0.04 : this.blinkLeft > 0 ? 0.1 : 1, lk = this.blinkLeft > 0 ? 0.7 : k * 0.6;
+    for (const e of [b.eyeL, b.eyeR]) { e.scale.y += (open - e.scale.y) * lk; e.scale.x = e.scale.z = 1; }
+    for (const l of [b.lidL, b.lidR]) l.scale.setScalar(Math.max(0.001, l.scale.x + ((prayer ? 1 : 0.001) - l.scale.x) * k * 0.6));
+    if (!this.gazeT || t > this.gazeT) { this.gazeT = t + 1.2 + Math.random() * 3.5; this.gaze = [(Math.random() - 0.5) * 0.008, (Math.random() - 0.5) * 0.014]; }
+    for (const [n, sx] of [['eyeL', 1], ['eyeR', -1]]) { const r = this.rest[n]; b[n].position.x += (r.x + (prayer ? 0 : this.gaze[1]) - b[n].position.x) * k * 0.5; b[n].position.y += (r.y + (prayer ? 0 : this.gaze[0]) - b[n].position.y) * k * 0.5; void sx; }
+    const smile = st === 'offer' ? 1 : st === 'meditate' ? 0.4 : prayer ? 0.7 : st === 'walk' ? 0.5 : 0.6;
     const chant = st === 'aarti' ? Math.max(0, Math.sin(t * 6.2 + this.seed)) * (0.6 + 0.4 * Math.sin(t * 1.3 + this.seed)) : 0;
-    L(b.jaw.rotation, 'x', chant * 0.1);
-    const ms = (bone, sx) => { const r = this.rest[bone]; b[bone].position.x += (r.x + sx * smile * 0.0022 - b[bone].position.x) * k; b[bone].position.y += (r.y + smile * 0.0036 - b[bone].position.y) * k; };
+    b.jaw.scale.setScalar(Math.max(0.001, b.jaw.scale.x + (chant - b.jaw.scale.x) * k));
+    const ms = (bone, sx) => { const r = this.rest[bone]; b[bone].position.x += (r.x + sx * smile * 0.003 - b[bone].position.x) * k; b[bone].position.y += (r.y + smile * 0.006 - b[bone].position.y) * k; };
     ms('mouthL', 1); ms('mouthR', -1);
-    for (const n of ['browL', 'browR']) b[n].position.y += (this.rest[n].y + smile * 0.0012 + (st === 'ring' ? 0.003 : 0) - (prayer ? 0.0008 : 0) - b[n].position.y) * k;
+    for (const n of ['browL', 'browR']) b[n].position.y += (this.rest[n].y + smile * 0.002 + (st === 'ring' ? 0.004 : 0) - (prayer ? 0.002 : 0) - b[n].position.y) * k;
     // keep the feet on the ground as the knees bend
-    const drop = T.seat ?? (1 - Math.cos(Math.min(b.knL.rotation.x, b.knR.rotation.x))) * 0.42 * 0.6;
+    const drop = T.seat ?? (1 - Math.cos(Math.min(b.knL.rotation.x, b.knR.rotation.x))) * THIGH * 0.6;
     b.hips.position.y += (this.rest.hips.y + T.bob - drop - b.hips.position.y) * k;
   }
 
-  handWorld(side = 1) { const v = new THREE.Vector3(0, -0.09, 0); return (side === 1 ? this.b.wrR : this.b.wrL).localToWorld(v); }
-  chestWorld() { const v = new THREE.Vector3(0, 0.12, 0.14); return this.b.chest.localToWorld(v); }
+  handWorld(side = 1) { const v = new THREE.Vector3(0, -0.055, 0.01); return (side === 1 ? this.b.wrR : this.b.wrL).localToWorld(v); }
+  chestWorld() { const v = new THREE.Vector3(0, 0.04, 0.16); return this.b.chest.localToWorld(v); }
 }
