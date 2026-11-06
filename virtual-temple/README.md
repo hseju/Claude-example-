@@ -94,5 +94,5 @@ For real multiplayer, run the same class on an authoritative server (one room pe
 ## Performance notes
 
 * Quality tiers: **Low** (no shadows or post effects, 8 devotees), **Medium** (1024 shadows, tilt-shift, 14 devotees, capped pixel ratio), **High** (2048 shadows, 20 devotees; the default everywhere, phones included, since the app is made for phones). Surface textures live in `textures/` (CC0, about 3.1 MB; see `textures/CREDITS.md`).
-* All diya flames in a scene are one GPU point draw; trees, flowers, pillars, petals and garlands are instanced; only the four diyas nearest you get real point lights.
+* All diya flames in a scene are one GPU point draw; trees, flowers, pillars, petals and garlands are instanced; every diya keeps the same steady glow pool on the ground (no real lights follow you from lamp to lamp, so nothing lights up as you walk).
 * Reduced motion slows wind, stops camera drifts and swaps fades for cuts. The OS setting is respected on first load.

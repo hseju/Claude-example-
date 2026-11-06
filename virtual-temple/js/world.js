@@ -77,7 +77,7 @@ export class World {
     this.sun.shadow.bias = -0.0005; this.sun.shadow.normalBias = 0.04;
     S.add(this.sun, this.sun.target);
     this.pointPool = [];
-    for (let i = 0; i < (this.quality.level === 'low' ? 2 : 4); i++) { const l = new THREE.PointLight('#ffae5a', 0, 7, 1.6); S.add(l); this.pointPool.push(l); }
+    // (no lights follow you from lamp to lamp any more: every diya keeps the same steady glow, so nothing lights up as you walk)
 
     this.flora = new Flora(this.scene, this.quality, this.windTime);
     this._ground();
@@ -592,7 +592,7 @@ export class World {
     const plane = new THREE.PlaneGeometry(1, 1); plane.rotateX(-Math.PI / 2);
     const pools = new THREE.InstancedMesh(plane, this.glowMat, list.length);
     const pm = new THREE.Matrix4();
-    list.forEach((p, i) => { const high = p.y > 0.6, floor = high ? 0.06 : p.y + 0.01, s = high ? 2.8 : 1.7; pm.compose(new THREE.Vector3(p.x, floor, p.z), new THREE.Quaternion(), new THREE.Vector3(s, 1, s)); pools.setMatrixAt(i, pm); });
+    list.forEach((p, i) => { const high = p.y > 0.6, floor = high ? 0.06 : p.y + 0.01, s = high ? 3.2 : 2.0; pm.compose(new THREE.Vector3(p.x, floor, p.z), new THREE.Quaternion(), new THREE.Vector3(s, 1, s)); pools.setMatrixAt(i, pm); });
     pools.renderOrder = 1; this.scene.add(pools);
   }
 
@@ -700,21 +700,9 @@ export class World {
     // sun follows the focus so the shadow map stays crisp near the player
     this.sun.position.copy(focus).addScaledVector(this.sunDir, 70); this.sun.target.position.copy(focus);
     this.sky.position.copy(focus).setY(0);
-    // nearest diyas get the real point lights
+    // every diya keeps the same steady glow, brighter after dark
     if (this.diyaPositions) {
-      // a few real lights follow you around, fading between lamps so nothing ever pops on or off
-      if (!this._lightT || t - this._lightT > 0.25) { this._lightT = t; this._want = this.diyaPositions.map((p, i) => [p.distanceToSquared(focus), i]).sort((a, b) => a[0] - b[0]).slice(0, this.pointPool.length).map(e => e[1]); }
-      const want = this._want;
-      for (const L of this.pointPool) { const u = L.userData; if (u.idx != null && !want.includes(u.idx)) u.out = true; }
-      const free = want.filter(i => !this.pointPool.some(L => L.userData.idx === i && !L.userData.out));
-      for (const L of this.pointPool) {
-        const u = L.userData; u.lvl = u.lvl || 0;
-        if (u.out) { u.lvl -= dt * 2.5; if (u.lvl <= 0) { u.lvl = 0; u.idx = null; u.out = false; } }
-        else if (u.idx == null && free.length) { u.idx = free.shift(); L.position.copy(this.diyaPositions[u.idx]); }
-        else if (u.idx != null) u.lvl = Math.min(1, u.lvl + dt * 1.5);
-        L.intensity = u.idx == null ? 0 : this.lampIntensity * u.lvl * (0.85 + Math.sin(t * 9 + u.idx) * 0.08 + Math.sin(t * 15.7 + u.idx * 2) * 0.05);
-      }
-      if (this.glowMat) this.glowMat.opacity = Math.min(0.75, 0.1 + this.lampIntensity * 0.1) * (0.94 + Math.sin(t * 11) * 0.03 + Math.sin(t * 17.3) * 0.03);
+      if (this.glowMat) this.glowMat.opacity = Math.min(0.9, 0.16 + this.lampIntensity * 0.12) * (0.94 + Math.sin(t * 11) * 0.03 + Math.sin(t * 17.3) * 0.03);
     }
     for (const b of this.bells) b.update(dt, t);
     for (const u of this.updaters) u(dt, t);
