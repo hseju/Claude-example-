@@ -8,6 +8,7 @@ import { Flora, normalFromCanvas } from './flora.js';
 import { HUT, buildHut } from './hut.js';
 import { relief, petalRing } from './ornament.js';
 import { dressWorld } from './dressing.js';
+import { sunShafts } from './sunbeams.js';
 import { pbr, triplanar } from './pbr.js';
 
 export const TEMPLES = {
@@ -98,6 +99,7 @@ export class World {
     this._urlis();
     this._grassPoints();
     this.flora.build((p) => this._diya(p, 0.38));
+    sunShafts(this, TEMPLES);   // light slanting through the trees and into the mandapas, with dust in it
     this._pathDiyas();
     this._bunting();
     this.scenery = new Scenery(this.scene, this.quality, this.water, this.bedSpots || []);

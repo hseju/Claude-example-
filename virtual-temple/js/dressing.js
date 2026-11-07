@@ -183,5 +183,71 @@ export function dressWorld(world, temples, HUT) {
       m.compose(new THREE.Vector3(x, 0.56, z), q.setFromEuler(e), new THREE.Vector3(sc, sc, sc)); leaves.setMatrixAt(li, m); leaves.setColorAt(li++, c.setHSL(0.28 + r() * 0.04, 0.5, 0.28 + r() * 0.1)); }
   });
   urns.castShadow = leaves.castShadow = true; S.add(urns, leaves);
+
+  // ---------------------------------------------------------------- ground cover
+  // moss and tiny flowers creeping in from the path edges, lying flat in the joints, and little sprigs standing up beside the curbs
+  const mossTex = (() => { const N = 256, cvs = document.createElement('canvas'); cvs.width = cvs.height = N; const x = cvs.getContext('2d'); const rr = rnd(91);
+    for (let i = 0; i < 70; i++) { const a = rr() * Math.PI * 2, d = Math.sqrt(rr()) * N * 0.36, px = N / 2 + Math.cos(a) * d, py = N / 2 + Math.sin(a) * d * 0.7, r0 = 6 + rr() * 16;
+      x.fillStyle = ['#4f7a2e', '#5f8a34', '#3f6a28', '#6d9a3c'][Math.floor(rr() * 4)]; x.globalAlpha = 0.85; x.beginPath(); x.ellipse(px, py, r0, r0 * (0.6 + rr() * 0.4), rr() * 3, 0, Math.PI * 2); x.fill(); }
+    x.globalAlpha = 1;
+    for (let i = 0; i < 26; i++) { const a = rr() * Math.PI * 2, d = Math.sqrt(rr()) * N * 0.32, px = N / 2 + Math.cos(a) * d, py = N / 2 + Math.sin(a) * d * 0.7, col = ['#ffffff', '#fff2a8', '#f6a8c4', '#c8b4f0'][Math.floor(rr() * 4)];
+      for (let k = 0; k < 5; k++) { const pa = k / 5 * Math.PI * 2; x.fillStyle = col; x.beginPath(); x.ellipse(px + Math.cos(pa) * 3, py + Math.sin(pa) * 3, 2.6, 1.6, pa, 0, Math.PI * 2); x.fill(); }
+      x.fillStyle = '#f2b81e'; x.beginPath(); x.arc(px, py, 1.6, 0, Math.PI * 2); x.fill(); }
+    const t = new THREE.CanvasTexture(cvs); t.colorSpace = THREE.SRGBColorSpace; return t; })();
+  const mossMat = new THREE.MeshStandardMaterial({ map: mossTex, alphaTest: 0.35, roughness: 0.95, polygonOffset: true, polygonOffsetFactor: -3 });
+  const mossSpots = [];
+  for (const [cx, cz, w, d] of STRIPS) {
+    const alongZ = d > w, len = alongZ ? d : w, half = (alongZ ? w : d) / 2;
+    for (let i = 0; i < len * (low ? 0.6 : 1.3); i++) {
+      const along = (alongZ ? cz : cx) + (r() - 0.5) * len, off = (half - 0.12 - Math.pow(r(), 2) * 0.9) * (r() < 0.5 ? -1 : 1);
+      const [x, z] = alongZ ? [cx + off, along] : [along, cz + off];
+      if (Math.abs(z - GATE_Z) < 1.6 || Math.hypot(x, z) < 13) continue;
+      mossSpots.push([x, z, 0.35 + r() * 0.5]);
+    }
+  }
+  for (let i = 0; i < (low ? 30 : 70); i++) { const a = r() * Math.PI * 2, rr2 = 12.6 - r() * 0.6; mossSpots.push([Math.cos(a) * rr2, Math.sin(a) * rr2, 0.3 + r() * 0.4]); }
+  const moss = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), mossMat, mossSpots.length);
+  mossSpots.forEach(([x, z, sc], i) => { m.compose(new THREE.Vector3(x, 0.033, z), q.setFromAxisAngle(up, r() * 6.3), new THREE.Vector3(sc * (1 + r() * 0.6), 1, sc)); moss.setMatrixAt(i, m); moss.setColorAt(i, c.setScalar(0.85 + r() * 0.3)); });
+  moss.receiveShadow = true; S.add(moss);
+  const sprigTex = (() => { const W = 128, H = 128, cvs = document.createElement('canvas'); cvs.width = W; cvs.height = H; const x = cvs.getContext('2d'); const rr = rnd(17);
+    for (let i = 0; i < 26; i++) { const bx = 14 + rr() * 100, h = 40 + rr() * 70, lean = (rr() - 0.5) * 26; x.strokeStyle = ['#4f8a34', '#5f9a3c', '#3f7a2c'][i % 3]; x.lineWidth = 2.5 + rr() * 2; x.beginPath(); x.moveTo(bx, H); x.quadraticCurveTo(bx + lean * 0.3, H - h * 0.6, bx + lean, H - h); x.stroke(); }
+    for (let i = 0; i < 9; i++) { const px = 18 + rr() * 92, py = 20 + rr() * 50, col = ['#ffffff', '#ffd23f', '#f6a8c4', '#b89cf0'][i % 4]; for (let k = 0; k < 5; k++) { const pa = k / 5 * Math.PI * 2; x.fillStyle = col; x.beginPath(); x.ellipse(px + Math.cos(pa) * 4, py + Math.sin(pa) * 4, 3.6, 2.2, pa, 0, Math.PI * 2); x.fill(); } x.fillStyle = '#f2b81e'; x.beginPath(); x.arc(px, py, 2.2, 0, Math.PI * 2); x.fill(); }
+    const t = new THREE.CanvasTexture(cvs); t.colorSpace = THREE.SRGBColorSpace; return t; })();
+  const sprigGeo = mergeGeos([new THREE.PlaneGeometry(0.34, 0.34).translate(0, 0.17, 0), new THREE.PlaneGeometry(0.34, 0.34).translate(0, 0.17, 0).rotateY(Math.PI / 2)]);
+  { const nr = sprigGeo.attributes.normal; for (let i = 0; i < nr.count; i++) nr.setXYZ(i, 0, 1, 0); }
+  const sprigSpots = [];
+  for (const [cx, cz, w, d] of STRIPS) {
+    const alongZ = d > w, len = alongZ ? d : w, half = (alongZ ? w : d) / 2 + 0.3;
+    for (let i = 0; i < len * (low ? 0.8 : 1.8); i++) { const along = (alongZ ? cz : cx) + (r() - 0.5) * len, off = (half + r() * 0.35) * (r() < 0.5 ? -1 : 1);
+      const [x, z] = alongZ ? [cx + off, along] : [along, cz + off]; if (Math.abs(z - GATE_Z) < 1.6 || hits(x, z, 0.1)) continue; sprigSpots.push([x, z]); }
+  }
+  const sprigs = new THREE.InstancedMesh(sprigGeo, new THREE.MeshStandardMaterial({ map: sprigTex, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.9 }), sprigSpots.length);
+  sprigSpots.forEach(([x, z], i) => { const sc = 0.7 + r() * 0.8; m.compose(new THREE.Vector3(x, 0.02, z), q.setFromAxisAngle(up, r() * 6.3), new THREE.Vector3(sc, sc, sc)); sprigs.setMatrixAt(i, m); });
+  S.add(sprigs);
+
+  // ---------------------------------------------------------------- bougainvillea spilling over the boundary walls
+  // clumps drape over the coping and tumble down the inner face in ragged strands of magenta bracts and leaves
+  const bougTex = (() => { const N = 256, cvs = document.createElement('canvas'); cvs.width = cvs.height = N; const x = cvs.getContext('2d'); const rr = rnd(55);
+    const strands = []; for (let i = 0; i < 12; i++) strands.push([8 + rr() * (N - 16), N * (0.45 + rr() * 0.55)]);
+    const dab = (px, py, sz, pink) => { x.fillStyle = pink ? ['#d21f7a', '#e0438f', '#f05a9e', '#b8186a', '#ff7ab4'][Math.floor(rr() * 5)] : ['#3f6d2d', '#4e7d35', '#5c8a3a'][Math.floor(rr() * 3)];
+      x.beginPath(); x.ellipse(px, py, sz, sz * 0.7, rr() * 3, 0, Math.PI * 2); x.fill(); };
+    for (let i = 0; i < 1300; i++) { const px = rr() * N, py = Math.pow(rr(), 1.5) * N * 0.34; dab(px, py, 3 + rr() * 5, rr() < 0.68); }   // the dense mass over the coping
+    for (const [sx, len] of strands) for (let i = 0; i < 90; i++) { const t = rr(), py = N * 0.3 + t * (len - N * 0.3), px = sx + Math.sin(t * 6 + sx) * 6 + (rr() - 0.5) * (14 * (1 - t) + 5); dab(px, py, (2.5 + rr() * 4) * (1 - t * 0.4), rr() < 0.7); }
+    const t = new THREE.CanvasTexture(cvs); t.colorSpace = THREE.SRGBColorSpace; return t; })();
+  // the drape: across the coping (t < 0.25), then hanging down the inner face with a gentle bulge
+  const drape = new THREE.PlaneGeometry(1, 1, 6, 12); { const pp = drape.attributes.position, uv = drape.attributes.uv;
+    for (let i = 0; i < pp.count; i++) { const u = uv.getX(i), v = 1 - uv.getY(i), xx = (u - 0.5);
+      let y, z; if (v < 0.25) { const k = v / 0.25; z = -0.3 + k * 0.78; y = 2.0 + Math.sin(k * Math.PI) * 0.14; } else { const k = (v - 0.25) / 0.75; z = 0.48 + Math.sin(k * Math.PI) * 0.14 + k * 0.04; y = 2.0 - k * 1.55; }
+      pp.setXYZ(i, xx, y, z + Math.sin(u * 9) * 0.03); }
+    drape.computeVertexNormals(); }
+  const WALLS = [[-46, -46, 46, -46, 0, 1], [-46, -46, -46, 40, 1, 0], [46, -46, 46, 40, -1, 0], [-46, 40, -4.2, 40, 0, -1], [4.2, 40, 46, 40, 0, -1]];
+  const clumps = [];
+  for (const [x0, z0, x1, z1, nx, nz] of WALLS) {
+    const len = Math.hypot(x1 - x0, z1 - z0), dx = (x1 - x0) / len, dz = (z1 - z0) / len, ry = Math.atan2(nx, nz);
+    for (let t = 2.6 + r() * 3; t < len - 2.6; t += 3.5 + r() * 5) { const w = 1.6 + r() * 1.8; if (Math.abs(x0 + dx * t) < 6.5 && Math.abs(z0 + dz * t - 40) < 1) continue; clumps.push([x0 + dx * t, z0 + dz * t, ry, w, 0.75 + r() * 0.45]); }
+  }
+  const boug = new THREE.InstancedMesh(drape, new THREE.MeshStandardMaterial({ map: bougTex, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.75 }), clumps.length);
+  clumps.forEach(([x, z, ry, w, hang], i) => { m.compose(new THREE.Vector3(x, 0, z), q.setFromAxisAngle(up, ry), new THREE.Vector3(w, 1, 1)); m.multiply(new THREE.Matrix4().makeTranslation(0, 2.0 * (1 - hang), 0).multiply(new THREE.Matrix4().makeScale(1, hang, 1))); boug.setMatrixAt(i, m); boug.setColorAt(i, c.setScalar(0.9 + r() * 0.2)); });
+  boug.castShadow = true; S.add(boug);
   void gold;
 }

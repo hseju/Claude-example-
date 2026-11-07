@@ -3,6 +3,7 @@ import * as TX from './textures.js';
 import { brass, gold, copper, clay, darkStone, pillarGeometry, HangingBell, diyaGeometry, lampStand, kalasha, garland, stoneMat, bandMat } from './architecture.js';
 import { FlameField, SmokeSystem, PetalOffering, dustMotes } from './fx.js';
 import { Avatar } from './avatar.js';
+import { frescoTexture, ceilingTexture, stainedGlassTexture } from './murals.js';
 
 // The immersive prayer hall: one circular domed mandapa with 12 lotus-marked prayer spots in
 // three rows of four, facing the sanctum. The shell is shared; the sanctum is rebuilt per deity.
@@ -50,7 +51,10 @@ export class PrayerHall {
     const bandM = bandMat('#cba579'); bandM.side = THREE.BackSide; bandM.map.repeat.set(28, 1);
     for (const y of [0.25, 6.0]) { const b = new THREE.Mesh(new THREE.CylinderGeometry(R - 0.05, R - 0.05, 0.5, 72, 1, true), bandM); b.position.y = y; S.add(b); }
     // dome
-    const ceil = new THREE.Mesh(new THREE.SphereGeometry(R, 64, 24, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ map: TX.domeCeiling(), roughness: 0.85, side: THREE.BackSide }));
+    // the painted ceiling: a golden sun at the crown, rings of lotus petals and stars, marigold swags round the rim
+    const ceilT = ceilingTexture();
+    const ceil = new THREE.Mesh(new THREE.SphereGeometry(R, 64, 24, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ map: ceilT, emissiveMap: ceilT, emissive: '#ffffff', emissiveIntensity: 0.22, roughness: 0.8, side: THREE.BackSide }));
+    this.ceilMat = ceil.material;
     ceil.position.y = 6.2; ceil.scale.y = 0.62; S.add(ceil);
     const pendant = new THREE.Mesh(new THREE.LatheGeometry([[0, 0], [0.5, 0.05], [0.9, 0.4], [0.7, 0.55], [0.35, 0.9], [0.12, 1.1], [0, 1.15]].map(([x, y]) => new THREE.Vector2(x, -y)), 24), new THREE.MeshStandardMaterial({ color: '#e7d6b8', roughness: 0.7 }));
     pendant.position.y = 6.2 + R * 0.62 - 0.05; S.add(pendant);
@@ -60,23 +64,36 @@ export class PrayerHall {
     const pil = new THREE.InstancedMesh(pg, stoneFine, angles.length); pil.castShadow = pil.receiveShadow = true;
     const m4 = new THREE.Matrix4(); angles.forEach((a, i) => { m4.makeTranslation(Math.cos(a) * 9.7, 0, Math.sin(a) * 9.7); pil.setMatrixAt(i, m4); }); S.add(pil);
     const ringBeam = new THREE.Mesh(new THREE.TorusGeometry(9.7, 0.28, 8, 72), stoneFine); ringBeam.rotation.x = Math.PI / 2; ringBeam.position.y = 6.05; S.add(ringBeam);
+    // fresco murals in the bays between the pillars: two flank the sanctum, two the entrance, two the side walls
+    const goldB = gold.clone(); goldB.side = THREE.BackSide;
+    for (const [a, kind, seed] of [[1.25, 'peacocks', 3], [1.75, 'elephant', 7], [0.25, 'lotus', 5], [0.75, 'mandala', 11], [0.35, 'mandala', 13], [0.65, 'peacocks', 17]]) {
+      const ang = a * Math.PI, th = Math.PI / 2 - ang, Wd = 2.4, Hd = 3.2, y = 3.0, L = Wd / (R - 0.07);
+      const t = frescoTexture(kind, seed); t.repeat.x = -1; t.offset.x = 1;   // seen from inside, so flip it back the right way round
+      const panel = new THREE.Mesh(new THREE.CylinderGeometry(R - 0.07, R - 0.07, Hd, 12, 1, true, th - L / 2, L), new THREE.MeshStandardMaterial({ map: t, roughness: 0.92, side: THREE.BackSide }));
+      panel.position.y = y; panel.receiveShadow = true; S.add(panel);
+      for (const dy of [-Hd / 2, Hd / 2]) { const tr = new THREE.Mesh(new THREE.CylinderGeometry(R - 0.12, R - 0.12, 0.11, 12, 1, true, th - L / 2 - 0.008, L + 0.016), goldB); tr.position.y = y + dy; S.add(tr); }
+      for (const s of [-1, 1]) { const e = ang + s * (L / 2 + 0.004), sd = new THREE.Mesh(new THREE.BoxGeometry(0.1, Hd + 0.1, 0.08), gold); sd.position.set(Math.cos(e) * (R - 0.12), y, Math.sin(e) * (R - 0.12)); sd.lookAt(0, y, 0); S.add(sd); }
+    }
     // jali windows with sunbeams (west side) and a softer east window
-    const jaliT = TX.jali(); jaliT.repeat.set(2, 2);
-    const jaliM = new THREE.MeshStandardMaterial({ color: '#d8bc90', alphaMap: jaliT, transparent: true, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.9 });
-    const glowM = this.windowGlow = new THREE.MeshBasicMaterial({ color: '#ffd9a0', fog: false }); this.windowGlowEast = new THREE.MeshBasicMaterial({ color: '#c99e70', fog: false });
+    // stained glass in jewel colours, lit from outside, throwing coloured light onto the marble
+    const glassT = stainedGlassTexture();
+    const glowM = this.windowGlow = new THREE.MeshBasicMaterial({ color: '#ffd9a0', map: glassT, fog: false }); this.windowGlowEast = new THREE.MeshBasicMaterial({ color: '#c99e70', map: glassT, fog: false });
+    const poolM = this.poolMat = new THREE.MeshBasicMaterial({ map: stainedGlassTexture(true), transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, polygonOffset: true, polygonOffsetFactor: -2 });
     const beamM = this.beamMat = new THREE.MeshBasicMaterial({ map: TX.beam(), transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false });
     this.beams = [];
     for (const a of [Math.PI * 0.86, Math.PI * 1.0, Math.PI * 1.14, Math.PI * 0.0, Math.PI * 0.14, -Math.PI * 0.14]) {
       const x = Math.cos(a) * (R - 0.08), z = Math.sin(a) * (R - 0.08), west = x < 0;
       const win = new THREE.Group(); win.position.set(x, 3.3, z); win.lookAt(0, 3.3, 0); S.add(win);
       const glow = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 2.4), glowM); glow.position.z = -0.06; win.add(glow); if (!west) glow.material = this.windowGlowEast;
-      const j = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 2.4), jaliM); win.add(j);
       const frame = new THREE.Mesh(new THREE.BoxGeometry(2.1, 2.8, 0.2), stoneFine); frame.position.z = -0.12; frame.scale.set(1, 1, 0.5); win.add(frame);
+      for (const [w, h, px, py] of [[0.06, 2.4, 0, 0], [1.7, 0.06, 0, 0.4]]) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.05), stoneFine); m.position.set(px, py, -0.02); win.add(m); }   // stone mullions
       if (west) {
         const beam = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 9), beamM); const dir = new THREE.Vector3(1, -0.62, 0.05).normalize();
         const mid = new THREE.Vector3(x, 3.3, z).addScaledVector(dir, 4.5);
         beam.position.copy(mid); beam.lookAt(mid.clone().add(new THREE.Vector3(0, 0, 1))); beam.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), dir);
         S.add(beam); this.beams.push(beam);
+        const pool = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 3.9), poolM); pool.rotation.set(-Math.PI / 2, 0, -Math.PI / 2);
+        pool.position.set(x + 3.3 / 0.62, 0.015, z + 0.05 * 3.3 / 0.62); pool.renderOrder = 1; S.add(pool);
         const b2 = beam.clone(); b2.rotateOnAxis(new THREE.Vector3(0, 1, 0), Math.PI / 2); S.add(b2); this.beams.push(b2);
       }
     }
@@ -116,7 +133,8 @@ export class PrayerHall {
     const [sun, si, beam, glow, glowE, hemi, dust] = P;
     this.sun.color.set(sun); this.sunBase = si; this.ambientBase = hemi;
     if (!this.aarti) { this.sun.intensity = si; this.hemi.intensity = hemi; }
-    this.beamMat.opacity = beam; this.windowGlow.color.set(glow); this.windowGlowEast.color.set(glowE);
+    this.beamMat.opacity = beam; this.poolMat.opacity = beam * 2.4; this.windowGlow.color.set(glow); this.windowGlowEast.color.set(glowE);
+    this.ceilMat.emissiveIntensity = tod === 'night' ? 0.1 : 0.22;
     this.dust.material.uniforms.uOpacity.value = dust;
   }
 
