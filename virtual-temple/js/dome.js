@@ -3,7 +3,7 @@ import * as TX from './textures.js';
 import { brass, gold, copper, clay, darkStone, HangingBell, diyaGeometry, lampStand, kalasha, garland } from './architecture.js';
 import { FlameField, SmokeSystem, PetalOffering, dustMotes } from './fx.js';
 import { mergeGeos, petalRing } from './ornament.js';
-import { greetStep } from './greet.js';
+import { greetStep, facesToward } from './greet.js';
 import { Avatar } from './avatar.js';
 import { HALL, buildRockHall, lampTower, lampGlow, diyaField, granite, carvedStone, carved, roughBox } from './rockhall.js';
 import { pbr } from './pbr.js';
@@ -369,7 +369,7 @@ export class PrayerHall {
   // the devotees near you turn to you, return your namaste with a bow, and turn back to the deity
   greetFrom(me) {
     let best = null, bd = 3.4;
-    for (const [, a] of this.occupants) { if (a.walkPts || a.greet) continue; const d = a.root.position.distanceTo(me.root.position); if (d < bd) { bd = d; best = a; } }
+    for (const [, a] of this.occupants) { if (a.walkPts || a.greet || !facesToward(a, me.root.position)) continue; const d = a.root.position.distanceTo(me.root.position); if (d < bd) { bd = d; best = a; } }
     if (best) best.greet = { at: (this._t || 0) + 0.3, target: me.root.position };
     return best;
   }

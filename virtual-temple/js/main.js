@@ -461,9 +461,9 @@ function receivePrasad() {
 function worldPranam() {
   if (app.mode !== 'world') return;
   input.auto = []; const av = me.avatar; av.setState('bow'); app.pranamUntil = app.time + 2.6;
-  // to the devotee nearest you (within a few steps, or close beside you at a shrine), who turns to face you and bows back;
-  // otherwise to the shrine you stand before, or the nearest temple
-  const T = nearShrine(), who = world.nearestDevotee(av.root.position, 4.5), dWho = who ? who.avatar.root.position.distanceTo(av.root.position) : 99;
+  // to the nearest devotee who is facing you (within a few steps, or close beside you at a shrine): they bow back.
+  // Anyone turned away does not see it. With no one facing you, your pranam goes to the shrine before you, or the nearest temple
+  const T = nearShrine(), who = world.nearestDevotee(av.root.position, 4.5, true), dWho = who ? who.avatar.root.position.distanceTo(av.root.position) : 99;
   const toWho = who && (!T || dWho < 2.6);
   const at = toWho ? who.avatar.root.position : T ? T.pos : Object.values(TEMPLES).sort((a, b) => a.pos.distanceTo(av.root.position) - b.pos.distanceTo(av.root.position))[0].pos;
   const d = at.clone().sub(av.root.position); av.root.rotation.y = Math.atan2(d.x, d.z);

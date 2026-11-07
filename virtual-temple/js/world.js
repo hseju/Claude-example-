@@ -9,7 +9,7 @@ import { HUT, buildHut } from './hut.js';
 import { relief, petalRing } from './ornament.js';
 import { dressWorld } from './dressing.js';
 import { PRASAD, buildPrasad } from './prasad.js';
-import { greetStep } from './greet.js';
+import { greetStep, facesToward } from './greet.js';
 import { sunShafts } from './sunbeams.js';
 import { pbr, triplanar } from './pbr.js';
 
@@ -777,11 +777,11 @@ export class World {
     }
   }
 
-  // you bow to the devotee nearest you: they turn to face you and return your pranam
+  // you bow to the nearest devotee who is facing you: they square up to you and return your pranam
   greet(npc, me) { npc.avatar.greet = { at: (this._clock || 0) + 0.25, target: me.root.position }; }
-  nearestDevotee(pos, within = 4.5) {
+  nearestDevotee(pos, within = 4.5, facingMe = false) {
     let best = null, bd = within;
-    for (const n of this.npcs) { if (n.follow || n.avatar.greet || n.avatar.state === 'offer') continue; const d = n.avatar.root.position.distanceTo(pos); if (d < bd) { bd = d; best = n; } }
+    for (const n of this.npcs) { if (n.follow || n.avatar.greet || n.avatar.state === 'offer') continue; if (facingMe && !facesToward(n.avatar, pos)) continue; const d = n.avatar.root.position.distanceTo(pos); if (d < bd) { bd = d; best = n; } }
     return best;
   }
 
