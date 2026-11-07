@@ -228,11 +228,11 @@ export function dressWorld(world, temples, HUT) {
   // ---------------------------------------------------------------- bougainvillea spilling over the boundary walls
   // clumps drape over the coping and tumble down the inner face in ragged strands of magenta bracts and leaves
   const bougTex = (() => { const N = 256, cvs = document.createElement('canvas'); cvs.width = cvs.height = N; const x = cvs.getContext('2d'); const rr = rnd(55);
-    const strands = []; for (let i = 0; i < 12; i++) strands.push([8 + rr() * (N - 16), N * (0.45 + rr() * 0.55)]);
+    const strands = []; for (let i = 0; i < 18; i++) strands.push([8 + rr() * (N - 16), N * (0.45 + rr() * 0.55)]);
     const dab = (px, py, sz, pink) => { x.fillStyle = pink ? ['#d21f7a', '#e0438f', '#f05a9e', '#b8186a', '#ff7ab4'][Math.floor(rr() * 5)] : ['#3f6d2d', '#4e7d35', '#5c8a3a'][Math.floor(rr() * 3)];
       x.beginPath(); x.ellipse(px, py, sz, sz * 0.7, rr() * 3, 0, Math.PI * 2); x.fill(); };
     for (let i = 0; i < 1300; i++) { const px = rr() * N, py = Math.pow(rr(), 1.5) * N * 0.34; dab(px, py, 3 + rr() * 5, rr() < 0.68); }   // the dense mass over the coping
-    for (const [sx, len] of strands) for (let i = 0; i < 90; i++) { const t = rr(), py = N * 0.3 + t * (len - N * 0.3), px = sx + Math.sin(t * 6 + sx) * 6 + (rr() - 0.5) * (14 * (1 - t) + 5); dab(px, py, (2.5 + rr() * 4) * (1 - t * 0.4), rr() < 0.7); }
+    for (const [sx, len] of strands) for (let i = 0; i < 120; i++) { const t = rr(), py = N * 0.3 + t * (len - N * 0.3), px = sx + Math.sin(t * 6 + sx) * 6 + (rr() - 0.5) * (20 * (1 - t) + 6); dab(px, py, (3 + rr() * 4.5) * (1 - t * 0.4), rr() < 0.7); }
     const t = new THREE.CanvasTexture(cvs); t.colorSpace = THREE.SRGBColorSpace; return t; })();
   // the drape: across the coping (t < 0.25), then hanging down the inner face with a gentle bulge
   const drape = new THREE.PlaneGeometry(1, 1, 6, 12); { const pp = drape.attributes.position, uv = drape.attributes.uv;
@@ -244,7 +244,7 @@ export function dressWorld(world, temples, HUT) {
   const clumps = [];
   for (const [x0, z0, x1, z1, nx, nz] of WALLS) {
     const len = Math.hypot(x1 - x0, z1 - z0), dx = (x1 - x0) / len, dz = (z1 - z0) / len, ry = Math.atan2(nx, nz);
-    for (let t = 2.6 + r() * 3; t < len - 2.6; t += 3.5 + r() * 5) { const w = 1.6 + r() * 1.8; if (Math.abs(x0 + dx * t) < 6.5 && Math.abs(z0 + dz * t - 40) < 1) continue; clumps.push([x0 + dx * t, z0 + dz * t, ry, w, 0.75 + r() * 0.45]); }
+    for (let t = 1.6 + r() * 2; t < len - 1.6; t += 2.2 + r() * 3.2) { const w = 2.0 + r() * 2.2; if (Math.abs(x0 + dx * t) < 6.5 && Math.abs(z0 + dz * t - 40) < 1) continue; clumps.push([x0 + dx * t, z0 + dz * t, ry, w, 0.75 + r() * 0.45]); }
   }
   const boug = new THREE.InstancedMesh(drape, new THREE.MeshStandardMaterial({ map: bougTex, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.75 }), clumps.length);
   clumps.forEach(([x, z, ry, w, hang], i) => { m.compose(new THREE.Vector3(x, 0, z), q.setFromAxisAngle(up, ry), new THREE.Vector3(w, 1, 1)); m.multiply(new THREE.Matrix4().makeTranslation(0, 2.0 * (1 - hang), 0).multiply(new THREE.Matrix4().makeScale(1, hang, 1))); boug.setMatrixAt(i, m); boug.setColorAt(i, c.setScalar(0.9 + r() * 0.2)); });
