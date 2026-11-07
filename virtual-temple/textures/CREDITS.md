@@ -13,5 +13,7 @@ All surface textures are from [Poly Haven](https://polyhaven.com) and released u
 | `mossstone_` | [Mossy Sandstone](https://polyhaven.com/a/mossy_sandstone) | pond rocks |
 | `slabs_` | [Marble 01](https://polyhaven.com/a/marble_01) | courtyard, plaza and paths (large cream slabs) |
 | `ashlar_` | [Sandstone Blocks 08](https://polyhaven.com/a/sandstone_blocks_08) | temple walls, plinths and boundary walls |
+| `cave_` | [Rock Face 03](https://polyhaven.com/a/rock_face_03) | the rock-cut prayer halls: walls, ceiling, pillars |
+| `granite_` | [Rock Wall 08](https://polyhaven.com/a/rock_wall_08) | the prayer halls' shrine, steps and platform |
 
 Each set has `_diff` (colour), `_nor` (OpenGL normal) and `_arm` (ambient occlusion, roughness, metalness).

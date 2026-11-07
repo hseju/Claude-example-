@@ -54,7 +54,7 @@ export function boxUV(geo, tile = 1) {
 // For the many temple pieces built in code (walls, plinths, pillars, steps, paving), the photographed surface is
 // projected along the three world axes and blended by the surface normal, so it keeps a true scale on any shape
 // without per-piece texture coordinates. A tint is given as the colour the stone should read as on average.
-const MEAN = { slabs: [0.444, 0.337, 0.194], ashlar: [0.377, 0.288, 0.176], sandstone: [0.562, 0.376, 0.216], flagstone: [0.22, 0.149, 0.097] };
+const MEAN = { slabs: [0.444, 0.337, 0.194], ashlar: [0.377, 0.288, 0.176], sandstone: [0.562, 0.376, 0.216], flagstone: [0.22, 0.149, 0.097], cave: [0.227, 0.141, 0.081], granite: [0.083, 0.07, 0.056] };
 const TP_VERT_DECL = 'varying vec3 vTpPos;\nvarying vec3 vTpNormal;\n';
 const TP_VERT = `
   vec4 tpW = vec4(transformed, 1.0);
