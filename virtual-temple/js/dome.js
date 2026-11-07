@@ -65,12 +65,12 @@ export class PrayerHall {
     const m4 = new THREE.Matrix4(); angles.forEach((a, i) => { m4.makeTranslation(Math.cos(a) * 9.7, 0, Math.sin(a) * 9.7); pil.setMatrixAt(i, m4); }); S.add(pil);
     const ringBeam = new THREE.Mesh(new THREE.TorusGeometry(9.7, 0.28, 8, 72), stoneFine); ringBeam.rotation.x = Math.PI / 2; ringBeam.position.y = 6.05; S.add(ringBeam);
     // fresco murals in the bays between the pillars: two flank the sanctum, two the entrance, two the side walls
-    const goldB = gold.clone(); goldB.side = THREE.BackSide;
+    const goldB = gold.clone(); goldB.side = THREE.BackSide; this.muralMats = [];
     for (const [a, kind, seed] of [[1.25, 'peacocks', 3], [1.75, 'elephant', 7], [0.25, 'lotus', 5], [0.75, 'mandala', 11], [0.35, 'mandala', 13], [0.65, 'peacocks', 17]]) {
       const ang = a * Math.PI, th = Math.PI / 2 - ang, Wd = 2.4, Hd = 3.2, y = 3.0, L = Wd / (R - 0.07);
       const t = frescoTexture(kind, seed); t.repeat.x = -1; t.offset.x = 1;   // seen from inside, so flip it back the right way round
-      const panel = new THREE.Mesh(new THREE.CylinderGeometry(R - 0.07, R - 0.07, Hd, 12, 1, true, th - L / 2, L), new THREE.MeshStandardMaterial({ map: t, roughness: 0.92, side: THREE.BackSide }));
-      panel.position.y = y; panel.receiveShadow = true; S.add(panel);
+      const panel = new THREE.Mesh(new THREE.CylinderGeometry(R - 0.07, R - 0.07, Hd, 12, 1, true, th - L / 2, L), new THREE.MeshStandardMaterial({ map: t, emissiveMap: t, emissive: '#ffffff', emissiveIntensity: 0.16, roughness: 0.92, side: THREE.BackSide }));
+      panel.position.y = y; panel.receiveShadow = true; S.add(panel); this.muralMats.push(panel.material);
       for (const dy of [-Hd / 2, Hd / 2]) { const tr = new THREE.Mesh(new THREE.CylinderGeometry(R - 0.12, R - 0.12, 0.11, 12, 1, true, th - L / 2 - 0.008, L + 0.016), goldB); tr.position.y = y + dy; S.add(tr); }
       for (const s of [-1, 1]) { const e = ang + s * (L / 2 + 0.004), sd = new THREE.Mesh(new THREE.BoxGeometry(0.1, Hd + 0.1, 0.08), gold); sd.position.set(Math.cos(e) * (R - 0.12), y, Math.sin(e) * (R - 0.12)); sd.lookAt(0, y, 0); S.add(sd); }
     }
@@ -134,7 +134,7 @@ export class PrayerHall {
     this.sun.color.set(sun); this.sunBase = si; this.ambientBase = hemi;
     if (!this.aarti) { this.sun.intensity = si; this.hemi.intensity = hemi; }
     this.beamMat.opacity = beam; this.poolMat.opacity = beam * 2.4; this.windowGlow.color.set(glow); this.windowGlowEast.color.set(glowE);
-    this.ceilMat.emissiveIntensity = tod === 'night' ? 0.1 : 0.22;
+    this.ceilMat.emissiveIntensity = tod === 'night' ? 0.1 : 0.22; for (const m of this.muralMats) m.emissiveIntensity = tod === 'night' ? 0.08 : 0.16;
     this.dust.material.uniforms.uOpacity.value = dust;
   }
 
