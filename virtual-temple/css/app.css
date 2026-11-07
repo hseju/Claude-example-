@@ -202,7 +202,7 @@ body.touch #prompt .btn { justify-content: center; }
 #actions button:hover { background: rgba(255,255,255,.06); }
 #actions button svg { width: 26px; height: 26px; stroke: var(--gold); fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 #actions button.done svg { stroke: var(--saffron); }
-#actions.busy button { opacity: .38; pointer-events: none; }   /* while you are away from your place: ringing the bell, offering flowers, walking round the deity */
+#actions.busy { opacity: 0; transform: translate(-24px, -50%); pointer-events: none; }   /* out of the way while you ring the bell, offer flowers, walk round the deity, or the camera comes in close */
 #actions .sep { height: 1px; width: 70%; align-self: center; background: var(--line); margin: 3px 0; flex: none; }
 #actions::-webkit-scrollbar { display: none; }
 #exitBtn { position: fixed; top: max(12px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right)); z-index: 12; }

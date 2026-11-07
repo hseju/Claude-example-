@@ -317,7 +317,7 @@ function act(name) {
 }
 
 // a few seconds close on what you are doing, then back to your view of the sanctum
-function showShot(mode, dur) { app.shot = { mode, until: app.time + dur, ret: app.camMode === 'darshan' ? 'darshan' : 'prayer' }; app.camMode = mode; }
+function showShot(mode, dur) { app.shot = { mode, until: app.time + dur, ret: app.camMode === 'darshan' ? 'darshan' : 'prayer' }; app.camMode = mode; $('actions').classList.add('busy'); }
 // leave your place for a moment: walk to the nearer bell and ring it, to the foot of the steps to shower flowers into the
 // thali, or up into the sanctum and once round the deity (pradakshina); then back to your place
 function startErrand(kind) {
@@ -1100,7 +1100,7 @@ function updateHall(dt, t, ctx) {
   if (app.hallState === 'seated') av.root.rotation.y = lerpAngle(av.root.rotation.y, Math.PI, 1 - Math.exp(-dt * 6));
   p.y += (hallFloor(p.x, p.z) - p.y) * (1 - Math.exp(-dt * 14));   // up and down the sanctum steps
   if (app.errand && av.state === 'ring' && !input.auto.length && av.stateTime > 1.7) av.setState('idle');
-  if (app.shot && app.time > app.shot.until) { if (app.camMode === app.shot.mode && app.hallState === 'seated' && !app.aarti) app.camMode = app.shot.ret; app.shot = null; }
+  if (app.shot && app.time > app.shot.until) { if (app.camMode === app.shot.mode && app.hallState === 'seated' && !app.aarti) app.camMode = app.shot.ret; app.shot = null; if (!app.errand) $('actions').classList.remove('busy'); }
   av.update(dt, t); footsteps(av);
   hall.update(dt, t, ctx);
   if (app.aarti) { app.aarti.t += dt; }
