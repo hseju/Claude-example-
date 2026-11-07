@@ -82,14 +82,14 @@ button {
 
 .top-left {
   position: absolute;
-  top: var(--gutter);
-  left: var(--gutter);
+  top: calc(var(--gutter) + env(safe-area-inset-top, 0px));
+  left: calc(var(--gutter) + env(safe-area-inset-left, 0px));
 }
 
 .top-right {
   position: absolute;
-  top: var(--gutter);
-  right: var(--gutter);
+  top: calc(var(--gutter) + env(safe-area-inset-top, 0px));
+  right: calc(var(--gutter) + env(safe-area-inset-right, 0px));
 }
 
 .clock {
@@ -548,7 +548,7 @@ input[type='text'],
 .bottom {
   position: absolute;
   left: 50%;
-  bottom: var(--gutter);
+  bottom: calc(var(--gutter) + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;
@@ -1053,4 +1053,13 @@ kbd {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Keep the creator's main actions in reach on short screens. */
+.creator .options > .row.end {
+  position: sticky;
+  bottom: -18px;
+  margin: 8px -20px -18px;
+  padding: 12px 20px 16px;
+  background: linear-gradient(rgba(30, 28, 44, 0), rgba(30, 28, 44, 0.97) 35%);
 }

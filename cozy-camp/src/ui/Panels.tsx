@@ -1,5 +1,5 @@
 import { Cloud, CloudFog, CloudLightning, CloudRain, Plus, RotateCcw, RotateCw, Snowflake, Sun, Trash2, X } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { DEFAULT_ENVIRONMENT, PLANNED_ENVIRONMENTS } from '../sim/environments';
 import { formatTime, SEASON_LABELS, WEATHER_LABELS } from '../sim/environment';
 import { BUILD_CATALOG } from '../sim/objects';
@@ -151,6 +151,7 @@ export function EnvironmentPanel() {
 
 export function SettingsPanel() {
   const ui = useUI();
+  const [confirmReset, setConfirmReset] = useState(false);
   const p = ui.prefs;
   const set = (patch: Partial<typeof p>) => {
     ui.setPrefs(patch);
@@ -205,14 +206,23 @@ export function SettingsPanel() {
       <div className="field">
         <span className="label">Campsite</span>
         <p className="hint">The campsite saves automatically in this browser.</p>
-        <button
-          className="chip danger"
-          onClick={() => {
-            if (window.confirm('Reset the campsite? Furniture, fire, tents and time go back to the start.')) resetWorld();
-          }}
-        >
-          Reset campsite
-        </button>
+        {confirmReset ? (
+          <>
+            <p className="hint">Furniture, the fire, tents and the clock go back to how they started.</p>
+            <div className="row">
+              <button className="chip danger" onClick={resetWorld}>
+                Yes, reset the campsite
+              </button>
+              <button className="chip" onClick={() => setConfirmReset(false)}>
+                Keep it
+              </button>
+            </div>
+          </>
+        ) : (
+          <button className="chip danger" onClick={() => setConfirmReset(true)}>
+            Reset campsite…
+          </button>
+        )}
       </div>
     </Panel>
   );
