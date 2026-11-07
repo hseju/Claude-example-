@@ -79,7 +79,7 @@ js/postfx.js        light tilt-shift, a painterly brush pass (generalized Kuwaha
 js/dressing.js      set dressing: carved curbs, fallen petals and glowing lotus inlays on the paths; brass lattice lanterns with pools of light; flowering bushes along the paths; brass urns of palms at the temple steps; moss, grass and wildflowers at the paving edges; bougainvillea over the walls
 js/ornament.js      carved relief friezes (lotus, bead-and-reel, scrolling vine, jewelled diamonds, chaitya arches) drawn as height maps into colour and normal maps; lotus-petal and bead rings; purna kalasha
 js/pbr.js           photographed surfaces (colour, normal, AO/roughness): tiled materials, and world-projected (triplanar) stone
-js/audio.js         Web Audio graph, zones and time-of-day mixes, music stations (streamed, shuffled, crossfaded), recorded ambience and aarti, synthesised bells and effects
+js/audio.js         Web Audio graph, zones and time-of-day mixes, music stations (streamed, shuffled, crossfaded), recorded ambience, aarti and temple bell (one brass ghanta strike played at each bell's pitch), synthesised effects
 js/presence.js      hall capacity rules and the local simulation
 js/profile.js       auth providers, profiles and settings storage
 ```

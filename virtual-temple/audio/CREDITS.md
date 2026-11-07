@@ -55,5 +55,6 @@ Solo flute alapanas (free, unmetered raga exposition, no percussion) from one li
 | File | Source | Recordist | Licence |
 | --- | --- | --- | --- |
 | `aarti.mp3` | [Kolhapur, Mahalakshmi Temple, Ceremony](https://archive.org/details/aporee_12129_14219) (2:37–3:47), plays only during an aarti | François-Emmanuel Fodéré | [CC BY-SA 3.0](http://creativecommons.org/licenses/by-sa/3.0/) |
+| `bell-ghanta.mp3` | One strike of a brass ghanta, the bell of Hindu worship, from [ghanta leather mallet 2015-05-16](https://commons.wikimedia.org/wiki/File:274316_the-very-real-horst_ghanta-leather-mallet-2015-05-16.wav) (24.9–31.9 s), used for every bell in the temple: the hall bells, the gateway bells and the aarti hand bell, each played at its own pitch | the-very-real-horst (via Freesound, sound 274316) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 
-Bells you ring, the conch, footsteps, the diya, flowers and abhishek are synthesised in the browser.
+Every bell plays the recorded ghanta above (synthesised only if the file cannot load). The conch, footsteps, the diya, flowers and abhishek are synthesised in the browser.

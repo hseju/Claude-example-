@@ -195,7 +195,7 @@ export class PrayerHall {
       const b = new HangingBell(1.6, 0.9), x = s * 2.9, z = -3.0, top = this.rock.ceilAt(x, z) - 3.1; b.group.position.set(x, 3.1, z); b.axis = 'z';
       const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, top, 6), brass); chain.position.y = top / 2; b.group.add(chain);
       this.scene.add(b.group);
-      b.onStrike = (bb, e = 1) => this.audio.bell(bb.group.getWorldPosition(new THREE.Vector3()), { size: 1.25, gain: 0.66 * (0.3 + 0.7 * e * e), hall: 0.6 });
+      b.onStrike = (bb, e = 1) => this.audio.bell(bb.group.getWorldPosition(new THREE.Vector3()), { size: 1.45, gain: 0.7 * (0.3 + 0.7 * e * e), hall: 0.6 });
       return b;
     });
     this.bell = this.bells[0];
