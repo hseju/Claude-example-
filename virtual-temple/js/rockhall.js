@@ -10,7 +10,7 @@ import { brass, clay, diyaGeometry } from './architecture.js';
 // two tall brass lamp towers, warm halos on the stone and long reflections in the wet floor.
 
 export const HALL = { X: 11, BACK: -6.8, FRONT: 10.9, CEIL: 8.4, AISLE: 5.6, PIL_X: 7.0, PIL_Z: [-4.6, -0.4, 3.8, 8.0], DOOR_W: 1.85, DOOR_TOP: 4.6, OCULUS: new THREE.Vector3(0, 8.4, -3.4) };
-export const ROCK = '#5a4c41', CARVE = '#6d5c4c', DEEP = '#3a3029';
+export const ROCK = '#6f5f50', CARVE = '#86715f', DEEP = '#463a31';
 
 export const granite = (tint = ROCK, tile = 2.4) => triplanar('ashlar', { tint, tile, roughness: 0.9, normal: 1.2, cacheKey: 'rockhall' });
 export const carvedStone = (tint = CARVE) => triplanar('sandstone', { tint, tile: 1.3, roughness: 0.85, normal: 1.3, cacheKey: 'rockhall' });
@@ -160,7 +160,7 @@ export function buildRockHall(S, quality) {
   { const p = throat.geometry.attributes.position; for (let j = 0; j < p.count; j++) { const x = p.getX(j), z = p.getZ(j), a = Math.atan2(z, x), k = 1 + 0.08 * Math.sin(a * 5 + p.getY(j) * 3) + 0.05 * Math.sin(a * 11); p.setXYZ(j, x * k, p.getY(j), z * k); } throat.geometry.computeVertexNormals(); }
   throat.material = deep.clone(); throat.material.side = THREE.BackSide; g.add(throat);
   const skyM = new THREE.MeshBasicMaterial({ color: '#fff1d6', fog: false }), sky = new THREE.Mesh(new THREE.CircleGeometry(1.4, 24), skyM); sky.rotation.x = Math.PI / 2; sky.position.set(H.OCULUS.x, H.CEIL + 2.2, H.OCULUS.z); g.add(sky);
-  const fern = new THREE.MeshStandardMaterial({ map: fernTexture(), alphaTest: 0.4, side: THREE.DoubleSide, roughness: 0.9 });
+  const fern = new THREE.MeshBasicMaterial({ map: fernTexture(), color: '#b8c890', alphaTest: 0.4, side: THREE.DoubleSide, fog: false });   // lit by the daylight above
   for (let j = 0; j < 9; j++) { const a = j / 9 * Math.PI * 2 + 0.3, f = new THREE.Mesh(new THREE.PlaneGeometry(0.28, 0.9 + (j % 3) * 0.25), fern);
     f.geometry.translate(0, -0.45 - (j % 3) * 0.12, 0); f.position.set(H.OCULUS.x + Math.cos(a) * 0.92, H.CEIL + 0.02, H.OCULUS.z + Math.sin(a) * 0.92); f.rotation.set(0, -a + Math.PI / 2, 0); f.rotateX(0.35 + (j % 2) * 0.2); g.add(f); }
   // carved wall niches between the pillars, each holding a lamp, and two larger ones flanking the sanctum
