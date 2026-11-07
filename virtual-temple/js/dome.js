@@ -422,7 +422,7 @@ export class PrayerHall {
   }
 
   cameraFor(mode, t, player) {
-    if (mode === 'select') return { pos: new THREE.Vector3(0, 7.6, 8.4), target: new THREE.Vector3(0, 0.2, -1.4), fov: 58 };
+    if (mode === 'select') return { pos: new THREE.Vector3(0, 4.6, 9.7), target: new THREE.Vector3(0, 0.6, -1.8), fov: 60 };
     const V = THREE.Vector3;
     // close on your own lamp stand: your hands, the wick catching, the incense
     if (mode === 'diya') { const sd = player.x <= 0 ? 1 : -1; return { pos: new V(player.x + sd * 0.85, 1.0, player.z - 2.3), target: new V(player.x, 0.55, player.z - 0.75), fov: 40 }; }
@@ -440,7 +440,7 @@ export class PrayerHall {
       const a = Math.atan2(player.z - HALL.AIM.z, player.x) + Math.PI - 0.6;
       return { pos: new V(Math.cos(a) * 1.6, 3.9, HALL.AIM.z + Math.sin(a) * 1.6), target: player.clone().add(new V(0, 0.75, 0)), fov: 64 };
     }
-    if (mode === 'walk') return { pos: player.clone().add(new THREE.Vector3(0, 3.2, 4.8)), target: player.clone().add(new THREE.Vector3(0, 0.8, -3)), fov: 50 };
+    if (mode === 'walk') { const pos = player.clone().add(new THREE.Vector3(0, 3.2, 4.8)); pos.z = Math.min(pos.z, HALL.FRONT - 0.7); pos.y = Math.min(pos.y, 4.5); return { pos, target: player.clone().add(new THREE.Vector3(0, 0.8, -3)), fov: 50 }; }
     if (mode === 'aarti') { const a = Math.sin(t * 0.06) * 0.5; return { pos: new THREE.Vector3(Math.sin(a) * 9, 4.4 + Math.sin(t * 0.09) * 0.4, 9.0 + Math.cos(a) * 0.6), target: new THREE.Vector3(0, 1.4, -4.2), fov: 50 }; }
     if (mode === 'darshan') return { pos: new THREE.Vector3(0, 1.75, -4.4), target: ALTAR_FOCUS.clone(), fov: 38 };
     // prayer: over the devotee's shoulder, framing the sanctum, with your devotee in the lower corner

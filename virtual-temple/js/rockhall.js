@@ -13,9 +13,11 @@ import { brass, clay, diyaGeometry } from './architecture.js';
 // stone and long reflections in the wet floor.
 
 const NAVE = 6.2, AISLE = 5.3, TOPY = 8.6;
-export const ceilY = (x) => Math.abs(x) >= NAVE ? AISLE : AISLE + (TOPY - AISLE) * Math.pow(Math.cos(Math.abs(x) / NAVE * Math.PI / 2), 0.8);
+// the stepped dome over the middle of the hall: six courses, each stepping in and up, from a ring 5.4 m across the
+// flat rock ceiling up to the opening at the top
+const DOME = { R: 5.4, N: 6, RISE: (TOPY - AISLE) / 6, IN: (5.4 - 0.9) / 5 };
 export const HALL = { X: 11, BACK: -6.8, FRONT: 10.9, PIL_X: NAVE, PIL_Z: [-3.8, 0.4, 4.6, 8.6], NICHE_W: 1.5, NICHE_TOP: 3.5, BENCH: 0.45, CELL_W: 2.75, CELL_BACK: -12.0, RING_IN: 1.5, RING_OUT: 2.45, RING_R: 2.0,
-  OCULUS: new THREE.Vector3(0, TOPY, -0.4), AIM: new THREE.Vector3(0, 1.4, -8.9), ceilY };
+  OCULUS: new THREE.Vector3(0, TOPY, -0.4), AIM: new THREE.Vector3(0, 1.4, -8.9) };
 export const ROCK = '#615a54', SHRINE = '#5f5852', DEEP = '#3f3832', CARVE = '#a69c92';   // CARVE is given to relief(), which treats it as linear
 
 export const cave = (tint = ROCK) => triplanar('cave', { tint, tile: 3.2, roughness: 0.95, normal: 1.5, side: THREE.DoubleSide, cacheKey: 'cave' });
@@ -307,22 +309,28 @@ export function buildRockHall(S, quality) {
     const rects = [[-2.0, 2.0, -1, 4.8]], us = axis(-X - 0.6, X + 0.6, step, [-1.2, 1.2]), vs = axis(0, TOPY + 0.8, step, [3.6]);
     mesh(roughGrid(us, vs, (x, y) => [x, y, F - flatness(rects, x, y) * (0.04 + 0.42 * fbm(x, y, 13.3)) * floorK(y)], (x, y) => Math.abs(x) < 1.2 && y < 3.6), rock);
   }
-  // the ceiling: low and rough over the aisles, rising in a hewn vault over the middle, with the opening in the rock
-  const dC = (x, z) => (0.05 + 0.6 * fbm(x, 21.7, z)) * smooth(1.3, 2.6, Math.hypot(x - O.x, z - O.z)) * (1 - 0.75 * Math.exp(-x * x / 3) * smooth(4.5, 7, z));
-  const ceilAt = (x, z) => ceilY(x) - dC(x, z);
+  // the ceiling: flat and rough, and over the middle a stepped dome of carved courses narrowing up to the opening in the rock
+  const rDome = (x, z) => Math.hypot(x - O.x, z - O.z);
+  const dC = (x, z) => (0.05 + 0.6 * fbm(x, 21.7, z)) * (0.05 + 0.95 * smooth(DOME.R + 0.2, DOME.R + 1.6, rDome(x, z))) * (1 - 0.75 * Math.exp(-x * x / 3) * smooth(4.5, 7, z));
+  const ceilAt = (x, z) => { const r = rDome(x, z); if (r < DOME.R) return r <= 0.9 ? TOPY : AISLE + DOME.RISE * Math.min(DOME.N - 1, Math.floor((DOME.R - r) / DOME.IN) + 1); return AISLE - dC(x, z); };
   {
-    const us = axis(-X - 0.7, X + 0.7, step * 1.1, [O.x - 1.6, O.x + 1.6]), vs = axis(B - 0.5, F + 0.5, step * 1.1, [O.z - 1.6, O.z + 1.6]);
-    mesh(roughGrid(us, vs, (x, z) => [x, ceilAt(x, z), z], (x, z) => Math.abs(x - O.x) < 1.6 && Math.abs(z - O.z) < 1.6), rock);
-    // the ring of rock round the opening, filling the square left in the ceiling
-    const na = 44, nt = 6, pos = [], idx = [];
-    for (let j = 0; j <= nt; j++) for (let i = 0; i < na; i++) { const a = i / na * Math.PI * 2, c = Math.cos(a), sn = Math.sin(a), edge = 1.6 / Math.max(Math.abs(c), Math.abs(sn)), r = 0.9 + (edge - 0.9) * (j / nt), x = O.x + c * r, z = O.z + sn * r; pos.push(x, ceilAt(x, z), z); }
-    for (let j = 0; j < nt; j++) for (let i = 0; i < na; i++) { const a = j * na + i, b = j * na + (i + 1) % na, c = (j + 1) * na + i, d = (j + 1) * na + (i + 1) % na; idx.push(a, c, b, b, c, d); }
-    const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); rg.setIndex(idx); rg.computeVertexNormals(); mesh(rg, rock);
+    const us = axis(-X - 0.7, X + 0.7, step * 1.1), vs = axis(B - 0.5, F + 0.5, step * 1.1);
+    mesh(roughGrid(us, vs, (x, z) => [x, AISLE - dC(x, z), z], (x, z) => rDome(x, z) < DOME.R + 0.25), rock);
+    const kinds = ['lotus', 'beads', 'vine', 'diamond', 'gavaksha', 'beads'];
+    for (let k = 0; k < DOME.N; k++) {
+      const r = DOME.R - k * DOME.IN, y = AISLE + k * DOME.RISE, outer = k === 0 ? DOME.R + 0.55 : r + DOME.IN + 0.04;
+      const face = carved(kinds[k], 2 * Math.PI * r, 1.3 + k * 0.05); face.side = THREE.BackSide;
+      const band = new THREE.Mesh(new THREE.CylinderGeometry(r, r, DOME.RISE, Math.max(32, Math.round(r * 18)), 1, true), face); band.position.set(O.x, y + DOME.RISE / 2, O.z); band.receiveShadow = true; g.add(band);
+      const soffit = new THREE.Mesh(new THREE.RingGeometry(r, outer, Math.max(32, Math.round(r * 18)), 1).rotateX(Math.PI / 2), rock); soffit.position.set(O.x, y - (k === 0 ? 0.01 : 0), O.z); soffit.castShadow = soffit.receiveShadow = true; g.add(soffit);
+      const roll = new THREE.Mesh(new THREE.TorusGeometry(r + 0.02, 0.065, 6, Math.max(40, Math.round(r * 22))).rotateX(Math.PI / 2), H.shrineMat || granite()); roll.position.set(O.x, y + 0.01, O.z); g.add(roll);
+    }
+    // the dome's last course is solid rock round the opening, so the sunlight only comes through it
+    const cap = new THREE.Mesh(new THREE.RingGeometry(0.9, DOME.R + 0.6, 64, 1).rotateX(-Math.PI / 2), rock); cap.position.set(O.x, TOPY + 0.02, O.z); cap.castShadow = true; g.add(cap);
   }
   // the shaft through the rock, slanting the way the sunlight comes in, with sky at the top and ferns over the lip
   const dirUp = H.OCULUS.clone().sub(H.AIM).normalize(), slope = dirUp.z / dirUp.y, rings = 6, rh = 0.32;
   const tp = [], ti = [], ns = 28;
-  for (let k = 0; k <= rings; k++) for (let i = 0; i < ns; i++) { const a = i / ns * Math.PI * 2, r = 0.9 + (vnoise(Math.cos(a) * 2 + 5, k * 0.7, Math.sin(a) * 2) - 0.5) * 0.22 * Math.min(1, k), x = O.x + Math.cos(a) * r, y = ceilY(O.x + Math.cos(a) * 0.9) + k * rh, cz = O.z + k * rh * slope; tp.push(x, y, cz + Math.sin(a) * r); }
+  for (let k = 0; k <= rings; k++) for (let i = 0; i < ns; i++) { const a = i / ns * Math.PI * 2, r = 0.9 + (vnoise(Math.cos(a) * 2 + 5, k * 0.7, Math.sin(a) * 2) - 0.5) * 0.22 * Math.min(1, k), x = O.x + Math.cos(a) * r, y = TOPY + k * rh, cz = O.z + k * rh * slope; tp.push(x, y, cz + Math.sin(a) * r); }
   for (let k = 0; k < rings; k++) for (let i = 0; i < ns; i++) { const a = k * ns + i, b = k * ns + (i + 1) % ns, c = (k + 1) * ns + i, d = (k + 1) * ns + (i + 1) % ns; ti.push(a, c, b, b, c, d); }
   const throat = new THREE.BufferGeometry(); throat.setAttribute('position', new THREE.Float32BufferAttribute(tp, 3)); throat.setIndex(ti); throat.computeVertexNormals(); mesh(throat, deep, 0, 0, 0, false);
   const top = new THREE.Vector3(O.x, O.y + rings * rh, O.z + rings * rh * slope);
