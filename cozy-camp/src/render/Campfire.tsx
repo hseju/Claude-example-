@@ -5,7 +5,7 @@ import { Rng, clamp, lerp, noise2 } from '../sim/math';
 import type { WorldObject } from '../sim/types';
 import { world } from '../state/store';
 import { glow, glowTexture, mat, uniqueMat } from './materials';
-import { Ball, Box, Cap, Cyl } from './parts';
+import { Ball, Box, Cap, Cyl, Merged } from './parts';
 import { quality } from './shared';
 
 const FLAME_PROFILE = [
@@ -72,9 +72,16 @@ export function Campfire({ o }: { o: WorldObject }) {
   const kettleSteam = useRef<THREE.Group>(null);
   const panSteam = useRef<THREE.Group>(null);
 
+  const frame = useRef(0);
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
     const k = fire.intensity;
+    // Fire shadows refresh every other frame: the light is fixed and campers move slowly.
+    const l = light.current;
+    if (l?.castShadow) {
+      l.shadow.autoUpdate = false;
+      if (frame.current++ % 2 === 0) l.shadow.needsUpdate = true;
+    }
     const env = world.env;
     // Logs visible by fuel.
     logRefs.current.forEach((g, i) => g && (g.visible = i < fire.logs));
@@ -132,18 +139,32 @@ export function Campfire({ o }: { o: WorldObject }) {
   });
 
   const steamMats = useMemo(
-    () => Array.from({ length: 6 }, () => new THREE.SpriteMaterial({ map: glowTexture(), color: '#e8eef5', transparent: true, depthWrite: false, opacity: 0.3 })),
+    () =>
+      Array.from(
+        { length: 6 },
+        () => new THREE.SpriteMaterial({ map: glowTexture(), color: '#e8eef5', transparent: true, depthWrite: false, opacity: 0.3 }),
+      ),
     [],
   );
 
   return (
     <group>
       {/* Stone ring and ash bed */}
-      {stones.map((s, i) => (
-        <mesh key={i} position={[s.x, s.s * 0.5, s.z]} rotation={[s.r, s.r * 2, 0]} scale={[s.s, s.s * 0.75, s.s]} castShadow receiveShadow material={mat('#8a8680', { flatShading: true })}>
-          <dodecahedronGeometry args={[1, 0]} />
-        </mesh>
-      ))}
+      <Merged>
+        {stones.map((s, i) => (
+          <mesh
+            key={i}
+            position={[s.x, s.s * 0.5, s.z]}
+            rotation={[s.r, s.r * 2, 0]}
+            scale={[s.s, s.s * 0.75, s.s]}
+            castShadow
+            receiveShadow
+            material={mat('#8a8680', { flatShading: true })}
+          >
+            <dodecahedronGeometry args={[1, 0]} />
+          </mesh>
+        ))}
+      </Merged>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]} material={ashMat} receiveShadow>
         <circleGeometry args={[0.52, 20]} />
       </mesh>
@@ -167,7 +188,15 @@ export function Campfire({ o }: { o: WorldObject }) {
           </group>
         ))}
         <sprite position={[0, 0.35, 0]} scale={[2.6, 2.6, 1]}>
-          <spriteMaterial ref={halo} map={glowTexture()} color="#ff8a3d" transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+          <spriteMaterial
+            ref={halo}
+            map={glowTexture()}
+            color="#ff8a3d"
+            transparent
+            depthWrite={false}
+            blending={THREE.AdditiveBlending}
+            toneMapped={false}
+          />
         </sprite>
       </group>
       <pointLight
@@ -181,23 +210,50 @@ export function Campfire({ o }: { o: WorldObject }) {
         shadow-normalBias={0.08}
         shadow-radius={4}
         shadow-camera-near={0.3}
-        shadow-camera-far={18}
+        shadow-camera-far={9}
       />
       <Sparks fire={o} />
       <Smoke fire={o} />
 
       {/* Grill grate on two side stones */}
-      <group position={[0, 0.44, 0]}>
-        {[-0.24, -0.12, 0, 0.12, 0.24].map((z) => (
-          <Cyl key={z} rt={0.008} h={0.86} r={[0, 0, Math.PI / 2]} p={[0, 0, z]} c="#3a3a3e" o={{ metalness: 0.7, roughness: 0.4 }} shadow={false} />
-        ))}
-        <Cyl rt={0.012} h={0.56} p={[-0.43, 0, 0]} r={[Math.PI / 2, 0, 0]} c="#3a3a3e" o={{ metalness: 0.7, roughness: 0.4 }} shadow={false} />
-        <Cyl rt={0.012} h={0.56} p={[0.43, 0, 0]} r={[Math.PI / 2, 0, 0]} c="#3a3a3e" o={{ metalness: 0.7, roughness: 0.4 }} shadow={false} />
-      </group>
-      <Cyl rt={0.02} h={0.44} p={[-0.43, 0.22, 0.22]} c="#3a3a3e" shadow={false} />
-      <Cyl rt={0.02} h={0.44} p={[0.43, 0.22, 0.22]} c="#3a3a3e" shadow={false} />
-      <Cyl rt={0.02} h={0.44} p={[-0.43, 0.22, -0.22]} c="#3a3a3e" shadow={false} />
-      <Cyl rt={0.02} h={0.44} p={[0.43, 0.22, -0.22]} c="#3a3a3e" shadow={false} />
+      <Merged>
+        <group position={[0, 0.44, 0]}>
+          {[-0.24, -0.12, 0, 0.12, 0.24].map((z) => (
+            <Cyl
+              key={z}
+              rt={0.008}
+              h={0.86}
+              r={[0, 0, Math.PI / 2]}
+              p={[0, 0, z]}
+              c="#3a3a3e"
+              o={{ metalness: 0.7, roughness: 0.4 }}
+              shadow={false}
+            />
+          ))}
+          <Cyl
+            rt={0.012}
+            h={0.56}
+            p={[-0.43, 0, 0]}
+            r={[Math.PI / 2, 0, 0]}
+            c="#3a3a3e"
+            o={{ metalness: 0.7, roughness: 0.4 }}
+            shadow={false}
+          />
+          <Cyl
+            rt={0.012}
+            h={0.56}
+            p={[0.43, 0, 0]}
+            r={[Math.PI / 2, 0, 0]}
+            c="#3a3a3e"
+            o={{ metalness: 0.7, roughness: 0.4 }}
+            shadow={false}
+          />
+        </group>
+        <Cyl rt={0.02} h={0.44} p={[-0.43, 0.22, 0.22]} c="#3a3a3e" shadow={false} />
+        <Cyl rt={0.02} h={0.44} p={[0.43, 0.22, 0.22]} c="#3a3a3e" shadow={false} />
+        <Cyl rt={0.02} h={0.44} p={[-0.43, 0.22, -0.22]} c="#3a3a3e" shadow={false} />
+        <Cyl rt={0.02} h={0.44} p={[0.43, 0.22, -0.22]} c="#3a3a3e" shadow={false} />
+      </Merged>
 
       {/* Pan with food */}
       <group ref={pan} position={[0.16, 0.47, 0.02]} visible={false}>
@@ -206,7 +262,13 @@ export function Campfire({ o }: { o: WorldObject }) {
         <group ref={(g) => (foodRefs.current.stew = g)} position={[0, 0.035, 0]}>
           <Cyl rt={0.16} h={0.03} seg={18} material={foodMat} shadow={false} />
           {[0, 1, 2, 3, 4].map((i) => (
-            <Box key={i} s={[0.04, 0.03, 0.04]} p={[Math.cos(i * 1.4) * 0.08, 0.02, Math.sin(i * 1.4) * 0.08]} c={i % 2 ? '#f0a040' : '#f4e6c0'} shadow={false} />
+            <Box
+              key={i}
+              s={[0.04, 0.03, 0.04]}
+              p={[Math.cos(i * 1.4) * 0.08, 0.02, Math.sin(i * 1.4) * 0.08]}
+              c={i % 2 ? '#f0a040' : '#f4e6c0'}
+              shadow={false}
+            />
           ))}
         </group>
         <group ref={(g) => (foodRefs.current.sausages = g)} position={[0, 0.08, 0]}>
@@ -319,7 +381,11 @@ function Smoke({ fire }: { fire: WorldObject }) {
   const N = 7;
   const refs = useRef<(THREE.Sprite | null)[]>([]);
   const mats = useMemo(
-    () => Array.from({ length: N }, () => new THREE.SpriteMaterial({ map: glowTexture(), color: '#b8b4ae', transparent: true, depthWrite: false, opacity: 0 })),
+    () =>
+      Array.from(
+        { length: N },
+        () => new THREE.SpriteMaterial({ map: glowTexture(), color: '#b8b4ae', transparent: true, depthWrite: false, opacity: 0 }),
+      ),
     [],
   );
   useFrame(({ clock }) => {

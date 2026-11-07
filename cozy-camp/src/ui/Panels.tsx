@@ -51,7 +51,15 @@ export function EnvironmentPanel() {
         <label htmlFor="time">
           Time of day <b>{formatTime(env.time)}</b>
         </label>
-        <input id="time" type="range" min={0} max={23.99} step={0.05} value={env.time} onChange={(e) => world.setTime(Number(e.target.value))} />
+        <input
+          id="time"
+          type="range"
+          min={0}
+          max={23.99}
+          step={0.05}
+          value={env.time}
+          onChange={(e) => world.setTime(Number(e.target.value))}
+        />
         <div className="chips">
           {TIME_PRESETS.map(([label, t]) => (
             <button key={label} className="chip small" onClick={() => world.setTime(t)}>
@@ -67,7 +75,11 @@ export function EnvironmentPanel() {
             {world.paused ? 'Paused' : 'Pause'}
           </button>
           {[1, 2, 4, 8].map((s) => (
-            <button key={s} className={`chip small ${!world.paused && world.speed === s ? 'on' : ''}`} onClick={() => ((world.speed = s), (world.paused = false), ui.bump())}>
+            <button
+              key={s}
+              className={`chip small ${!world.paused && world.speed === s ? 'on' : ''}`}
+              onClick={() => ((world.speed = s), (world.paused = false), ui.bump())}
+            >
               {s}×
             </button>
           ))}
@@ -151,7 +163,15 @@ export function SettingsPanel() {
         <label htmlFor="vol">
           Volume <b>{Math.round(p.volume * 100)}%</b>
         </label>
-        <input id="vol" type="range" min={0} max={1} step={0.01} value={p.volume} onChange={(e) => set({ volume: Number(e.target.value) })} />
+        <input
+          id="vol"
+          type="range"
+          min={0}
+          max={1}
+          step={0.01}
+          value={p.volume}
+          onChange={(e) => set({ volume: Number(e.target.value) })}
+        />
         <label className="toggle">
           <input type="checkbox" checked={p.muted} onChange={(e) => set({ muted: e.target.checked })} />
           <span>Mute all sound</span>
@@ -249,7 +269,8 @@ export function BuildPanel() {
       {placing ? (
         <>
           <p className="hint">
-            Move the pointer to position {moving ? `the ${moving.name.toLowerCase()}` : 'it'}, then tap the ground to place it. Green means the spot works.
+            Move the pointer to position {moving ? `the ${moving.name.toLowerCase()}` : 'it'}, then tap the ground to place it. Green means
+            the spot works.
           </p>
           <div className="row">
             <button className="chip" onClick={() => rotate(-Math.PI / 8)} aria-label="Rotate left">
@@ -284,7 +305,16 @@ export function BuildPanel() {
               <button
                 key={item.label}
                 className="chip"
-                onClick={() => ui.setPlacing({ kind: item.kind, init: item.init, rot: 0, x: focusPoint.x, z: focusPoint.z, valid: world.canPlace(item.kind, focusPoint.x, focusPoint.z) })}
+                onClick={() =>
+                  ui.setPlacing({
+                    kind: item.kind,
+                    init: item.init,
+                    rot: 0,
+                    x: focusPoint.x,
+                    z: focusPoint.z,
+                    valid: world.canPlace(item.kind, focusPoint.x, focusPoint.z),
+                  })
+                }
               >
                 <Plus size={14} /> {item.label}
               </button>

@@ -65,9 +65,27 @@ function Clock() {
   );
 }
 
-function ToolButton({ label, onClick, active, children, shortcut }: { label: string; onClick: () => void; active?: boolean; children: ReactNode; shortcut?: string }) {
+function ToolButton({
+  label,
+  onClick,
+  active,
+  children,
+  shortcut,
+}: {
+  label: string;
+  onClick: () => void;
+  active?: boolean;
+  children: ReactNode;
+  shortcut?: string;
+}) {
   return (
-    <button className={`icon-btn ${active ? 'on' : ''}`} onClick={onClick} aria-label={label} aria-pressed={active} title={shortcut ? `${label} (${shortcut})` : label}>
+    <button
+      className={`icon-btn ${active ? 'on' : ''}`}
+      onClick={onClick}
+      aria-label={label}
+      aria-pressed={active}
+      title={shortcut ? `${label} (${shortcut})` : label}
+    >
       {children}
     </button>
   );
@@ -94,7 +112,12 @@ function Toolbar() {
       <ToolButton label="Time & weather" shortcut="T" active={ui.panel === 'environment'} onClick={() => ui.setPanel('environment')}>
         <SunMedium size={19} />
       </ToolButton>
-      <ToolButton label={world.paused ? 'Resume' : 'Pause'} shortcut="Space" active={world.paused} onClick={() => ((world.paused = !world.paused), ui.bump())}>
+      <ToolButton
+        label={world.paused ? 'Resume' : 'Pause'}
+        shortcut="Space"
+        active={world.paused}
+        onClick={() => ((world.paused = !world.paused), ui.bump())}
+      >
         {world.paused ? <Play size={19} /> : <Pause size={19} />}
       </ToolButton>
       <button

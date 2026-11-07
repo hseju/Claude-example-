@@ -174,10 +174,14 @@ export const cook: ActivityDef = {
     }
     ctx.hold(null);
     ctx.lookAt(w.campfire);
-    const cooked = yield* ctx.waitUntil(() => (fire.pan?.doneness ?? 0) >= 1, 75, (dt) => {
-      ctx.gain('warmth', 0.8 * fire.intensity, dt);
-      ctx.gain('fun', 0.15, dt);
-    });
+    const cooked = yield* ctx.waitUntil(
+      () => (fire.pan?.doneness ?? 0) >= 1,
+      75,
+      (dt) => {
+        ctx.gain('warmth', 0.8 * fire.intensity, dt);
+        ctx.gain('fun', 0.15, dt);
+      },
+    );
     ctx.lookAt(null);
     if (!cooked || !fire.pan) throw new ActivityFail('The fire was too low to cook');
 

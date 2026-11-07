@@ -5,7 +5,7 @@ import { clamp, lerp } from '../sim/math';
 import { tentSize } from '../sim/objects';
 import type { WorldObject } from '../sim/types';
 import { mat, uniqueMat } from './materials';
-import { Ball, Box, Cap, Cyl, Rod } from './parts';
+import { Ball, Box, Cap, Cyl, Merged, Rod } from './parts';
 
 function easeOutBack(t: number) {
   const c1 = 1.5;
@@ -32,7 +32,10 @@ export function Tent({ o }: { o: WorldObject }) {
   const slant = Math.hypot(halfW, h);
   const angle = Math.atan2(h, halfW);
 
-  const fabric = useMemo(() => uniqueMat(ts.color, { roughness: 0.92, side: THREE.DoubleSide, emissive: '#ffb45a', emissiveIntensity: 0 }), [ts.color]);
+  const fabric = useMemo(
+    () => uniqueMat(ts.color, { roughness: 0.92, side: THREE.DoubleSide, emissive: '#ffb45a', emissiveIntensity: 0 }),
+    [ts.color],
+  );
   const trim = useMemo(() => new THREE.Color(ts.color).multiplyScalar(0.72).getStyle(), [ts.color]);
   const back = useMemo(() => triangle([-halfW, 0], [halfW, 0], [0, h]), [halfW, h]);
   const flapL = useMemo(() => triangle([0, 0], [halfW, 0], [halfW, h]), [halfW, h]);
@@ -81,26 +84,28 @@ export function Tent({ o }: { o: WorldObject }) {
 
       <group ref={body}>
         {/* Ground sheet and sleeping bags */}
-        <Box s={[w - 0.05, 0.02, d - 0.05]} p={[0, 0.01, 0]} c="#4a4a44" shadow={false} />
-        {tentSize(o).sleepers.map((sx, i) => (
-          <group key={i} position={[sx, 0.06, -0.15]}>
-            <Cap rad={0.16} len={0.95} r={[Math.PI / 2, 0, 0]} scale={[1, 1, 0.45]} c={BAG_COLORS[(i + (o.id.length % 3)) % 3]} />
-            <Box s={[0.3, 0.08, 0.18]} p={[0, 0.03, -0.62]} c="#efe8dc" />
-          </group>
-        ))}
-        {/* Roof panels */}
-        <mesh position={[halfW / 2, h / 2, 0]} rotation={[0, 0, -angle]} material={fabric} castShadow receiveShadow>
-          <boxGeometry args={[slant, 0.025, d]} />
-        </mesh>
-        <mesh position={[-halfW / 2, h / 2, 0]} rotation={[0, 0, angle]} material={fabric} castShadow receiveShadow>
-          <boxGeometry args={[slant, 0.025, d]} />
-        </mesh>
-        {/* Trim along the ridge and eaves */}
-        <Box s={[0.07, 0.07, d + 0.06]} p={[0, h, 0]} c={trim} />
-        <Box s={[0.05, 0.04, d]} p={[halfW, 0.02, 0]} c={trim} />
-        <Box s={[0.05, 0.04, d]} p={[-halfW, 0.02, 0]} c={trim} />
-        {/* Back wall */}
-        <mesh geometry={back} position={[0, 0, -d / 2]} material={fabric} castShadow />
+        <Merged>
+          <Box s={[w - 0.05, 0.02, d - 0.05]} p={[0, 0.01, 0]} c="#4a4a44" shadow={false} />
+          {tentSize(o).sleepers.map((sx, i) => (
+            <group key={i} position={[sx, 0.06, -0.15]}>
+              <Cap rad={0.16} len={0.95} r={[Math.PI / 2, 0, 0]} scale={[1, 1, 0.45]} c={BAG_COLORS[(i + (o.id.length % 3)) % 3]} />
+              <Box s={[0.3, 0.08, 0.18]} p={[0, 0.03, -0.62]} c="#efe8dc" />
+            </group>
+          ))}
+          {/* Roof panels */}
+          <mesh position={[halfW / 2, h / 2, 0]} rotation={[0, 0, -angle]} material={fabric} castShadow receiveShadow>
+            <boxGeometry args={[slant, 0.025, d]} />
+          </mesh>
+          <mesh position={[-halfW / 2, h / 2, 0]} rotation={[0, 0, angle]} material={fabric} castShadow receiveShadow>
+            <boxGeometry args={[slant, 0.025, d]} />
+          </mesh>
+          {/* Trim along the ridge and eaves */}
+          <Box s={[0.07, 0.07, d + 0.06]} p={[0, h, 0]} c={trim} />
+          <Box s={[0.05, 0.04, d]} p={[halfW, 0.02, 0]} c={trim} />
+          <Box s={[0.05, 0.04, d]} p={[-halfW, 0.02, 0]} c={trim} />
+          {/* Back wall */}
+          <mesh geometry={back} position={[0, 0, -d / 2]} material={fabric} castShadow />
+        </Merged>
         {/* Door flaps (shrink toward the corners when opened) */}
         <group ref={leftFlap} position={[-halfW, 0, d / 2]}>
           <mesh geometry={flapL} material={fabric} castShadow />
@@ -109,15 +114,17 @@ export function Tent({ o }: { o: WorldObject }) {
           <mesh geometry={flapR} material={fabric} castShadow />
         </group>
         {/* Poles, ropes and pegs */}
-        <Cyl rt={0.025} h={h + 0.15} p={[0, (h + 0.15) / 2, d / 2 + 0.03]} c="#6a5038" />
-        <Cyl rt={0.025} h={h + 0.15} p={[0, (h + 0.15) / 2, -d / 2 - 0.03]} c="#6a5038" />
-        <Ball rad={0.04} p={[0, h + 0.17, d / 2 + 0.03]} c="#d9a441" />
-        <Rod a={[0, h + 0.1, d / 2 + 0.03]} b={[0, 0.02, d / 2 + 0.75]} c="#d8cdb5" rad={0.008} />
-        <Rod a={[0, h + 0.1, -d / 2 - 0.03]} b={[0, 0.02, -d / 2 - 0.75]} c="#d8cdb5" rad={0.008} />
-        <Rod a={[halfW, 0.05, d / 2]} b={[halfW + 0.35, 0.0, d / 2 + 0.25]} c="#d8cdb5" rad={0.008} />
-        <Rod a={[-halfW, 0.05, d / 2]} b={[-halfW - 0.35, 0.0, d / 2 + 0.25]} c="#d8cdb5" rad={0.008} />
-        <Rod a={[halfW, 0.05, -d / 2]} b={[halfW + 0.35, 0.0, -d / 2 - 0.25]} c="#d8cdb5" rad={0.008} />
-        <Rod a={[-halfW, 0.05, -d / 2]} b={[-halfW - 0.35, 0.0, -d / 2 - 0.25]} c="#d8cdb5" rad={0.008} />
+        <Merged>
+          <Cyl rt={0.025} h={h + 0.15} p={[0, (h + 0.15) / 2, d / 2 + 0.03]} c="#6a5038" />
+          <Cyl rt={0.025} h={h + 0.15} p={[0, (h + 0.15) / 2, -d / 2 - 0.03]} c="#6a5038" />
+          <Ball rad={0.04} p={[0, h + 0.17, d / 2 + 0.03]} c="#d9a441" />
+          <Rod a={[0, h + 0.1, d / 2 + 0.03]} b={[0, 0.02, d / 2 + 0.75]} c="#d8cdb5" rad={0.008} />
+          <Rod a={[0, h + 0.1, -d / 2 - 0.03]} b={[0, 0.02, -d / 2 - 0.75]} c="#d8cdb5" rad={0.008} />
+          <Rod a={[halfW, 0.05, d / 2]} b={[halfW + 0.35, 0.0, d / 2 + 0.25]} c="#d8cdb5" rad={0.008} />
+          <Rod a={[-halfW, 0.05, d / 2]} b={[-halfW - 0.35, 0.0, d / 2 + 0.25]} c="#d8cdb5" rad={0.008} />
+          <Rod a={[halfW, 0.05, -d / 2]} b={[halfW + 0.35, 0.0, -d / 2 - 0.25]} c="#d8cdb5" rad={0.008} />
+          <Rod a={[-halfW, 0.05, -d / 2]} b={[-halfW - 0.35, 0.0, -d / 2 - 0.25]} c="#d8cdb5" rad={0.008} />
+        </Merged>
         {/* Little lantern hanging inside */}
         <group position={[0, h - 0.35, -0.2]}>
           <Cyl rt={0.05} h={0.1} c="#3a3a3a" o={{ metalness: 0.5 }} shadow={false} />

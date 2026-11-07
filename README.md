@@ -1,5 +1,8 @@
 # BollyLook
 
+> This repository also contains **Cozy Camping World**, a browser 3D camping simulation.
+> See [`cozy-camp/README.md`](cozy-camp/README.md).
+
 Shop the outfits from Bollywood films and songs. A user picks a catalog scene or uploads a
 screenshot. Claude breaks the outfit down into individual garments, and each garment gets
 affiliate-tagged "closest match" and "budget dupe" searches on Myntra, AJIO and Amazon.in.

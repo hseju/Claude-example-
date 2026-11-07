@@ -9,15 +9,13 @@ interface KindInfo {
   slots: () => Slot[];
 }
 
-const slot = (
-  id: string,
-  kind: SlotKind,
-  x: number,
-  z: number,
-  rot: number,
-  approach: { x: number; z: number },
-  y = 0,
-): Slot => ({ id, kind, local: { x, z, rot, y }, approach, occupant: null });
+const slot = (id: string, kind: SlotKind, x: number, z: number, rot: number, approach: { x: number; z: number }, y = 0): Slot => ({
+  id,
+  kind,
+  local: { x, z, rot, y },
+  approach,
+  occupant: null,
+});
 
 const seat = (id: string, x: number, y: number, depth = 0.62) => slot(id, 'sit', x, 0, 0, { x, z: depth }, y);
 

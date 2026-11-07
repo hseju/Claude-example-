@@ -272,9 +272,7 @@ export interface WorldObject {
   swing?: number;
 }
 
-export type Collider =
-  | { type: 'circle'; r: number }
-  | { type: 'box'; hw: number; hd: number };
+export type Collider = { type: 'circle'; r: number } | { type: 'box'; hw: number; hd: number };
 
 // ---------------------------------------------------------------------------
 // Wildlife

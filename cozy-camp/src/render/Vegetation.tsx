@@ -56,11 +56,7 @@ const GEO = {
     merge(
       Array.from({ length: 6 }, (_, i) => {
         const a = (i / 6) * Math.PI * 2;
-        return new THREE.ConeGeometry(0.09, 0.75, 4, 1)
-          .scale(1, 1, 0.3)
-          .translate(0, 0.37, 0)
-          .rotateX(0.95)
-          .rotateY(a);
+        return new THREE.ConeGeometry(0.09, 0.75, 4, 1).scale(1, 1, 0.3).translate(0, 0.37, 0).rotateX(0.95).rotateY(a);
       }),
     ),
   grass: () =>
@@ -145,7 +141,10 @@ function Instanced({
 export function Vegetation({ season }: { season: Season }) {
   const terrain = world.terrain;
   const pal = world.def.palette[season];
-  const geos = useMemo(() => Object.fromEntries(Object.entries(GEO).map(([k, f]) => [k, f()])) as Record<keyof typeof GEO, THREE.BufferGeometry>, []);
+  const geos = useMemo(
+    () => Object.fromEntries(Object.entries(GEO).map(([k, f]) => [k, f()])) as Record<keyof typeof GEO, THREE.BufferGeometry>,
+    [],
+  );
 
   const trunkMat = useMemo(() => mat('#6b4a33', { sway: 0.5, roughness: 0.95 }), []);
   const birchMat = useMemo(() => mat('#e8e2d6', { sway: 0.5, roughness: 0.8 }), []);
@@ -195,7 +194,16 @@ export function Vegetation({ season }: { season: Season }) {
   );
 
   const decor = useMemo(() => {
-    const by: Record<DecorInstance['kind'], Inst[]> = { bush: [], fern: [], grass: [], flower: [], mushroom: [], reed: [], stump: [], lilypad: [] };
+    const by: Record<DecorInstance['kind'], Inst[]> = {
+      bush: [],
+      fern: [],
+      grass: [],
+      flower: [],
+      mushroom: [],
+      reed: [],
+      stump: [],
+      lilypad: [],
+    };
     const flowerCols = pal.flowers.map((c) => new THREE.Color(c));
     const grass = new THREE.Color(pal.grass).multiplyScalar(1.12);
     const grassDry = new THREE.Color(pal.grassDry);
@@ -216,8 +224,16 @@ export function Vegetation({ season }: { season: Season }) {
     <group>
       <Instanced geometry={geos.pineTrunk} material={trunkMat} items={trees.groups.pine} />
       <Instanced geometry={geos.pineTop} material={leafMat} items={trees.tops.pine} />
-      <Instanced geometry={geos.pineTrunk} material={trunkMat} items={trees.groups.tallPine.map((t) => ({ ...t, scale: (t.scale as number) * 1.25 }))} />
-      <Instanced geometry={geos.tallTop} material={leafMat} items={trees.tops.tallPine.map((t) => ({ ...t, scale: (t.scale as number) * 1.25 }))} />
+      <Instanced
+        geometry={geos.pineTrunk}
+        material={trunkMat}
+        items={trees.groups.tallPine.map((t) => ({ ...t, scale: (t.scale as number) * 1.25 }))}
+      />
+      <Instanced
+        geometry={geos.tallTop}
+        material={leafMat}
+        items={trees.tops.tallPine.map((t) => ({ ...t, scale: (t.scale as number) * 1.25 }))}
+      />
       <Instanced geometry={geos.roundTrunk} material={trunkMat} items={trees.groups.round} />
       <Instanced geometry={geos.roundTop} material={leafMat} items={trees.tops.round} />
       <Instanced geometry={geos.birchTrunk} material={birchMat} items={trees.groups.birch} />
@@ -254,7 +270,10 @@ function GlowMushrooms() {
     return out;
   }, []);
   const stem = useMemo(() => new THREE.CylinderGeometry(0.025, 0.035, 0.16, 6).translate(0, 0.08, 0), []);
-  const cap = useMemo(() => new THREE.SphereGeometry(0.075, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.8, 1).translate(0, 0.15, 0), []);
+  const cap = useMemo(
+    () => new THREE.SphereGeometry(0.075, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.8, 1).translate(0, 0.15, 0),
+    [],
+  );
   const capMat = useMemo(() => uniqueMat('#7fe8dc', { emissive: '#4fe0d0', emissiveIntensity: 0.4, roughness: 0.4 }), []);
   const stemMat = useMemo(() => uniqueMat('#d8efe9', { emissive: '#2fa89a', emissiveIntensity: 0.2 }), []);
 

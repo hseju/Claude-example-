@@ -115,7 +115,15 @@ export const skywatch: ActivityDef = {
   outdoor: true,
   menu: true,
   blocked(w, ch) {
-    return nearestFreeSlot(w, ch, (o) => o.kind === 'blanket', () => true, ch.id) ? null : 'The blanket is full';
+    return nearestFreeSlot(
+      w,
+      ch,
+      (o) => o.kind === 'blanket',
+      () => true,
+      ch.id,
+    )
+      ? null
+      : 'The blanket is full';
   },
   utility(w, ch) {
     let u = (1 - ch.needs.fun) * 0.55 + (1 - ch.needs.energy) * 0.2;
@@ -124,7 +132,13 @@ export const skywatch: ActivityDef = {
   },
   *run(ctx) {
     const w = ctx.w;
-    const spot = nearestFreeSlot(w, ctx.ch, (o) => o.kind === 'blanket', () => true, ctx.ch.id);
+    const spot = nearestFreeSlot(
+      w,
+      ctx.ch,
+      (o) => o.kind === 'blanket',
+      () => true,
+      ctx.ch.id,
+    );
     if (!spot) throw new ActivityFail('The blanket is full');
     ctx.step('Heading to the picnic blanket');
     yield* ctx.enterSlot(spot.o, spot.s, 'sit');
@@ -253,10 +267,14 @@ export const chatListen: ActivityDef = {
     ctx.step('Chatting');
     ctx.anim('talk');
     yield* ctx.waitUntil(() => ctx.ch.chatPartner !== null, 4);
-    yield* ctx.waitUntil(() => ctx.ch.chatPartner === null, 25, () => {
-      const partner = ctx.ch.chatPartner ? ctx.w.char(ctx.ch.chatPartner) : undefined;
-      if (partner) ctx.face(partner);
-    });
+    yield* ctx.waitUntil(
+      () => ctx.ch.chatPartner === null,
+      25,
+      () => {
+        const partner = ctx.ch.chatPartner ? ctx.w.char(ctx.ch.chatPartner) : undefined;
+        if (partner) ctx.face(partner);
+      },
+    );
     ctx.anim('wave');
     yield* ctx.wait(0.8);
   },
@@ -396,7 +414,13 @@ export const explore: ActivityDef = {
       }
 
       // Pick up a nature find if one is close by.
-      const find = nearestFreeSlot(w, ctx.ch, (o) => o.kind === 'collectible' && Boolean(o.on), () => true, ctx.ch.id);
+      const find = nearestFreeSlot(
+        w,
+        ctx.ch,
+        (o) => o.kind === 'collectible' && Boolean(o.on),
+        () => true,
+        ctx.ch.id,
+      );
       if (find && Math.hypot(find.o.x - ctx.ch.x, find.o.z - ctx.ch.z) < 7) yield* collectRoutine(ctx, find.o);
     }
     yield* depositFinds(ctx);
@@ -428,7 +452,13 @@ export const collect: ActivityDef = {
       if (yield* collectRoutine(ctx, first)) got++;
     }
     while (got < (first ? 1 : 3)) {
-      const find = nearestFreeSlot(w, ctx.ch, (o) => o.kind === 'collectible' && Boolean(o.on), () => true, ctx.ch.id);
+      const find = nearestFreeSlot(
+        w,
+        ctx.ch,
+        (o) => o.kind === 'collectible' && Boolean(o.on),
+        () => true,
+        ctx.ch.id,
+      );
       if (!find) break;
       if (yield* collectRoutine(ctx, find.o)) got++;
       else break;

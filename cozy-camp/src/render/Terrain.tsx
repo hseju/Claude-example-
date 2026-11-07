@@ -223,7 +223,11 @@ export function Ripples() {
   const meshes = useRef<(THREE.Mesh | null)[]>([]);
   const geometry = useMemo(() => new THREE.RingGeometry(0.85, 1, 32).rotateX(-Math.PI / 2), []);
   const materials = useMemo(
-    () => Array.from({ length: POOL }, () => new THREE.MeshBasicMaterial({ color: '#cfe6ff', transparent: true, opacity: 0, depthWrite: false })),
+    () =>
+      Array.from(
+        { length: POOL },
+        () => new THREE.MeshBasicMaterial({ color: '#cfe6ff', transparent: true, opacity: 0, depthWrite: false }),
+      ),
     [],
   );
   useFrame(() => {

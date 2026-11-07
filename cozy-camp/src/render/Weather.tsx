@@ -14,7 +14,12 @@ function Rain() {
   const N = 2200;
   const { geometry, drops } = useMemo(() => {
     const rng = new Rng(2);
-    const drops = Array.from({ length: N }, () => ({ x: rng.range(-AREA / 2, AREA / 2), y: rng.range(0, HEIGHT), z: rng.range(-AREA / 2, AREA / 2), v: rng.range(13, 18) }));
+    const drops = Array.from({ length: N }, () => ({
+      x: rng.range(-AREA / 2, AREA / 2),
+      y: rng.range(0, HEIGHT),
+      z: rng.range(-AREA / 2, AREA / 2),
+      v: rng.range(13, 18),
+    }));
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 6), 3));
     return { geometry: g, drops };
@@ -41,8 +46,8 @@ function Rain() {
       d.z += wz * dt;
       if (d.y < 0) {
         d.y += HEIGHT;
-        d.x = ((d.x + AREA / 2) % AREA + AREA) % AREA - AREA / 2;
-        d.z = ((d.z + AREA / 2) % AREA + AREA) % AREA - AREA / 2;
+        d.x = ((((d.x + AREA / 2) % AREA) + AREA) % AREA) - AREA / 2;
+        d.z = ((((d.z + AREA / 2) % AREA) + AREA) % AREA) - AREA / 2;
       }
       const x = fx + d.x;
       const z = fz + d.z;
@@ -62,13 +67,20 @@ function Snow() {
   const N = 1800;
   const { geometry, flakes } = useMemo(() => {
     const rng = new Rng(3);
-    const flakes = Array.from({ length: N }, () => ({ x: rng.range(-AREA / 2, AREA / 2), y: rng.range(0, HEIGHT), z: rng.range(-AREA / 2, AREA / 2), v: rng.range(0.6, 1.4), p: rng.range(0, 10) }));
+    const flakes = Array.from({ length: N }, () => ({
+      x: rng.range(-AREA / 2, AREA / 2),
+      y: rng.range(0, HEIGHT),
+      z: rng.range(-AREA / 2, AREA / 2),
+      v: rng.range(0.6, 1.4),
+      p: rng.range(0, 10),
+    }));
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 3), 3));
     return { geometry: g, flakes };
   }, []);
   const material = useMemo(
-    () => new THREE.PointsMaterial({ color: '#ffffff', size: 0.12, map: glowTexture(), transparent: true, depthWrite: false, opacity: 0.9 }),
+    () =>
+      new THREE.PointsMaterial({ color: '#ffffff', size: 0.12, map: glowTexture(), transparent: true, depthWrite: false, opacity: 0.9 }),
     [],
   );
   const pts = useRef<THREE.Points>(null);
@@ -91,8 +103,8 @@ function Snow() {
       f.z += (wz + Math.cos(t * 0.8 + f.p) * 0.4) * dt;
       if (f.y < 0) {
         f.y += HEIGHT;
-        f.x = ((f.x + AREA / 2) % AREA + AREA) % AREA - AREA / 2;
-        f.z = ((f.z + AREA / 2) % AREA + AREA) % AREA - AREA / 2;
+        f.x = ((((f.x + AREA / 2) % AREA) + AREA) % AREA) - AREA / 2;
+        f.z = ((((f.z + AREA / 2) % AREA) + AREA) % AREA) - AREA / 2;
       }
       pos.setXYZ(i, focusPoint.x + f.x, i < active ? f.y : -50, focusPoint.z + f.z);
     }
@@ -110,7 +122,15 @@ function FallingLeaves() {
     const trees = world.terrain.trees.filter((t) => t.kind === 'round' || t.kind === 'birch');
     return Array.from({ length: N }, () => {
       const tr = rng.pick(trees);
-      return { tree: tr, x: tr.x, y: rng.range(0, 3), z: tr.z, p: rng.range(0, 10), v: rng.range(0.4, 0.8), c: rng.pick(['#d9772e', '#e3a63a', '#b8462e', '#c98a2e']) };
+      return {
+        tree: tr,
+        x: tr.x,
+        y: rng.range(0, 3),
+        z: tr.z,
+        p: rng.range(0, 10),
+        v: rng.range(0.4, 0.8),
+        c: rng.pick(['#d9772e', '#e3a63a', '#b8462e', '#c98a2e']),
+      };
     });
   }, []);
   const geometry = useMemo(() => new THREE.PlaneGeometry(0.12, 0.08), []);

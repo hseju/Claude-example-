@@ -250,7 +250,15 @@ function Moon() {
         <meshBasicMaterial color="#e6dcc2" transparent opacity={0.45} fog={false} depthWrite={false} />
       </mesh>
       <sprite scale={[40, 40, 1]}>
-        <spriteMaterial ref={halo} map={glowTexture()} color="#9fb4ff" transparent depthWrite={false} blending={THREE.AdditiveBlending} fog={false} />
+        <spriteMaterial
+          ref={halo}
+          map={glowTexture()}
+          color="#9fb4ff"
+          transparent
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+          fog={false}
+        />
       </sprite>
     </group>
   );
@@ -285,7 +293,15 @@ function ShootingStars() {
   return (
     <mesh ref={ref} visible={false}>
       <boxGeometry args={[0.35, 0.35, 16]} />
-      <meshBasicMaterial ref={mat} color="#fff8e6" transparent toneMapped={false} fog={false} depthWrite={false} blending={THREE.AdditiveBlending} />
+      <meshBasicMaterial
+        ref={mat}
+        color="#fff8e6"
+        transparent
+        toneMapped={false}
+        fog={false}
+        depthWrite={false}
+        blending={THREE.AdditiveBlending}
+      />
     </mesh>
   );
 }
@@ -299,12 +315,25 @@ export function Clouds() {
       z: rng.range(-90, 60),
       y: rng.range(38, 52),
       s: rng.range(5, 10),
-      puffs: Array.from({ length: rng.int(4, 7) }, () => [rng.range(-1.6, 1.6), rng.range(-0.2, 0.5), rng.range(-0.8, 0.8), rng.range(0.7, 1.3)]),
+      puffs: Array.from({ length: rng.int(4, 7) }, () => [
+        rng.range(-1.6, 1.6),
+        rng.range(-0.2, 0.5),
+        rng.range(-0.8, 0.8),
+        rng.range(0.7, 1.3),
+      ]),
       threshold: i / 16,
     }));
   }, []);
   const material = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 1, transparent: true, opacity: 0.8, depthWrite: false, flatShading: true }),
+    () =>
+      new THREE.MeshStandardMaterial({
+        color: '#ffffff',
+        roughness: 1,
+        transparent: true,
+        opacity: 0.8,
+        depthWrite: false,
+        flatShading: true,
+      }),
     [],
   );
   const group = useRef<THREE.Group>(null);
@@ -318,7 +347,11 @@ export function Clouds() {
     const cover = env.mix.cloud;
     material.opacity = 0.35 + cover * 0.5;
     const night = skyState.night;
-    material.color.setRGB(1 - night * 0.55 - env.mix.storm * 0.45, 1 - night * 0.5 - env.mix.storm * 0.45, 1 - night * 0.4 - env.mix.storm * 0.4);
+    material.color.setRGB(
+      1 - night * 0.55 - env.mix.storm * 0.45,
+      1 - night * 0.5 - env.mix.storm * 0.45,
+      1 - night * 0.4 - env.mix.storm * 0.4,
+    );
     g.children.forEach((c, i) => {
       const cl = clouds[i];
       c.position.x += dx;

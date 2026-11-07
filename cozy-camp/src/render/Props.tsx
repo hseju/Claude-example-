@@ -5,9 +5,10 @@ import * as THREE from 'three';
 import { clamp, Rng } from '../sim/math';
 import type { CollectibleKind, FoodKind, WorldObject } from '../sim/types';
 import { world } from '../state/store';
+import { ModelOr } from './assets';
 import { Campfire } from './Campfire';
 import { ginghamTexture, glowTexture, mat, uniqueMat } from './materials';
-import { Ball, Box, Cap, Cyl, Rod } from './parts';
+import { Ball, Box, Cap, Cyl, Merged, Rod } from './parts';
 import { focusPoint, skyState } from './shared';
 import { Tent } from './Tent';
 
@@ -16,17 +17,27 @@ const WOOD_DARK = '#6a4a33';
 const WOOD_LIGHT = '#b98a5e';
 const METAL = '#4a4d52';
 
-function Rounded({ s, p, r, c, radius = 0.03 }: { s: [number, number, number]; p?: [number, number, number]; r?: [number, number, number]; c: string; radius?: number }) {
-  return (
-    <RoundedBox args={s} radius={radius} smoothness={3} position={p} rotation={r} castShadow receiveShadow material={mat(c)} />
-  );
+function Rounded({
+  s,
+  p,
+  r,
+  c,
+  radius = 0.03,
+}: {
+  s: [number, number, number];
+  p?: [number, number, number];
+  r?: [number, number, number];
+  c: string;
+  radius?: number;
+}) {
+  return <RoundedBox args={s} radius={radius} smoothness={3} position={p} rotation={r} castShadow receiveShadow material={mat(c)} />;
 }
 
 function Chair({ o }: { o: WorldObject }) {
   const c = o.color ?? '#c0583c';
   const frame = '#33363a';
   return (
-    <group>
+    <Merged>
       {[-0.22, 0.22].map((x) => (
         <group key={x}>
           <Rod a={[x, 0, 0.2]} b={[x, 0.3, -0.18]} c={frame} rad={0.014} />
@@ -42,25 +53,25 @@ function Chair({ o }: { o: WorldObject }) {
         <boxGeometry args={[0.46, 0.42, 0.04]} />
       </mesh>
       <Cyl rt={0.035} rb={0.03} h={0.06} p={[0.27, 0.5, 0.15]} c={frame} />
-    </group>
+    </Merged>
   );
 }
 
 function LogBench() {
   return (
-    <group>
+    <Merged>
       <Cyl rt={0.16} h={1.6} r={[0, 0, Math.PI / 2]} p={[0, 0.22, 0]} c={WOOD} seg={12} />
       <Cyl rt={0.155} h={0.02} r={[0, 0, Math.PI / 2]} p={[0.8, 0.22, 0]} c={WOOD_LIGHT} seg={12} />
       <Cyl rt={0.155} h={0.02} r={[0, 0, Math.PI / 2]} p={[-0.8, 0.22, 0]} c={WOOD_LIGHT} seg={12} />
       <Box s={[0.12, 0.12, 0.3]} p={[-0.55, 0.06, 0]} c={WOOD_DARK} />
       <Box s={[0.12, 0.12, 0.3]} p={[0.55, 0.06, 0]} c={WOOD_DARK} />
-    </group>
+    </Merged>
   );
 }
 
 function Bench() {
   return (
-    <group>
+    <Merged>
       {[-0.12, 0.0, 0.12].map((z) => (
         <Rounded key={z} s={[1.6, 0.04, 0.11]} p={[0, 0.36, z]} c={WOOD_LIGHT} radius={0.015} />
       ))}
@@ -73,16 +84,16 @@ function Bench() {
           <Box s={[0.06, 0.66, 0.06]} p={[x, 0.33, -0.17]} c={WOOD_DARK} />
         </group>
       ))}
-    </group>
+    </Merged>
   );
 }
 
 function Stool() {
   return (
-    <group>
+    <Merged>
       <Cyl rt={0.2} rb={0.22} h={0.3} p={[0, 0.15, 0]} c={WOOD} seg={12} />
       <Cyl rt={0.195} h={0.015} p={[0, 0.305, 0]} c={WOOD_LIGHT} seg={12} />
-    </group>
+    </Merged>
   );
 }
 
@@ -99,7 +110,9 @@ function Woodpile({ o }: { o: WorldObject }) {
   useFrame(() => refs.current.forEach((g, i) => g && (g.visible = i < (o.count ?? 0))));
   return (
     <group>
-      <Box s={[0.9, 0.04, 0.5]} p={[0, 0.02, 0]} c={WOOD_DARK} />
+      <Merged>
+        <Box s={[0.9, 0.04, 0.5]} p={[0, 0.02, 0]} c={WOOD_DARK} />
+      </Merged>
       {slots.map(([x, y], i) => (
         <group key={i} ref={(g) => (refs.current[i] = g)} position={[x, y + 0.02, 0]}>
           <Cyl rt={0.07} h={0.6} r={[Math.PI / 2, 0, 0]} c={i % 3 ? WOOD : '#7a5338'} seg={8} />
@@ -107,14 +120,16 @@ function Woodpile({ o }: { o: WorldObject }) {
         </group>
       ))}
       {/* Chopping block with an axe */}
-      <group position={[0.85, 0, 0.1]}>
-        <Cyl rt={0.2} rb={0.22} h={0.32} p={[0, 0.16, 0]} c={WOOD} />
-        <Cyl rt={0.195} h={0.01} p={[0, 0.325, 0]} c={WOOD_LIGHT} />
-        <group position={[0, 0.34, 0]} rotation={[0, 0.6, -0.5]}>
-          <Cyl rt={0.018} h={0.5} p={[0, 0.25, 0]} c="#9a6a3e" />
-          <Box s={[0.14, 0.09, 0.025]} p={[0.05, 0.02, 0]} c="#9aa0a6" o={{ metalness: 0.6, roughness: 0.4 }} />
+      <Merged>
+        <group position={[0.85, 0, 0.1]}>
+          <Cyl rt={0.2} rb={0.22} h={0.32} p={[0, 0.16, 0]} c={WOOD} />
+          <Cyl rt={0.195} h={0.01} p={[0, 0.325, 0]} c={WOOD_LIGHT} />
+          <group position={[0, 0.34, 0]} rotation={[0, 0.6, -0.5]}>
+            <Cyl rt={0.018} h={0.5} p={[0, 0.25, 0]} c="#9a6a3e" />
+            <Box s={[0.14, 0.09, 0.025]} p={[0.05, 0.02, 0]} c="#9aa0a6" o={{ metalness: 0.6, roughness: 0.4 }} />
+          </group>
         </group>
-      </group>
+      </Merged>
     </group>
   );
 }
@@ -139,20 +154,33 @@ function PrepTable({ o }: { o: WorldObject }) {
   const plateMats = useMemo(() => Array.from({ length: 4 }, () => uniqueMat('#9a5a2a', { roughness: 0.6 })), []);
   return (
     <group>
-      <Rounded s={[1.44, 0.05, 0.72]} p={[0, 0.72, 0]} c="#c79a6a" radius={0.02} />
-      {[
-        [-0.65, -0.3],
-        [0.65, -0.3],
-        [-0.65, 0.3],
-        [0.65, 0.3],
-      ].map(([x, z]) => (
-        <Cyl key={`${x}${z}`} rt={0.022} h={0.72} p={[x, 0.36, z]} c={METAL} />
-      ))}
-      {/* Cutting board with ingredients being prepared */}
-      <Rounded s={[0.42, 0.025, 0.28]} p={[0, 0.76, 0.12]} c={WOOD_LIGHT} radius={0.01} />
+      <Merged>
+        <Rounded s={[1.44, 0.05, 0.72]} p={[0, 0.72, 0]} c="#c79a6a" radius={0.02} />
+        {[
+          [-0.65, -0.3],
+          [0.65, -0.3],
+          [-0.65, 0.3],
+          [0.65, 0.3],
+        ].map(([x, z]) => (
+          <Cyl key={`${x}${z}`} rt={0.022} h={0.72} p={[x, 0.36, z]} c={METAL} />
+        ))}
+        {/* Cutting board with ingredients being prepared */}
+        <Rounded s={[0.42, 0.025, 0.28]} p={[0, 0.76, 0.12]} c={WOOD_LIGHT} radius={0.01} />
+        {/* Cooler under the table */}
+        <Rounded s={[0.5, 0.3, 0.32]} p={[-0.35, 0.15, -0.05]} c="#3f7fa8" radius={0.04} />
+        <Box s={[0.52, 0.04, 0.34]} p={[-0.35, 0.31, -0.05]} c="#e9e7e1" />
+        <Cyl rt={0.035} h={0.12} p={[0.6, 0.81, -0.22]} c="#c2873a" o={{ roughness: 0.4 }} />
+        <Cyl rt={0.03} h={0.1} p={[0.5, 0.8, -0.26]} c="#9e3b2f" o={{ roughness: 0.4 }} />
+      </Merged>
       <group position={[0, 0.79, 0.12]}>
         {Array.from({ length: 8 }, (_, i) => (
-          <mesh key={i} ref={(m) => (veg.current[i] = m)} position={[-0.15 + (i % 4) * 0.08, 0.008, -0.06 + Math.floor(i / 4) * 0.1]} material={mat(i % 3 === 0 ? '#f08a3a' : i % 3 === 1 ? '#e84a3a' : '#f2e2b8')} castShadow>
+          <mesh
+            key={i}
+            ref={(m) => (veg.current[i] = m)}
+            position={[-0.15 + (i % 4) * 0.08, 0.008, -0.06 + Math.floor(i / 4) * 0.1]}
+            material={mat(i % 3 === 0 ? '#f08a3a' : i % 3 === 1 ? '#e84a3a' : '#f2e2b8')}
+            castShadow
+          >
             <boxGeometry args={[0.035, 0.025, 0.035]} />
           </mesh>
         ))}
@@ -179,13 +207,7 @@ function PrepTable({ o }: { o: WorldObject }) {
           </mesh>
         </group>
       ))}
-      {/* Supplies on the table */}
-      <Cyl rt={0.035} h={0.12} p={[0.6, 0.81, -0.22]} c="#c2873a" o={{ roughness: 0.4 }} />
-      <Cyl rt={0.03} h={0.1} p={[0.5, 0.8, -0.26]} c="#9e3b2f" o={{ roughness: 0.4 }} />
       <TableLantern />
-      {/* Cooler under the table */}
-      <Rounded s={[0.5, 0.3, 0.32]} p={[-0.35, 0.15, -0.05]} c="#3f7fa8" radius={0.04} />
-      <Box s={[0.52, 0.04, 0.34]} p={[-0.35, 0.31, -0.05]} c="#e9e7e1" />
     </group>
   );
 }
@@ -226,7 +248,7 @@ function Tarp() {
     return g;
   }, []);
   return (
-    <group>
+    <Merged>
       <mesh geometry={geometry} castShadow receiveShadow material={mat('#c9a46a', { side: THREE.DoubleSide, roughness: 0.95 })} />
       {[
         [-1.6, 1.3, 2.0],
@@ -241,7 +263,7 @@ function Tarp() {
       ))}
       {/* String of little lights along the front edge */}
       <TarpLights />
-    </group>
+    </Merged>
   );
 }
 
@@ -266,7 +288,7 @@ function TarpLights() {
 
 function SupplyBox() {
   return (
-    <group>
+    <Merged>
       <Rounded s={[0.82, 0.42, 0.52]} p={[0, 0.21, 0]} c={WOOD} radius={0.03} />
       {[-0.12, 0.12].map((y) => (
         <Box key={y} s={[0.84, 0.04, 0.54]} p={[0, 0.21 + y, 0]} c={WOOD_DARK} />
@@ -280,7 +302,7 @@ function SupplyBox() {
         <coneGeometry args={[0.03, 0.2, 8]} />
       </mesh>
       <Cyl rt={0.07} h={0.14} p={[0.25, 0.48, -0.08]} c="#e8dcc0" />
-    </group>
+    </Merged>
   );
 }
 
@@ -303,7 +325,13 @@ function FishBucket({ o }: { o: WorldObject }) {
         <torusGeometry args={[0.2, 0.008, 6, 16, Math.PI]} />
       </mesh>
       {[0, 1, 2, 3].map((i) => (
-        <mesh key={i} ref={(m) => (tails.current[i] = m)} position={[Math.cos(i * 1.7) * 0.08, 0.33, Math.sin(i * 1.7) * 0.08]} rotation={[0, i, 0]} material={mat(['#c98f8a', '#c9b85a', '#e0a03f', '#b7c2c9'][i])}>
+        <mesh
+          key={i}
+          ref={(m) => (tails.current[i] = m)}
+          position={[Math.cos(i * 1.7) * 0.08, 0.33, Math.sin(i * 1.7) * 0.08]}
+          rotation={[0, i, 0]}
+          material={mat(['#c98f8a', '#c9b85a', '#e0a03f', '#b7c2c9'][i])}
+        >
           <coneGeometry args={[0.035, 0.08, 3]} />
         </mesh>
       ))}
@@ -317,10 +345,17 @@ function Dock() {
   const planks = Math.round(len / 0.24);
   const deck = 0.1;
   return (
-    <group>
+    <Merged>
       {Array.from({ length: planks }, (_, i) => {
         const x = -len / 2 + (i + 0.5) * (len / planks);
-        return <Box key={i} s={[len / planks - 0.03, 0.05, d.width]} p={[x, deck - 0.025, 0]} c={i % 3 === 0 ? '#9a7350' : i % 3 === 1 ? '#a57d58' : '#8f6a49'} />;
+        return (
+          <Box
+            key={i}
+            s={[len / planks - 0.03, 0.05, d.width]}
+            p={[x, deck - 0.025, 0]}
+            c={i % 3 === 0 ? '#9a7350' : i % 3 === 1 ? '#a57d58' : '#8f6a49'}
+          />
+        );
       })}
       <Box s={[len, 0.08, 0.08]} p={[0, deck - 0.08, d.width / 2 - 0.04]} c={WOOD_DARK} />
       <Box s={[len, 0.08, 0.08]} p={[0, deck - 0.08, -d.width / 2 + 0.04]} c={WOOD_DARK} />
@@ -332,18 +367,18 @@ function Dock() {
       <mesh position={[len / 2 - 0.1, deck + 0.3, -d.width / 2 + 0.08]} rotation={[Math.PI / 2, 0, 0]} material={mat('#d8cdb5')}>
         <torusGeometry args={[0.07, 0.015, 6, 14]} />
       </mesh>
-    </group>
+    </Merged>
   );
 }
 
 function Tackle() {
   return (
-    <group>
+    <Merged>
       <Rounded s={[0.5, 0.22, 0.3]} p={[0, 0.11, 0]} c="#4f7a4a" radius={0.03} />
       <Box s={[0.18, 0.03, 0.04]} p={[0, 0.25, 0]} c="#2f3a2e" />
       <Rod a={[-0.3, 0, -0.2]} b={[-0.18, 1.5, -0.32]} c="#5a3a28" rad={0.012} />
       <Rod a={[-0.2, 0, -0.22]} b={[-0.02, 1.45, -0.36]} c="#3a5a7a" rad={0.012} />
-    </group>
+    </Merged>
   );
 }
 
@@ -363,8 +398,10 @@ function Lantern({ o }: { o: WorldObject }) {
   });
   return (
     <group>
-      <Cyl rt={0.04} rb={0.05} h={1.5} p={[0, 0.75, 0]} c={WOOD_DARK} />
-      <Box s={[0.32, 0.04, 0.04]} p={[0.14, 1.45, 0]} c={WOOD_DARK} />
+      <Merged>
+        <Cyl rt={0.04} rb={0.05} h={1.5} p={[0, 0.75, 0]} c={WOOD_DARK} />
+        <Box s={[0.32, 0.04, 0.04]} p={[0.14, 1.45, 0]} c={WOOD_DARK} />
+      </Merged>
       <group ref={swing} position={[0.26, 1.43, 0]}>
         <Rod a={[0, 0, 0]} b={[0, -0.1, 0]} c={METAL} rad={0.006} />
         <group position={[0, -0.26, 0]}>
@@ -429,9 +466,11 @@ function Telescope({ o }: { o: WorldObject }) {
   });
   return (
     <group>
-      {[0, 2.09, 4.19].map((a) => (
-        <Rod key={a} a={[0, 0.9, 0]} b={[Math.sin(a) * 0.32, 0, Math.cos(a) * 0.32 - 0.05]} c="#5a4636" rad={0.018} shadow />
-      ))}
+      <Merged>
+        {[0, 2.09, 4.19].map((a) => (
+          <Rod key={a} a={[0, 0.9, 0]} b={[Math.sin(a) * 0.32, 0, Math.cos(a) * 0.32 - 0.05]} c="#5a4636" rad={0.018} shadow />
+        ))}
+      </Merged>
       <group ref={tube} position={[0, 0.95, 0]} rotation={[-0.7, 0, 0]}>
         <Cyl rt={0.07} rb={0.055} h={0.75} r={[Math.PI / 2, 0, 0]} p={[0, 0, 0.12]} c="#3e5f8a" o={{ metalness: 0.4, roughness: 0.4 }} />
         <Cyl rt={0.075} h={0.06} r={[Math.PI / 2, 0, 0]} p={[0, 0, 0.48]} c="#d9b45a" o={{ metalness: 0.7, roughness: 0.3 }} />
@@ -466,7 +505,10 @@ const FIND_COLORS: Record<CollectibleKind, string> = { pinecone: '#7a5232', flow
 function Basket({ o }: { o: WorldObject }) {
   const items = useMemo(() => {
     const rng = new Rng(4);
-    return Array.from({ length: 12 }, () => [rng.range(-0.12, 0.12), rng.range(0.16, 0.24), rng.range(-0.1, 0.1)] as [number, number, number]);
+    return Array.from(
+      { length: 12 },
+      () => [rng.range(-0.12, 0.12), rng.range(0.16, 0.24), rng.range(-0.1, 0.1)] as [number, number, number],
+    );
   }, []);
   const refs = useRef<(THREE.Mesh | null)[]>([]);
   const mats = useMemo(() => items.map(() => uniqueMat('#7a5232', { roughness: 0.7 })), [items]);
@@ -499,13 +541,13 @@ function Basket({ o }: { o: WorldObject }) {
 
 function Crate() {
   return (
-    <group>
+    <Merged>
       <Rounded s={[0.78, 0.5, 0.58]} p={[0, 0.25, 0]} c="#a87a50" radius={0.025} />
       {[-0.13, 0.13].map((y) => (
         <Box key={y} s={[0.8, 0.05, 0.6]} p={[0, 0.25 + y, 0]} c={WOOD_DARK} />
       ))}
       <Ball rad={0.07} p={[0.15, 0.56, 0.05]} c="#5a7a4a" />
-    </group>
+    </Merged>
   );
 }
 
@@ -516,10 +558,12 @@ function BranchSpot({ o }: { o: WorldObject }) {
   });
   return (
     <group ref={ref}>
-      <Cyl rt={0.03} rb={0.04} h={0.8} r={[0, 0.3, Math.PI / 2]} p={[0, 0.04, 0]} c="#6a4a33" />
-      <Cyl rt={0.025} rb={0.035} h={0.65} r={[0, -0.6, Math.PI / 2]} p={[0.05, 0.08, 0.05]} c="#7a5338" />
-      <Cyl rt={0.02} rb={0.03} h={0.55} r={[0, 1.2, Math.PI / 2]} p={[-0.05, 0.06, -0.05]} c="#5e4030" />
-      <Ball rad={0.06} scale={[1.2, 0.3, 0.8]} p={[0.25, 0.03, 0.1]} c="#6a8a3a" shadow={false} />
+      <Merged>
+        <Cyl rt={0.03} rb={0.04} h={0.8} r={[0, 0.3, Math.PI / 2]} p={[0, 0.04, 0]} c="#6a4a33" />
+        <Cyl rt={0.025} rb={0.035} h={0.65} r={[0, -0.6, Math.PI / 2]} p={[0.05, 0.08, 0.05]} c="#7a5338" />
+        <Cyl rt={0.02} rb={0.03} h={0.55} r={[0, 1.2, Math.PI / 2]} p={[-0.05, 0.06, -0.05]} c="#5e4030" />
+        <Ball rad={0.06} scale={[1.2, 0.3, 0.8]} p={[0.25, 0.03, 0.1]} c="#6a8a3a" shadow={false} />
+      </Merged>
     </group>
   );
 }
@@ -564,7 +608,15 @@ function Collectible({ o }: { o: WorldObject }) {
       )}
       {kind === 'stone' && <Ball rad={0.07} scale={[1.2, 0.55, 0.9]} p={[0, 0.035, 0]} c="#8f9aa6" o={{ roughness: 0.35 }} />}
       <sprite position={[0, 0.35, 0]} scale={[0.35, 0.35, 1]}>
-        <spriteMaterial ref={sparkle} map={glowTexture()} color="#fff4c2" transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+        <spriteMaterial
+          ref={sparkle}
+          map={glowTexture()}
+          color="#fff4c2"
+          transparent
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+          toneMapped={false}
+        />
       </sprite>
     </group>
   );
@@ -575,12 +627,20 @@ function Bridge() {
   const planks = 14;
   const arch = (t: number) => 0.12 + Math.sin(Math.PI * t) * 0.28;
   return (
-    <group>
+    <Merged>
       {Array.from({ length: planks }, (_, i) => {
         const t = (i + 0.5) / planks;
         const x = (t - 0.5) * b.length;
         const slope = Math.cos(Math.PI * t) * 0.28 * (Math.PI / b.length);
-        return <Box key={i} s={[b.length / planks - 0.025, 0.05, b.width]} p={[x, arch(t), 0]} r={[0, 0, Math.atan(slope)]} c={i % 2 ? '#9a7350' : '#a57d58'} />;
+        return (
+          <Box
+            key={i}
+            s={[b.length / planks - 0.025, 0.05, b.width]}
+            p={[x, arch(t), 0]}
+            r={[0, 0, Math.atan(slope)]}
+            c={i % 2 ? '#9a7350' : '#a57d58'}
+          />
+        );
       })}
       {[-1, 1].map((s) => (
         <group key={s}>
@@ -605,7 +665,7 @@ function Bridge() {
           })}
         </group>
       ))}
-    </group>
+    </Merged>
   );
 }
 
@@ -667,7 +727,7 @@ export function ObjectView({ o, version }: { o: WorldObject; version: number }) 
   })();
   return (
     <group ref={group} position={[o.x, y, o.z]} rotation={[0, o.rot, 0]} userData={{ objectId: o.id }}>
-      {body}
+      <ModelOr kind={o.kind}>{body}</ModelOr>
     </group>
   );
 }

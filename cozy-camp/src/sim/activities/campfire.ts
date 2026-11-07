@@ -20,7 +20,13 @@ export function freeFireSeat(w: World, ch: Character): { o: WorldObject; s: Slot
 export function anySeat(w: World, ch: Character, near: V2 = ch): { o: WorldObject; s: Slot } | null {
   return (
     freeFireSeat(w, ch) ??
-    nearestFreeSlot(w, near, (o) => SEAT_KINDS.includes(o.kind) || o.kind === 'blanket', () => true, ch.id)
+    nearestFreeSlot(
+      w,
+      near,
+      (o) => SEAT_KINDS.includes(o.kind) || o.kind === 'blanket',
+      () => true,
+      ch.id,
+    )
   );
 }
 
@@ -143,7 +149,13 @@ export const gatherWood: ActivityDef = {
     const w = ctx.w;
     let spot: WorldObject | undefined = p.objectId ? w.obj(p.objectId) : undefined;
     if (!spot) {
-      const free = nearestFreeSlot(w, ctx.ch, (o) => o.kind === 'branchSpot' && Boolean(o.on), () => true, ctx.ch.id);
+      const free = nearestFreeSlot(
+        w,
+        ctx.ch,
+        (o) => o.kind === 'branchSpot' && Boolean(o.on),
+        () => true,
+        ctx.ch.id,
+      );
       spot = free?.o;
     }
     if (!spot || !spot.on) throw new ActivityFail('No fallen branches to gather');
@@ -247,7 +259,13 @@ export const sit: ActivityDef = {
       const s = o?.slots.find((x) => !x.occupant || x.occupant === ctx.ch.id);
       if (o && s) target = { o, s };
     } else if (!ctx.run.byPlayer) {
-      target = nearestFreeSlot(w, ctx.ch, (o) => o.kind === 'bench' || o.kind === 'blanket', () => true, ctx.ch.id);
+      target = nearestFreeSlot(
+        w,
+        ctx.ch,
+        (o) => o.kind === 'bench' || o.kind === 'blanket',
+        () => true,
+        ctx.ch.id,
+      );
     }
     target ??= anySeat(w, ctx.ch);
     if (!target) throw new ActivityFail('No free seats');
@@ -283,10 +301,14 @@ export const marshmallow: ActivityDef = {
       ctx.hold('stick', 0);
       ctx.anim('sitRoast');
       ctx.lookAt(w.campfire);
-      const done = yield* ctx.waitUntil(() => ctx.ch.heldState >= 1, 30, (dt) => {
-        ctx.ch.heldState = Math.min(1, ctx.ch.heldState + dt * 0.11 * (0.25 + w.fire.intensity));
-        ctx.gain('warmth', 0.6 * w.fire.intensity, dt);
-      });
+      const done = yield* ctx.waitUntil(
+        () => ctx.ch.heldState >= 1,
+        30,
+        (dt) => {
+          ctx.ch.heldState = Math.min(1, ctx.ch.heldState + dt * 0.11 * (0.25 + w.fire.intensity));
+          ctx.gain('warmth', 0.6 * w.fire.intensity, dt);
+        },
+      );
       ctx.lookAt(null);
       if (!done) break;
       ctx.step('Eating a toasty marshmallow');

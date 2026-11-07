@@ -32,7 +32,15 @@ function Swatches({ colors, value, onChange, label }: { colors: string[]; value:
   return (
     <div className="swatches" role="radiogroup" aria-label={label}>
       {colors.map((c) => (
-        <button key={c} role="radio" aria-checked={value === c} aria-label={c} className={`swatch ${value === c ? 'on' : ''}`} style={{ background: c }} onClick={() => onChange(c)} />
+        <button
+          key={c}
+          role="radio"
+          aria-checked={value === c}
+          aria-label={c}
+          className={`swatch ${value === c ? 'on' : ''}`}
+          style={{ background: c }}
+          onClick={() => onChange(c)}
+        />
       ))}
     </div>
   );
@@ -137,7 +145,9 @@ export function AvatarCreator() {
                 </button>
               ))}
             </div>
-            {a.hat !== 'none' && <Swatches label="Hat colour" colors={CLOTHES} value={a.hatColor} onChange={(hatColor) => set({ hatColor })} />}
+            {a.hat !== 'none' && (
+              <Swatches label="Hat colour" colors={CLOTHES} value={a.hatColor} onChange={(hatColor) => set({ hatColor })} />
+            )}
             <label className="toggle">
               <input type="checkbox" checked={a.scarf} onChange={(e) => set({ scarf: e.target.checked })} />
               <span>Cosy scarf</span>

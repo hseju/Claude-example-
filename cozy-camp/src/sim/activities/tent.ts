@@ -159,10 +159,20 @@ export const shelter: ActivityDef = {
   *run(ctx, p) {
     const w = ctx.w;
     const bed = findBed(w, ctx.ch, p.objectId);
-    const tarp = nearestFreeSlot(w, ctx.ch, (o) => o.kind === 'tarp', () => true, ctx.ch.id);
+    const tarp = nearestFreeSlot(
+      w,
+      ctx.ch,
+      (o) => o.kind === 'tarp',
+      () => true,
+      ctx.ch.id,
+    );
     const picked = p.objectId ? w.obj(p.objectId)?.kind : undefined;
     const preferTent =
-      bed && picked !== 'tarp' && (picked === 'tent' || !tarp || Math.hypot(bed.o.x - ctx.ch.x, bed.o.z - ctx.ch.z) < Math.hypot(tarp.o.x - ctx.ch.x, tarp.o.z - ctx.ch.z) + 3);
+      bed &&
+      picked !== 'tarp' &&
+      (picked === 'tent' ||
+        !tarp ||
+        Math.hypot(bed.o.x - ctx.ch.x, bed.o.z - ctx.ch.z) < Math.hypot(tarp.o.x - ctx.ch.x, tarp.o.z - ctx.ch.z) + 3);
     ctx.say('🌧️', 'Brr, rain!', 2.5);
     const stillRaining = () => w.rain() > 0.12;
     if (preferTent && bed) {
@@ -173,17 +183,25 @@ export const shelter: ActivityDef = {
       ctx.step('Listening to the rain from the tent');
       if (w.isNight()) ts.lightOn = true;
       ctx.onCleanup(() => (ts.lightOn = false));
-      yield* ctx.waitUntil(() => !stillRaining(), 400, (dt) => {
-        ctx.gain('warmth', 0.3, dt);
-        ctx.gain('energy', 0.05, dt);
-      });
+      yield* ctx.waitUntil(
+        () => !stillRaining(),
+        400,
+        (dt) => {
+          ctx.gain('warmth', 0.3, dt);
+          ctx.gain('energy', 0.05, dt);
+        },
+      );
       ts.lightOn = false;
       yield* crawlOut(ctx, bed.o);
     } else if (tarp) {
       ctx.step('Hurrying under the tarp');
       yield* ctx.enterSlot(tarp.o, tarp.s, 'idle', { run: true });
       ctx.step('Waiting out the rain under the tarp');
-      yield* ctx.waitUntil(() => !stillRaining(), 400, (dt) => ctx.gain('fun', 0.05, dt));
+      yield* ctx.waitUntil(
+        () => !stillRaining(),
+        400,
+        (dt) => ctx.gain('fun', 0.05, dt),
+      );
     } else {
       throw new ActivityFail('Nowhere dry to go');
     }

@@ -141,15 +141,7 @@ export class Terrain {
       const nearLake = this.lakeRadius(x, z) < 1.8;
       const roll = rng.next();
       const kind: TreeInstance['kind'] =
-        r > 23 && roll < 0.45
-          ? 'tallPine'
-          : nearLake && roll < 0.45
-            ? 'birch'
-            : roll < 0.55
-              ? 'pine'
-              : roll < 0.85
-                ? 'round'
-                : 'birch';
+        r > 23 && roll < 0.45 ? 'tallPine' : nearLake && roll < 0.45 ? 'birch' : roll < 0.55 ? 'pine' : roll < 0.85 ? 'round' : 'birch';
       this.trees.push({ x, z, kind, scale: rng.range(0.8, 1.25) * (r > 22 ? 1.15 : 1), rot: rng.range(0, 6.28), tint: rng.next() });
     }
 
@@ -196,13 +188,7 @@ export class Terrain {
     place('bush', 70, (x, z) => land(x, z) && offPaths(x, z) && !this.inClearing(x, z, -1.5), [0.6, 1.2]);
     place('fern', 90, (x, z) => land(x, z) && offPaths(x, z) && !this.inClearing(x, z, -1), [0.5, 1.0]);
     place('grass', 420, (x, z) => land(x, z) && this.trailDist(x, z) > 0.6 && !this.nearStructure(x, z, -0.6), [0.5, 1.1], 22);
-    place(
-      'flower',
-      70,
-      (x, z) => land(x, z) && offPaths(x, z) && (Math.hypot(x + 6, z - 6.2) < 7 || Math.hypot(x, z) > 9),
-      [0.6, 1.0],
-      20,
-    );
+    place('flower', 70, (x, z) => land(x, z) && offPaths(x, z) && (Math.hypot(x + 6, z - 6.2) < 7 || Math.hypot(x, z) > 9), [0.6, 1.0], 20);
     place('mushroom', 26, (x, z) => land(x, z) && offPaths(x, z) && Math.hypot(x, z) > 9, [0.6, 1.2]);
     place('stump', 7, (x, z) => land(x, z) && offPaths(x, z) && !this.inClearing(x, z, 0) && Math.hypot(x, z) < 18, [0.8, 1.1]);
     place(

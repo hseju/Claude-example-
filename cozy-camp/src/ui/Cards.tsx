@@ -114,7 +114,13 @@ export function AvatarCard({ ch }: { ch: Character }) {
               const reason = a.blocked(world, ch, {});
               const active = run?.id === a.id;
               return (
-                <button key={a.id} className={`act ${active ? 'on' : ''}`} disabled={Boolean(reason)} title={reason ?? a.label} onClick={() => startPlayerActivity(a.id)}>
+                <button
+                  key={a.id}
+                  className={`act ${active ? 'on' : ''}`}
+                  disabled={Boolean(reason)}
+                  title={reason ?? a.label}
+                  onClick={() => startPlayerActivity(a.id)}
+                >
                   <span aria-hidden>{a.icon}</span>
                   {a.label}
                 </button>
@@ -133,7 +139,15 @@ function objectSummary(o: WorldObject): string[] {
   switch (o.kind) {
     case 'campfire': {
       const f = o.fire!;
-      const state = !f.lit ? (f.ember > 0.1 ? 'Glowing embers' : 'Cold ashes') : f.intensity > 0.75 ? 'Roaring' : f.intensity > 0.4 ? 'Burning steadily' : 'Burning low';
+      const state = !f.lit
+        ? f.ember > 0.1
+          ? 'Glowing embers'
+          : 'Cold ashes'
+        : f.intensity > 0.75
+          ? 'Roaring'
+          : f.intensity > 0.4
+            ? 'Burning steadily'
+            : 'Burning low';
       const lines = [`${state} · fuel ${Math.round((f.fuel / 1.6) * 100)}%`];
       if (f.pan) lines.push(`${FOOD_NAMES[f.pan.food]} cooking: ${Math.min(100, Math.round(f.pan.doneness * 100))}%`);
       lines.push(f.kettleHeat > 0.5 ? 'Kettle is hot' : 'Kettle is cool');
@@ -142,7 +156,10 @@ function objectSummary(o: WorldObject): string[] {
     case 'tent': {
       const t = o.tent!;
       const inside = o.slots.filter((s) => s.kind === 'sleep' && s.occupant).map((s) => world.char(s.occupant!)?.name);
-      return [t.pitch >= 1 ? 'Pitched' : t.pitch <= 0 ? 'Packed in its bag' : 'Being set up…', inside.length ? `Inside: ${inside.join(', ')}` : 'Nobody inside'];
+      return [
+        t.pitch >= 1 ? 'Pitched' : t.pitch <= 0 ? 'Packed in its bag' : 'Being set up…',
+        inside.length ? `Inside: ${inside.join(', ')}` : 'Nobody inside',
+      ];
     }
     case 'woodpile':
       return [`${o.count ?? 0} logs stacked`];
@@ -150,7 +167,10 @@ function objectSummary(o: WorldObject): string[] {
       return [`${o.count ?? 0} fish for dinner`];
     case 'prepTable': {
       const p = o.prep!;
-      return [p.plates ? `${p.plates} plates of ${FOOD_NAMES[p.plateFood]} ready` : 'No food ready yet', p.food ? `Preparing ${FOOD_NAMES[p.food]}` : ''].filter(Boolean);
+      return [
+        p.plates ? `${p.plates} plates of ${FOOD_NAMES[p.plateFood]} ready` : 'No food ready yet',
+        p.food ? `Preparing ${FOOD_NAMES[p.food]}` : '',
+      ].filter(Boolean);
     }
     case 'lantern':
       return [o.on ? 'Glowing warmly' : 'Unlit'];
@@ -159,7 +179,9 @@ function objectSummary(o: WorldObject): string[] {
       return [`🌰 ${b.pinecone}  🌼 ${b.flower}  🍄 ${b.mushroom}  🪨 ${b.stone}`];
     }
     case 'telescope':
-      return [world.daylight() > 0.35 ? 'Waiting for nightfall' : world.env.mix.cloud > 0.7 ? 'Too cloudy tonight' : 'Clear view of the stars'];
+      return [
+        world.daylight() > 0.35 ? 'Waiting for nightfall' : world.env.mix.cloud > 0.7 ? 'Too cloudy tonight' : 'Clear view of the stars',
+      ];
     case 'hammock':
     case 'chair':
     case 'bench':
@@ -208,7 +230,13 @@ export function ObjectCard({ o }: { o: WorldObject }) {
           {actions.map((a) => {
             const reason = ACTIVITIES[a.activity].blocked(world, world.player, a.params);
             return (
-              <button key={a.label} className="act" disabled={Boolean(reason)} title={reason ?? a.label} onClick={() => startPlayerActivity(a.activity, a.params)}>
+              <button
+                key={a.label}
+                className="act"
+                disabled={Boolean(reason)}
+                title={reason ?? a.label}
+                onClick={() => startPlayerActivity(a.activity, a.params)}
+              >
                 <span aria-hidden>{a.icon}</span>
                 {a.label}
               </button>

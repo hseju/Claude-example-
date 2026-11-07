@@ -456,14 +456,26 @@ function HeldItem({ ch, item }: { ch: Character; item: Character['held'] }) {
         <group position={[0, -0.02, 0.18]}>
           <Cyl rt={0.17} rb={0.14} h={0.05} c="#2e2e33" o={{ metalness: 0.6, roughness: 0.45 }} seg={16} />
           <Box s={[0.04, 0.02, 0.2]} p={[0, 0.01, -0.17]} c="#2e2e33" />
-          <Cyl rt={0.14} h={0.02} p={[0, 0.03, 0]} c={ch.heldMeta === 'stew' ? '#9a5a2a' : ch.heldMeta === 'sausages' ? '#a8603a' : '#c7843c'} seg={14} />
+          <Cyl
+            rt={0.14}
+            h={0.02}
+            p={[0, 0.03, 0]}
+            c={ch.heldMeta === 'stew' ? '#9a5a2a' : ch.heldMeta === 'sausages' ? '#a8603a' : '#c7843c'}
+            seg={14}
+          />
         </group>
       );
     case 'bowl':
       return (
         <group position={[-0.05, 0.02, 0.1]}>
           <Cyl rt={0.1} rb={0.06} h={0.06} c="#e9e2d2" seg={14} />
-          <Cyl rt={0.085} h={0.012} p={[0, 0.03, 0]} c={ch.heldMeta === 'stew' ? '#9a5a2a' : ch.heldMeta === 'sausages' ? '#a8603a' : '#c7843c'} seg={12} />
+          <Cyl
+            rt={0.085}
+            h={0.012}
+            p={[0, 0.03, 0]}
+            c={ch.heldMeta === 'stew' ? '#9a5a2a' : ch.heldMeta === 'sausages' ? '#a8603a' : '#c7843c'}
+            seg={12}
+          />
         </group>
       );
     case 'mug':
@@ -528,7 +540,15 @@ function HeldItem({ ch, item }: { ch: Character; item: Character['held'] }) {
           </mesh>
           <Cyl rt={0.055} h={0.02} p={[0, -0.075, 0]} c="#3a3a3a" />
           <sprite scale={[0.7, 0.7, 1]}>
-            <spriteMaterial map={glowTexture()} color="#ffb45a" transparent opacity={0.35} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+            <spriteMaterial
+              map={glowTexture()}
+              color="#ffb45a"
+              transparent
+              opacity={0.35}
+              depthWrite={false}
+              blending={THREE.AdditiveBlending}
+              toneMapped={false}
+            />
           </sprite>
         </group>
       );
@@ -600,7 +620,10 @@ export function Avatar({ ch, preview = false }: { ch: Character; preview?: boole
   const forceRender = useUI((s) => s.tick);
   void forceRender;
 
-  const cheekMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#f29a9a', transparent: true, opacity: 0.55, roughness: 0.9 }), []);
+  const cheekMat = useMemo(
+    () => new THREE.MeshStandardMaterial({ color: '#f29a9a', transparent: true, opacity: 0.55, roughness: 0.9 }),
+    [],
+  );
 
   useFrame(({ clock }, rdt) => {
     const dt = Math.min(rdt, 0.05);
@@ -753,7 +776,13 @@ export function Avatar({ ch, preview = false }: { ch: Character; preview?: boole
                     {[-1, 1].map((sx) => (
                       <group key={sx} position={[sx * 0.088, 0, 0.226]}>
                         <Ball rad={0.038} scale={[0.82, 1.15, 0.5]} c="#231a17" o={{ roughness: 0.3 }} shadow={false} />
-                        <Ball rad={0.012} p={[0.012, 0.02, 0.02]} c="#ffffff" o={{ emissive: '#ffffff', emissiveIntensity: 0.4 }} shadow={false} />
+                        <Ball
+                          rad={0.012}
+                          p={[0.012, 0.02, 0.02]}
+                          c="#ffffff"
+                          o={{ emissive: '#ffffff', emissiveIntensity: 0.4 }}
+                          shadow={false}
+                        />
                       </group>
                     ))}
                   </group>
@@ -792,6 +821,7 @@ function AvatarLabel({ ch }: { ch: Character }) {
   const following = useUI((s) => s.cameraMode === 'follow' && s.followId === ch.id);
   const bubble = ch.bubble;
   const kind = ch.controller === 'player' ? 'you' : ch.controller === 'remote' ? 'remote' : 'ai';
+  const asleepInTent = ch.activity?.id === 'sleep' && ch.inSleepingBag;
   const y = ch.activity?.id === 'sleep' && ch.inSleepingBag ? 0.8 : 1.42 * ch.appearance.scale;
   return (
     <Html position={[0, y, 0]} center zIndexRange={[20, 0]} style={{ pointerEvents: 'none' }}>
@@ -802,7 +832,7 @@ function AvatarLabel({ ch }: { ch: Character }) {
             {bubble.text && <em>{bubble.text}</em>}
           </div>
         )}
-        {(showNames || selected) && !following && (
+        {(selected || (showNames && !asleepInTent)) && !following && (
           <div className={`nametag ${kind}`}>
             <i aria-hidden>{kind === 'you' ? '★' : kind === 'remote' ? '◆' : '🍃'}</i>
             {ch.name}
@@ -845,7 +875,9 @@ export function FishingLines() {
       const f = b.flight;
       const bx = lerp(b.sx, b.x, f);
       const bz = lerp(b.sz, b.z, f);
-      const by = b.landed ? wl + 0.02 - b.dip * 0.07 + Math.sin(clock.elapsedTime * 2 + i) * 0.01 : lerp(tip.y, wl, f) + Math.sin(f * Math.PI) * 1.4;
+      const by = b.landed
+        ? wl + 0.02 - b.dip * 0.07 + Math.sin(clock.elapsedTime * 2 + i) * 0.01
+        : lerp(tip.y, wl, f) + Math.sin(f * Math.PI) * 1.4;
       bob.position.set(bx, by, bz);
       const pos = geos[i].attributes.position as THREE.BufferAttribute;
       for (let j = 0; j < 10; j++) {

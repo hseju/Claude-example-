@@ -11,7 +11,13 @@ export const fish: ActivityDef = {
   blocked(w, ch) {
     if (!w.def.lake) return 'There is no lake here';
     if (w.env.mix.storm > 0.6) return 'Too stormy to fish';
-    const free = nearestFreeSlot(w, ch, (o) => o.kind === 'dock', (s) => s.kind === 'fish', ch.id);
+    const free = nearestFreeSlot(
+      w,
+      ch,
+      (o) => o.kind === 'dock',
+      (s) => s.kind === 'fish',
+      ch.id,
+    );
     return free ? null : 'Both fishing spots are taken';
   },
   utility(w, ch) {
@@ -24,7 +30,13 @@ export const fish: ActivityDef = {
   },
   *run(ctx) {
     const w = ctx.w;
-    const spot = nearestFreeSlot(w, ctx.ch, (o) => o.kind === 'dock', (s) => s.kind === 'fish', ctx.ch.id);
+    const spot = nearestFreeSlot(
+      w,
+      ctx.ch,
+      (o) => o.kind === 'dock',
+      (s) => s.kind === 'fish',
+      ctx.ch.id,
+    );
     if (!spot) throw new ActivityFail('Both fishing spots are taken');
     ctx.step('Walking to the dock');
     yield* ctx.enterSlot(spot.o, spot.s, 'idle');
@@ -58,9 +70,13 @@ export const fish: ActivityDef = {
 
       ctx.step('Waiting for a bite');
       ctx.anim('fishIdle');
-      const bit = yield* ctx.waitUntil(() => bobber.biteFish !== null, ctx.rng.range(16, 28), (dt) => {
-        ctx.gain('fun', 0.25, dt);
-      });
+      const bit = yield* ctx.waitUntil(
+        () => bobber.biteFish !== null,
+        ctx.rng.range(16, 28),
+        (dt) => {
+          ctx.gain('fun', 0.25, dt);
+        },
+      );
       if (!bit || !bobber.biteFish) {
         ctx.step('Reeling in, no luck this time');
         ctx.anim('reel');

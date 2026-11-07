@@ -44,7 +44,15 @@ export interface FishHooks {
   sound(name: string, at: V2): void;
 }
 
-export function stepFish(fish: Fish[], bobbers: Bobber[], terrain: Terrain, rng: Rng, dt: number, biteBoost: number, hooks: FishHooks): void {
+export function stepFish(
+  fish: Fish[],
+  bobbers: Bobber[],
+  terrain: Terrain,
+  rng: Rng,
+  dt: number,
+  biteBoost: number,
+  hooks: FishHooks,
+): void {
   for (const f of fish) {
     if (f.hidden || f.state === 'hooked' || f.state === 'caught') continue;
     f.jump = Math.max(0, f.jump - dt * 1.6);

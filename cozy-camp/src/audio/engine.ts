@@ -192,7 +192,17 @@ export class AudioEngine {
     return g;
   }
 
-  private noiseBurst(kind: NoiseKind, type: BiquadFilterType, freq: number, dur: number, peak: number, pan = 0, attack = 0.005, q = 0.8, sweepTo?: number) {
+  private noiseBurst(
+    kind: NoiseKind,
+    type: BiquadFilterType,
+    freq: number,
+    dur: number,
+    peak: number,
+    pan = 0,
+    attack = 0.005,
+    q = 0.8,
+    sweepTo?: number,
+  ) {
     const ctx = this.ctx!;
     const t = ctx.currentTime;
     const src = ctx.createBufferSource();
@@ -228,7 +238,16 @@ export class AudioEngine {
 
   private crackle(level: number) {
     if (level < 0.02) return;
-    this.noiseBurst('white', 'highpass', 1800 + Math.random() * 3000, 0.012 + Math.random() * 0.03, level * (0.08 + Math.random() * 0.16), Math.random() * 0.6 - 0.3, 0.001, 0.5);
+    this.noiseBurst(
+      'white',
+      'highpass',
+      1800 + Math.random() * 3000,
+      0.012 + Math.random() * 0.03,
+      level * (0.08 + Math.random() * 0.16),
+      Math.random() * 0.6 - 0.3,
+      0.001,
+      0.5,
+    );
   }
 
   private cricket(level: number) {

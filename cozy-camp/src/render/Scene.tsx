@@ -19,12 +19,15 @@ import { Wildlife } from './Wildlife';
 /** Advances the simulation and nudges React a few times per second. */
 function SimDriver() {
   const acc = useRef(0);
-  const { gl } = useThree();
+  const { gl, scene } = useThree();
   useEffect(() => {
     gl.shadowMap.autoUpdate = false;
     const dbg = (window as unknown as { cozy?: Record<string, unknown> }).cozy;
-    if (dbg) dbg.gl = gl;
-  }, [gl]);
+    if (dbg) {
+      dbg.gl = gl;
+      dbg.scene = scene;
+    }
+  }, [gl, scene]);
   useFrame((_, dt) => {
     world.update(dt);
     // Shadows are rendered once per frame (not again for the lake reflection).
@@ -99,7 +102,10 @@ function Selection() {
   const sel = useRef<THREE.Mesh>(null);
   const hov = useRef<THREE.Mesh>(null);
   const geo = useMemo(() => new THREE.RingGeometry(0.9, 1, 48).rotateX(-Math.PI / 2), []);
-  const selMat = useMemo(() => new THREE.MeshBasicMaterial({ color: '#ffe7b0', transparent: true, opacity: 0.85, depthWrite: false, toneMapped: false }), []);
+  const selMat = useMemo(
+    () => new THREE.MeshBasicMaterial({ color: '#ffe7b0', transparent: true, opacity: 0.85, depthWrite: false, toneMapped: false }),
+    [],
+  );
   const hovMat = useMemo(() => new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.35, depthWrite: false }), []);
   useFrame(({ clock }) => {
     const ui = useUI.getState();
@@ -146,7 +152,13 @@ function PlacementGhost() {
   const ghostObj = useMemo(() => {
     if (!placing) return null;
     const src = placing.id ? world.obj(placing.id) : undefined;
-    const o = createObject({ kind: placing.kind, id: `ghost-${placing.kind}`, x: 0, z: 0, init: { ...(placing.init ?? {}), color: src?.color } });
+    const o = createObject({
+      kind: placing.kind,
+      id: `ghost-${placing.kind}`,
+      x: 0,
+      z: 0,
+      init: { ...(placing.init ?? {}), color: src?.color },
+    });
     if (src?.tent && o.tent) {
       o.tent.pitch = src.tent.pitch;
       o.tent.color = src.tent.color;
@@ -154,7 +166,10 @@ function PlacementGhost() {
     }
     return o;
   }, [placing?.kind, placing?.id, placing?.init]);
-  const ringMat = useMemo(() => new THREE.MeshBasicMaterial({ color: '#7be08a', transparent: true, opacity: 0.8, depthWrite: false, toneMapped: false }), []);
+  const ringMat = useMemo(
+    () => new THREE.MeshBasicMaterial({ color: '#7be08a', transparent: true, opacity: 0.8, depthWrite: false, toneMapped: false }),
+    [],
+  );
   const geo = useMemo(() => new THREE.RingGeometry(0.85, 1, 40).rotateX(-Math.PI / 2), []);
   const group = useRef<THREE.Group>(null);
   useFrame(() => {

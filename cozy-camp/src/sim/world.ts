@@ -84,7 +84,7 @@ export class World {
     readonly def: EnvironmentDefinition,
     opts: { playerName?: string; playerAppearance?: Appearance; seed?: number } = {},
   ) {
-    this.rng = new Rng(opts.seed ?? (Date.now() & 0xffffffff));
+    this.rng = new Rng(opts.seed ?? Date.now() & 0xffffffff);
     this.terrain = new Terrain(def);
     this.env = createEnv(def.defaults.time, def.defaults.season, def.defaults.weather);
 

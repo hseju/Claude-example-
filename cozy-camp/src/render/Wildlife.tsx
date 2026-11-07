@@ -106,7 +106,12 @@ function Deer({ a }: { a: Animal }) {
     grp.rotation.y = a.heading;
     const moving = a.state === 'move' || a.state === 'flee';
     const grazing = a.state === 'graze';
-    if (neck.current) neck.current.rotation.x = THREE.MathUtils.lerp(neck.current.rotation.x, grazing ? 1.1 : -0.15 + Math.sin(clock.elapsedTime) * 0.05, 0.05);
+    if (neck.current)
+      neck.current.rotation.x = THREE.MathUtils.lerp(
+        neck.current.rotation.x,
+        grazing ? 1.1 : -0.15 + Math.sin(clock.elapsedTime) * 0.05,
+        0.05,
+      );
     legs.current.forEach((l, i) => {
       if (l) l.rotation.x = moving ? Math.sin(a.hop * 2 + (i % 2 ? Math.PI : 0) + (i > 1 ? Math.PI / 2 : 0)) * 0.5 : 0;
     });
@@ -294,7 +299,11 @@ function Moths() {
       if (!l) return;
       const t = clock.elapsedTime * (2.2 + i * 0.2) + i * 2;
       const y = world.terrain.surfaceHeight(l.x, l.z) + 1.2;
-      m.position.set(l.x + 0.26 * Math.cos(l.rot) + Math.sin(t) * 0.25, y + Math.sin(t * 1.7) * 0.15, l.z - 0.26 * Math.sin(l.rot) + Math.cos(t * 1.3) * 0.25);
+      m.position.set(
+        l.x + 0.26 * Math.cos(l.rot) + Math.sin(t) * 0.25,
+        y + Math.sin(t * 1.7) * 0.15,
+        l.z - 0.26 * Math.sin(l.rot) + Math.cos(t * 1.3) * 0.25,
+      );
       m.rotation.y = t;
       m.scale.y = 0.4 + Math.abs(Math.sin(t * 12)) * 0.6;
     });
