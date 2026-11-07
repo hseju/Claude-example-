@@ -18,6 +18,7 @@ const BELL_PARTIALS = [
 ];
 
 const SA = 138.59;            // tonic (C#3) for the drone
+const OM = 136.1;             // the pitch an Om is traditionally chanted to; the voices in the Shiva hall chant an octave below
 const MEL = SA * 2;           // melody Sa (C#4)
 const st = (n) => Math.pow(2, n / 12);
 
@@ -83,6 +84,7 @@ export class TempleAudio {
     this.onTrack = null;      // called when a new track starts
     this._queues = {};
     this.synthMelody = false; // raga phrases on synthesised bansuri/sitar; off now that recordings carry the music
+    this.sanctum = null;      // 'shiva' inside the Shiva hall: the outside falls silent and the cave fills with a chanted Om
   }
 
   get ready() { return !!this.ctx && this.ctx.state === 'running'; }
@@ -115,6 +117,7 @@ export class TempleAudio {
     this._buildMusic();
     this._schedule();
     this.applyZone(this.zone, 0.1);
+    if (this.sanctum) this._omLoop();
     this.loadLibrary();
     try { await ctx.resume(); } catch (e) {}
     return this.ready;
@@ -210,8 +213,10 @@ export class TempleAudio {
     // hall: a hummed "Om" choir and a low drone for the Shiva shrine
     { const g = ctx.createGain(); g.gain.value = 0; g.connect(this.buses.music); this._send(g, { hall: 0.6 }); L.chant = g; this._buildChant(g); }
     { const g = ctx.createGain(); g.gain.value = 0; g.connect(this.buses.music); this._send(g, { hall: 0.5 }); L.shivaDrone = g;
-      for (const [f, a] of [[SA / 2, 0.5], [SA * 0.75, 0.3], [SA, 0.18]]) { const o = ctx.createOscillator(); o.frequency.value = f; const og = ctx.createGain(); og.gain.value = a * 0.25;
+      for (const [f, a] of [[OM / 2, 0.5], [OM * 0.75, 0.3], [OM, 0.22], [OM * 1.5, 0.08]]) { const o = ctx.createOscillator(); o.frequency.value = f; const og = ctx.createGain(); og.gain.value = a * 0.25;
         const lfo = ctx.createOscillator(); lfo.frequency.value = 0.05 + Math.random() * 0.05; const lg = ctx.createGain(); lg.gain.value = a * 0.08; lfo.connect(lg).connect(og.gain); o.connect(og).connect(g); o.start(); lfo.start(); } }
+    // the chanted Om in the Shiva hall (voices are made breath by breath, see _omLoop), ringing in the cave
+    { const g = ctx.createGain(); g.gain.value = 0; g.connect(this.buses.music); this._send(g, { hall: 0.75, stone: 0.2 }); L.om = g; }
     // one-shot destinations
     L.birds = gainNode(out); L.bells = gainNode(out); this._send(L.bells, { stone: 0.5, hall: 0.25 }); L.cows = gainNode(out); L.night = gainNode(out); L.recorded = gainNode(out);
   }
@@ -430,8 +435,8 @@ export class TempleAudio {
     this.zone = z;
     if (!this.ctx || !this.layers.wind) return;
     const L = this.layers, m = TOD_MIX[this.tod], out = 1 - z.dome, rec = this._hasRec('ambience.' + this.tod), sm = this.session, quiet = sm ? sm.ambience ?? 0.6 : 1;
-    const set = (g, v) => this._ramp(g.gain, v, tc);
-    set(this.outdoor, 0.4 + out * 0.6);
+    const set = (g, v) => this._ramp(g.gain, v, tc), still = this.sanctum ? 0 : 1;   // inside the Shiva hall only the Om is heard
+    set(this.outdoor, this.sanctum ? 0.05 : 0.4 + out * 0.6);
     this._ramp(this.outdoorLP.frequency, 700 + out * 17000, tc);
     set(L.wind, quiet * 0.035 * m.wind * (0.4 + z.entrance + z.garden * 0.6));
     set(L.fountain, quiet * 0.05 * z.courtyard * (this.tod === 'night' ? 0.6 : 1));   // a soft trickle, only close to the fountain
@@ -445,12 +450,13 @@ export class TempleAudio {
     const recMusic = this._musicOn(), music = recMusic ? 0 : m.music;
     const near = Math.max(z.corridor, z.dome);
     // without a recording the music is just a soft tanpura drone, mostly heard by the shrines
-    set(L.tanpura, music * (0.04 + near * 0.3) * (this.ceremony ? 0.3 : 1));
+    set(L.tanpura, still * music * (0.04 + near * 0.3) * (this.ceremony ? 0.3 : 1));
     if (this._musicIn) this._ramp(this._musicIn.gain, (sm ? sm.musicLevel ?? 0.35 : 0.6 + near * 0.2) * (this.ceremony ? 0.05 : 1), tc);   // the music leads, everywhere
-    set(L.melody, music * (0.3 + near * 0.3 + z.krishna * 0.25) * (this.ceremony ? 0 : 1));
-    set(L.tabla, music * m.tabla * (0.25 + near * 0.3));
-    set(L.chant, recMusic ? 0 : m.chant * 0.3 * z.dome);
-    set(L.shivaDrone, (recMusic ? 0.15 : 0.5) * z.shiva * (0.2 + z.dome));
+    set(L.melody, still * music * (0.3 + near * 0.3 + z.krishna * 0.25) * (this.ceremony ? 0 : 1));
+    set(L.tabla, still * music * m.tabla * (0.25 + near * 0.3));
+    set(L.chant, recMusic || this.sanctum ? 0 : m.chant * 0.3 * z.dome);
+    set(L.shivaDrone, this.sanctum ? 0.55 * (this.ceremony ? 0.4 : 1) : (recMusic ? 0.15 : 0.5) * z.shiva * (0.2 + z.dome));
+    set(L.om, this.sanctum ? (this.ceremony ? 0.3 : 1) : 0);
     this._ramp(this.hallReturn.gain, 0.12 + z.dome * 0.7, tc);
     this._ramp(this.stoneReturn.gain, 0.15 + z.corridor * 0.55, tc);
   }
@@ -501,6 +507,7 @@ export class TempleAudio {
   // music stations: 'auto' plays uplifting music by day and meditation music at night
   get stations() { return Object.keys(this.playlists); }
   _station() {
+    if (this.sanctum) return null;
     if (this.session) return this.session.music && this.playlists[this.session.music] ? this.session.music : null;
     const s = this.musicStyle;
     if (s === 'off') return null;
@@ -533,10 +540,22 @@ export class TempleAudio {
   playStation(force = false) {
     if (!this.ctx) return;
     const st = this._station();
+    if (!st && this.sanctum && this._cur) { this._held = { deck: this._cur, station: this._curStation }; }   // paused where it is, to pick up again outside
     if (!st) { this._cur = null; this._curStation = null; this._fadeMusic(); this.nowPlaying = null; this.onTrack && this.onTrack(null); return; }
     if (!force && st === this._curStation && this._cur) return;
     if (!this._ensureDecks()) return;
     this._curStation = st; this._advance();
+  }
+  // coming out of the Shiva hall: the track that was playing fades back in from where it stopped
+  _resumeMusic() {
+    const h = this._held; this._held = null;
+    const st = this._station(), d = h && h.deck;
+    if (!d || st !== h.station || !d.track || d.el.ended || !this._decks) { this.playStation(); return; }
+    const now = this.ctx.currentTime; this._fadeMusic(d);
+    d.g.gain.cancelScheduledValues(now); d.g.gain.setValueAtTime(d.g.gain.value, now); d.g.gain.linearRampToValueAtTime(1, now + 3);
+    const p = d.el.play(); if (p && p.catch) p.catch(() => {});
+    this._cur = d; this._curStation = st; this.nowPlaying = { title: d.track.title, artist: d.track.artist, station: st };
+    this.onTrack && this.onTrack(this.nowPlaying);
   }
   _nextTrack(st) {
     const list = this.playlists[st]; if (!list || !list.length) return null;
@@ -715,6 +734,62 @@ export class TempleAudio {
     const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.setValueAtTime(3000, t); lp.frequency.linearRampToValueAtTime(500, t + dur * 0.6);
     for (const det of [-6, 0, 5]) { const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f0; o.detune.value = det; const vib = ctx.createOscillator(); vib.frequency.value = 4.6; const vg = ctx.createGain(); vg.gain.value = 1.2; vib.connect(vg).connect(o.frequency); o.connect(f1); o.connect(f2); o.start(t); o.stop(t + dur + 0.1); vib.start(t); vib.stop(t + dur + 0.1); }
     f1.connect(lp); f2.connect(f2g).connect(lp); lp.connect(g).connect(out); this._send(g, { hall: 0.7 });
+  }
+
+  // ---------------------------------------------------------------- the Shiva hall: a deep Om chanted together
+  // Stepping into the Shiva hall, everything from outside falls away: the music station pauses where it is, and the birds,
+  // wind and water fade to almost nothing. The cave fills with "Aum" chanted by a group of deep male voices together, over
+  // a drone on the Om pitch, all ringing in the stone. Stepping out, it all comes back.
+  setSanctum(id) {
+    const s = id === 'shiva' ? id : null;
+    if (s === this.sanctum) return;
+    this.sanctum = s;
+    if (!this.ctx) return;
+    clearTimeout(this._omTimer); this._omTimer = null;
+    if (s) { this.playStation(); this._omLoop(); } else this._resumeMusic();
+    this.applyZone(this.zone, s ? 1.2 : 2);
+  }
+  _omLoop() {
+    if (!this.ctx || !this.sanctum || this._omTimer) return;
+    const tick = () => {
+      if (!this.sanctum) { this._omTimer = null; return; }
+      const dur = 9.5 + Math.random() * 2.5, t = this.ctx.currentTime + 0.08;
+      // the group chants as one, each voice drawing breath a moment apart; a few devotees further off chant a little out of step
+      [[1, 0, 0], [1, 0.12, 7], [0.5, 0.2, -6], [1, 0.07, 3], [0.5, 0.25, -9]].forEach(([oct, dt, cents], i) => this._omVoice(t + dt + Math.random() * 0.1, dur - dt, OM / 2 / oct, cents, i < 3 ? 0.2 : 0.14));
+      if (Math.random() < 0.7) this._omVoice(t + dur * 0.5, dur * 0.85, OM / 2, 12, 0.07);
+      this._omTimer = setTimeout(tick, (dur + 1.3 + Math.random() * 0.6) * 1000);   // a breath between each Om, the cave ringing on through it
+    };
+    this._omTimer = setTimeout(tick, 400);
+  }
+  // one voice's "Aum": an open "aa" that rounds through "oo" into a long hummed "mm", from a deep, breathy chest voice
+  _omVoice(t, dur, f0, cents, level) {
+    const ctx = this.ctx, A = 0.27, U = 0.48;   // where the vowel turns to "oo", and where the lips close on "mm"
+    const out = ctx.createGain(); out.gain.setValueAtTime(0, t); out.gain.linearRampToValueAtTime(level, t + 0.7);
+    out.gain.setValueAtTime(level, t + dur * 0.62); out.gain.linearRampToValueAtTime(level * 0.8, t + dur * 0.85); out.gain.linearRampToValueAtTime(0, t + dur);
+    out.connect(this.layers.om);
+    const src = ctx.createOscillator(); src.type = 'sawtooth'; src.detune.value = cents;
+    src.frequency.setValueAtTime(f0 * 0.965, t); src.frequency.exponentialRampToValueAtTime(f0, t + 0.45);   // the voice settles onto the note
+    const vib = ctx.createOscillator(); vib.frequency.value = 0.18 + Math.random() * 0.2; const vg = ctx.createGain(); vg.gain.value = f0 * 0.004; vib.connect(vg).connect(src.frequency);
+    const tilt = ctx.createBiquadFilter(); tilt.type = 'lowpass'; tilt.Q.value = 0.5;   // the chest voice: rich low down, soft above
+    tilt.frequency.setValueAtTime(2200, t); tilt.frequency.linearRampToValueAtTime(1100, t + dur * U); tilt.frequency.linearRampToValueAtTime(420, t + dur * (U + 0.08));
+    src.connect(tilt);
+    // the mouth: three formants that move from "aa" to "oo" and fade as the lips close, and the nasal hum that takes over
+    const F = [[[700, 340, 280], 5, [2.4, 2.0, 0.5]], [[1100, 780, 900], 7, [1.3, 0.7, 0.06]], [[2450, 2300, 2200], 9, [0.4, 0.18, 0.02]]];
+    for (const [fq, q, gn] of F) {
+      const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = q;
+      bp.frequency.setValueAtTime(fq[0], t); bp.frequency.setValueAtTime(fq[0], t + dur * A * 0.7); bp.frequency.linearRampToValueAtTime(fq[1], t + dur * A); bp.frequency.setValueAtTime(fq[1], t + dur * U * 0.9); bp.frequency.linearRampToValueAtTime(fq[2], t + dur * U);
+      const g = ctx.createGain(); g.gain.setValueAtTime(gn[0], t); g.gain.setValueAtTime(gn[0], t + dur * A * 0.7); g.gain.linearRampToValueAtTime(gn[1], t + dur * A); g.gain.setValueAtTime(gn[1], t + dur * U * 0.9); g.gain.linearRampToValueAtTime(gn[2], t + dur * U);
+      tilt.connect(bp).connect(g).connect(out);
+    }
+    const hum = ctx.createBiquadFilter(); hum.type = 'lowpass'; hum.frequency.value = 320; hum.Q.value = 0.9;   // "mmm": the closed mouth hums deep in the chest
+    const hg = ctx.createGain(); hg.gain.setValueAtTime(0.3, t); hg.gain.setValueAtTime(0.3, t + dur * U * 0.9); hg.gain.linearRampToValueAtTime(0.75, t + dur * (U + 0.06));
+    src.connect(hum).connect(hg).connect(out);
+    // a breath of air on the open vowel
+    const n = ctx.createBufferSource(); n.buffer = this.noise; n.loop = true; const nb = ctx.createBiquadFilter(); nb.type = 'bandpass'; nb.frequency.value = 1300; nb.Q.value = 0.8;
+    const ng = ctx.createGain(); ng.gain.setValueAtTime(0, t); ng.gain.linearRampToValueAtTime(0.05, t + 0.3); ng.gain.linearRampToValueAtTime(0.012, t + dur * A); ng.gain.linearRampToValueAtTime(0, t + dur * U);
+    n.connect(nb).connect(ng).connect(out);
+    for (const o of [src, vib]) { o.start(t); o.stop(t + dur + 0.05); }
+    n.start(t, Math.random() * 1.5); n.stop(t + dur * U + 0.1);
   }
 
   // ---------------------------------------------------------------- shared aarti ceremony

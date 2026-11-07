@@ -230,6 +230,7 @@ function goHall(h, spot = -1) {
     app.camMode = 'select'; app.hallState = 'select';
     $('actions').hidden = true; $('spotSheet').hidden = false; $('fullSheet').hidden = true;
     $('spotSub').textContent = freeText(h);
+    audio.setSanctum(h.templeId);   // in the Shiva hall the music and the sounds of outside fall silent under a chanted Om
     audio.applyZone({ entrance: 0, courtyard: 0, corridor: 0.2, dome: 1, garden: 0, ganesha: +(h.templeId === 'ganesha'), shiva: +(h.templeId === 'shiva'), krishna: +(h.templeId === 'krishna') }, 1.4);
     snapCamera();
     if (!app.lookHinted) { app.lookHinted = true; setTimeout(() => toast('Drag to look around the hall, pinch to zoom', 3200), 900); }
@@ -270,7 +271,7 @@ function leaveHall() {
     const out = T.entrance.clone().add(T.entrance.clone().setY(0).normalize().multiplyScalar(-1.5));
     me.avatar.root.position.copy(out); const away = out.clone().negate(); me.avatar.root.rotation.y = Math.atan2(away.x, away.z); me.avatar.setState('idle');
     cam.tYaw = cam.yaw = Math.atan2(-away.x, -away.z);
-    app.currentHall = null; app.hallState = null; input.auto = [];
+    app.currentHall = null; app.hallState = null; input.auto = []; audio.setSanctum(null);
     $('spotSheet').hidden = true; $('actions').hidden = true; $('fullSheet').hidden = true;
     setMode('world'); app.camMode = 'world'; snapCamera();
   });
@@ -1186,19 +1187,21 @@ function updateTodChip(t = currentTOD()) {
 function setMusicStyle(id) {
   settings.musicStyle = id; persist(); startAudioOnce(); audio.setMusicStyle(id); applySettingsUI(); renderSoundPop();
   const st = MUSIC_STYLES.find(s => s.id === id); if (id === 'off') toast('Music off. Only nature sounds and bells.');
+  else if (audio.sanctum) toast(`${st.label} music will play when you leave the Shiva hall`);
   else if (!audio.nowPlaying) toast(`${st.label} music`);
 }
 const esc = (t) => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 function renderNowPlaying() {
   const np = audio.nowPlaying;
-  $('nowPlaying').innerHTML = np ? `<b>${esc(np.title)}</b> · ${esc(np.artist)}` : (settings.musicStyle === 'off' ? 'Music is off' : 'Starts when sound is on');
+  $('nowPlaying').innerHTML = np ? `<b>${esc(np.title)}</b> · ${esc(np.artist)}` : audio.sanctum ? '<b>Om</b> · chanted in the Shiva hall' : (settings.musicStyle === 'off' ? 'Music is off' : 'Starts when sound is on');
 }
 function renderSoundPop() {
   const pop = $('soundPop'); if (pop.hidden) return;
   const np = audio.nowPlaying, station = np && MUSIC_STYLES.find(s => s.id === np.station);
   const opt = (s) => `<button data-m="${s.id}" aria-pressed="${settings.musicStyle === s.id}"><span><b>${s.label}</b><small>${s.sub}</small></span></button>`;
   pop.innerHTML = `<h3>Music</h3>` +
-    (np ? `<div class="np"><i aria-hidden="true">♪</i><span><b>${esc(np.title)}</b><small>${esc(np.artist)} · ${station ? station.label : ''}</small></span><button id="npNext" aria-label="Next track">Next</button></div>` : '') +
+    (np ? `<div class="np"><i aria-hidden="true">♪</i><span><b>${esc(np.title)}</b><small>${esc(np.artist)} · ${station ? station.label : ''}</small></span><button id="npNext" aria-label="Next track">Next</button></div>`
+      : audio.sanctum ? `<div class="np"><i aria-hidden="true">ॐ</i><span><b>Om</b><small>Chanted in the Shiva hall · your music picks up again outside</small></span></div>` : '') +
     MUSIC_STYLES.map(opt).join('') +
     `<div class="row"><span>Mute everything</span><button class="toggle" id="popMute" role="switch" aria-checked="${settings.muted}" aria-label="Mute everything"></button></div>`;
   pop.querySelectorAll('[data-m]').forEach(b => b.onclick = () => setMusicStyle(b.dataset.m));
