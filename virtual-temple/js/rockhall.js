@@ -16,7 +16,7 @@ const NAVE = 6.2, AISLE = 5.3, TOPY = 8.6;
 export const ceilY = (x) => Math.abs(x) >= NAVE ? AISLE : AISLE + (TOPY - AISLE) * Math.pow(Math.cos(Math.abs(x) / NAVE * Math.PI / 2), 0.8);
 export const HALL = { X: 11, BACK: -6.8, FRONT: 10.9, PIL_X: NAVE, PIL_Z: [-3.8, 0.4, 4.6, 8.6], NICHE_W: 1.5, NICHE_TOP: 3.5, BENCH: 0.45,
   OCULUS: new THREE.Vector3(0, TOPY, -0.4), AIM: new THREE.Vector3(0, 1.4, -8.9), ceilY };
-export const ROCK = '#6c5c4e', SHRINE = '#5f554c', DEEP = '#43382f', CARVE = '#6a5e53';
+export const ROCK = '#615a54', SHRINE = '#5f5852', DEEP = '#3f3832', CARVE = '#a69c92';   // CARVE is given to relief(), which treats it as linear
 
 export const cave = (tint = ROCK) => triplanar('cave', { tint, tile: 3.2, roughness: 0.95, normal: 1.5, side: THREE.DoubleSide, cacheKey: 'cave' });
 export const granite = (tint = SHRINE) => triplanar('granite', { tint, tile: 2.2, roughness: 0.88, normal: 1.3, cacheKey: 'shrine' });
@@ -180,8 +180,8 @@ export function reliefPanel(kind, w, h, { mirror = false, depth = 0.2, density =
   x.save(); if (mirror) { x.translate(W, 0); x.scale(-1, 1); } FIG[kind](pen(x, W, H)); x.restore();
   const src = x.getImageData(0, 0, W, H).data, h0 = new Float32Array(W * H);
   for (let i = 0; i < W * H; i++) h0[i] = src[i * 4] / 255;
-  const b1 = blur(h0, W, H, 1), b3 = blur(h0, W, H, 3), b8 = blur(h0, W, H, 8), hp = new Float32Array(W * H);
-  for (let i = 0; i < W * H; i++) { const px = i % W, py = (i / W) | 0; hp[i] = 0.45 * b1[i] + 0.35 * b3[i] + 0.2 * b8[i] + (vnoise(px * 0.09, py * 0.09, seed) - 0.5) * 0.05 + (vnoise(px * 0.45, py * 0.45, seed + 9) - 0.5) * 0.02; }
+  const b1 = blur(h0, W, H, 2), b3 = blur(h0, W, H, 6), b8 = blur(h0, W, H, 14), hp = new Float32Array(W * H);
+  for (let i = 0; i < W * H; i++) { const px = i % W, py = (i / W) | 0; hp[i] = 0.3 * b1[i] + 0.38 * b3[i] + 0.32 * b8[i] + (vnoise(px * 0.09, py * 0.09, seed) - 0.5) * 0.05 + (vnoise(px * 0.45, py * 0.45, seed + 9) - 0.5) * 0.02; }
   const low = blur(hp, W, H, 3), big = blur(hp, W, H, 12);
   // the carving: broad forms in the mesh
   const su = Math.max(8, Math.round(w * density)), sv = Math.max(8, Math.round(h * density)), geo = new THREE.PlaneGeometry(w, h, su, sv), pos = geo.attributes.position, uv = geo.attributes.uv;
@@ -197,7 +197,7 @@ export function reliefPanel(kind, w, h, { mirror = false, depth = 0.2, density =
     const i = py * W + px, hi = (j) => hp[j] - low[j];
     const dx = (hi(py * W + Math.min(W - 1, px + 1)) - hi(py * W + Math.max(0, px - 1))) * k, dy = (hi(Math.min(H - 1, py + 1) * W + px) - hi(Math.max(0, py - 1) * W + px)) * k;
     const l = Math.hypot(dx, dy, 1); nimg.data[i * 4] = (-dx / l * 0.5 + 0.5) * 255; nimg.data[i * 4 + 1] = (dy / l * 0.5 + 0.5) * 255; nimg.data[i * 4 + 2] = (1 / l * 0.5 + 0.5) * 255; nimg.data[i * 4 + 3] = 255;
-    const shade = (0.62 + 0.45 * Math.pow(Math.max(0, hp[i]), 0.8)) * Math.min(1.05, Math.max(0.55, 1 - (big[i] - hp[i]) * 2.2)) * (0.9 + vnoise(px * 0.3, py * 0.3, seed + 3) * 0.2);
+    const shade = (0.8 + 0.22 * Math.pow(Math.max(0, hp[i]), 0.8)) * Math.min(1.04, Math.max(0.6, 1 - (big[i] - hp[i]) * 2.0)) * (0.9 + vnoise(px * 0.3, py * 0.3, seed + 3) * 0.2);
     for (let ch = 0; ch < 3; ch++) cimg.data[i * 4 + ch] = Math.min(255, br[ch] * 255 * shade); cimg.data[i * 4 + 3] = 255;
   }
   nx.putImageData(nimg, 0, 0); cx.putImageData(cimg, 0, 0);
@@ -252,9 +252,9 @@ export function lampGlow(spots, { reflections = true } = {}) {
   const grp = new THREE.Group(), gt = glowTexture(), m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
   const add = (geo, mat, list, place) => { if (!list.length) return null; const im = new THREE.InstancedMesh(geo, mat, list.length); list.forEach((s, i) => { place(s, m4); im.setMatrixAt(i, m4); }); im.renderOrder = 4; im.frustumCulled = false; grp.add(im); return im; };
   const flat = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
-  const pm = new THREE.MeshBasicMaterial({ map: gt, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, opacity: 0.55, polygonOffset: true, polygonOffsetFactor: -4 });
+  const pm = new THREE.MeshBasicMaterial({ map: gt, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, opacity: 0.45, polygonOffset: true, polygonOffsetFactor: -4 });
   const pools = add(flat, pm, spots.filter((s) => s.pool), (s, m) => { const n = s.wall || new THREE.Vector3(); m.compose(new THREE.Vector3(s.p.x + n.x * s.pool * 0.35, (s.floorY ?? s.p.y) + 0.008, s.p.z + n.z * s.pool * 0.35), q.identity(), new THREE.Vector3(s.pool * 2, 1, s.pool * 2)); });
-  const wm = new THREE.MeshBasicMaterial({ map: gt, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, opacity: 0.5, side: THREE.DoubleSide });
+  const wm = new THREE.MeshBasicMaterial({ map: gt, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, opacity: 0.32, side: THREE.DoubleSide });
   const halos = add(new THREE.PlaneGeometry(1, 1), wm, spots.filter((s) => s.wall), (s, m) => { q.setFromUnitVectors(new THREE.Vector3(0, 0, 1), s.wall); m.compose(s.p.clone().addScaledVector(s.wall, -(s.inset ?? 0.24)).add(new THREE.Vector3(0, 0.55, 0)), q, new THREE.Vector3(1.5, 2.0, 1)); });
   let streaks = null;
   if (reflections) {

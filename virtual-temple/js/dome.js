@@ -33,8 +33,8 @@ export class PrayerHall {
 
   buildShell() {
     const S = this.scene, Q = this.quality, low = Q.level === 'low', V = (x, y, z) => new THREE.Vector3(x, y, z);
-    this.hemi = new THREE.HemisphereLight('#ffd2a0', '#3a2414', 0.42); S.add(this.hemi);
-    this.ambientBase = 0.42; this.sunBase = 70;
+    this.hemi = new THREE.HemisphereLight('#e6d6c4', '#2a2018', 0.26); S.add(this.hemi);
+    this.ambientBase = 0.26; this.sunBase = 70;
     // daylight falling through the opening in the rock, onto the lingam in the sanctum
     // the cave hewn from the rock: walls, ceiling and the opening, pillars, carved panels, benches and the niche shrine
     const R = this.rock = buildRockHall(S, Q); this.skyMat = R.sky; const stoneFine = R.shrine;
@@ -68,9 +68,9 @@ export class PrayerHall {
       const T = lampTower(3.3); T.mesh.position.set(s * 4.45, 0, -5.35); S.add(T.mesh);
       for (const w of T.wicks) this.shellFlames.push({ p: w.clone().add(T.mesh.position), s: 0.2 });
       spots.push({ p: T.mesh.position.clone(), pool: 2.1, floorY: 0, refl: 3.6, noDiya: true });
-      const L = new THREE.PointLight('#ff9440', 22, 15, 1.25); L.position.set(s * 4.45, 2.4, -5.35); S.add(L); this.towers.push(L);
+      const L = new THREE.PointLight('#ffa65a', 18, 14, 1.3); L.position.set(s * 4.45, 2.4, -5.35); S.add(L); this.towers.push(L);
     }
-    if (!low) for (const s of [-1, 1]) { const L = new THREE.PointLight('#ff8a3a', 14, 15, 1.3); L.position.set(s * 9.2, 1.6, 2.4); S.add(L); this.towers.push(L); }
+    if (!low) for (const s of [-1, 1]) { const L = new THREE.PointLight('#ff9c52', 10, 13, 1.35); L.position.set(s * 9.2, 1.6, 2.4); S.add(L); this.towers.push(L); }
     this.glow = lampGlow(spots, { reflections: !low }); S.add(this.glow.group);
     // petals strewn before the sanctum steps
     { const pts = []; for (let i = 0; i < 90; i++) { const a = (Math.random() - 0.5) * 2.6, d = Math.pow(Math.random(), 1.6) * 4.2; pts.push(V(Math.sin(a) * d * 1.3, 0.012, -4.6 + Math.cos(a) * d)); }
@@ -108,7 +108,7 @@ export class PrayerHall {
 
   // the shaft through the rock follows the time of day; at night the shrine is lit by its lamps and a thin moonbeam
   setTimeOfDay(tod) {
-    const P = { morning: ['#ffe2b0', 70, 0.2, '#fff1d6', 0.42, 1], afternoon: ['#fff4e2', 80, 0.18, '#ffffff', 0.45, 1], evening: ['#ffb070', 52, 0.22, '#ffc890', 0.38, 0.85], night: ['#9db0f0', 9, 0.06, '#1c2850', 0.26, 0.3] }[tod];
+    const P = { morning: ['#ffe6c0', 80, 0.22, '#fff1d6', 0.26, 1], afternoon: ['#fff6ea', 90, 0.2, '#ffffff', 0.28, 1], evening: ['#ffbc80', 60, 0.24, '#ffc890', 0.22, 0.85], night: ['#9db0f0', 10, 0.06, '#1c2850', 0.14, 0.3] }[tod];
     if (!P) return;
     const [sun, si, beam, sky, hemi, dust] = P;
     this.sun.color.set(sun); this.sunBase = si; this.ambientBase = hemi;
@@ -191,7 +191,7 @@ export class PrayerHall {
     if (this.envRT) this.envRT.dispose();
     this.scene.updateMatrixWorld(true);
     this.envRT = this.pmrem.fromScene(this.scene, 0.04); this.scene.environment = this.envRT.texture;
-    this.scene.environmentIntensity = 0.75;
+    this.scene.environmentIntensity = 0.55;
   }
 
   _shiva(A, add) {
@@ -393,7 +393,7 @@ export class PrayerHall {
     this.smoke.update(dt, t); this.petals.update(dt);
     this.dust.material.uniforms.uTime.value = t; this.dust.visible = !ctx.reducedMotion || true;
     if (this.glow.streakMat) this.glow.streakMat.uniforms.uTime.value = t;
-    for (let i = 0; i < this.towers.length; i++) this.towers[i].intensity = (i < 2 ? 22 : 14) * (0.93 + Math.sin(t * 8.3 + i * 2.1) * 0.04 + Math.sin(t * 13.7 + i) * 0.03);
+    for (let i = 0; i < this.towers.length; i++) this.towers[i].intensity = (i < 2 ? 18 : 10) * (0.93 + Math.sin(t * 8.3 + i * 2.1) * 0.04 + Math.sin(t * 13.7 + i) * 0.03);
     this.bell.update(dt, t);
     // markers pulse softly
     const pulse = ctx.reducedMotion ? 1 : 0.85 + Math.sin(t * 2.2) * 0.15;
