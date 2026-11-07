@@ -1,9 +1,11 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 import * as TX from './textures.js';
-import { brass, gold, copper, clay, darkStone, pillarGeometry, HangingBell, diyaGeometry, lampStand, kalasha, garland, stoneMat, bandMat } from './architecture.js';
+import { brass, gold, copper, clay, darkStone, HangingBell, diyaGeometry, lampStand, kalasha, garland } from './architecture.js';
 import { FlameField, SmokeSystem, PetalOffering, dustMotes } from './fx.js';
+import { mergeGeos, petalRing } from './ornament.js';
 import { Avatar } from './avatar.js';
-import { frescoTexture, ceilingTexture, stainedGlassTexture } from './murals.js';
+import { HALL, buildRockHall, lampTower, lampGlow, diyaField, granite, carvedStone, carved } from './rockhall.js';
+import { pbr } from './pbr.js';
 
 // The immersive prayer hall: one circular domed mandapa with 12 lotus-marked prayer spots in
 // three rows of four, facing the sanctum. The shell is shared; the sanctum is rebuilt per deity.
@@ -20,7 +22,7 @@ export class PrayerHall {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color('#1b120c');
     this.scene.fog = new THREE.Fog('#2a1a10', 18, 40);
-    this.flames = new FlameField(160); this.scene.add(this.flames.points);
+    this.flames = new FlameField(360); this.scene.add(this.flames.points);
     this.smoke = new SmokeSystem(quality.level === 'low' ? 180 : 420); this.scene.add(this.smoke.points);
     this.petals = new PetalOffering(700); this.scene.add(this.petals.mesh);
     this.occupants = new Map(); // spot -> Avatar (simulated devotees)
@@ -30,79 +32,57 @@ export class PrayerHall {
   }
 
   buildShell() {
-    const S = this.scene;
-    this.hemi = new THREE.HemisphereLight('#ffe6c4', '#3a2618', 0.55); S.add(this.hemi);
-    this.ambientBase = 0.55; this.sunBase = 2.2;
-    // late-afternoon sun entering through the side jalis
-    this.sun = new THREE.DirectionalLight('#ffd49a', 2.2); this.sun.position.set(-16, 13, 3); this.sun.target.position.set(1, 0, 0);
-    this.sun.castShadow = this.quality.shadows > 0; this.sun.shadow.mapSize.set(this.quality.shadows || 512, this.quality.shadows || 512);
-    const sc = this.sun.shadow.camera; sc.left = -14; sc.right = 14; sc.top = 14; sc.bottom = -14; sc.far = 50; this.sun.shadow.bias = -0.0008; this.sun.shadow.normalBias = 0.03;
+    const S = this.scene, Q = this.quality, low = Q.level === 'low', V = (x, y, z) => new THREE.Vector3(x, y, z);
+    this.hemi = new THREE.HemisphereLight('#ffd9b0', '#2a1a10', 0.22); S.add(this.hemi);
+    this.ambientBase = 0.22; this.sunBase = 70;
+    // daylight falling through the opening in the rock, onto the lingam in the sanctum
+    const O = HALL.OCULUS, aim = V(0, 1.5, -8.9), dir = aim.clone().sub(O).normalize();
+    this.sun = new THREE.SpotLight('#ffe2b0', 70, 18, 0.17, 0.5, 1.2); this.sun.position.copy(O).addScaledVector(dir, -1.4); this.sun.target.position.copy(aim);
+    this.sun.castShadow = Q.shadows > 0; this.sun.shadow.mapSize.set(1024, 1024); this.sun.shadow.camera.near = 0.5; this.sun.shadow.camera.far = 18; this.sun.shadow.bias = -0.0006; this.sun.shadow.normalBias = 0.02;
     S.add(this.sun, this.sun.target);
-    // floor
-    const floorM = new THREE.MeshStandardMaterial({ map: TX.marble('hall', '#efe6d8', 'rgba(150,120,95,0.3)', [5, 5]), roughness: 0.22, metalness: 0.0 });
-    const floor = new THREE.Mesh(new THREE.CircleGeometry(R, 72), floorM); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; floor.userData.floor = true; S.add(floor); this.floor = floor;
-    const inlay = new THREE.MeshStandardMaterial({ color: '#8c2a22', roughness: 0.35 });
-    for (const [a, b] of [[7.6, 7.85], [9.0, 9.15]]) { const r = new THREE.Mesh(new THREE.RingGeometry(a, b, 72), inlay); r.rotation.x = -Math.PI / 2; r.position.y = 0.004; S.add(r); }
-    const aisle = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 15), new THREE.MeshStandardMaterial({ color: '#7a2220', roughness: 0.9 })); aisle.rotation.x = -Math.PI / 2; aisle.position.set(0, 0.006, 3.0); aisle.receiveShadow = true; S.add(aisle); // carpet runner
-    const border = new THREE.Mesh(new THREE.PlaneGeometry(1.36, 15), new THREE.MeshStandardMaterial({ color: '#c99a3e', roughness: 0.6, metalness: 0.3 })); border.rotation.x = -Math.PI / 2; border.position.set(0, 0.005, 3.0); S.add(border);
-    // walls
-    const wallM = new THREE.MeshStandardMaterial({ map: TX.sandstone('hallwall', '#dcc29a', { repeat: [14, 2], rows: 5 }), roughness: 0.9, side: THREE.BackSide });
-    const wall = new THREE.Mesh(new THREE.CylinderGeometry(R, R, 6.2, 72, 1, true), wallM); wall.position.y = 3.1; wall.receiveShadow = true; S.add(wall);
-    const bandM = bandMat('#cba579'); bandM.side = THREE.BackSide; bandM.map.repeat.set(28, 1);
-    for (const y of [0.25, 6.0]) { const b = new THREE.Mesh(new THREE.CylinderGeometry(R - 0.05, R - 0.05, 0.5, 72, 1, true), bandM); b.position.y = y; S.add(b); }
-    // dome
-    // the painted ceiling: a golden sun at the crown, rings of lotus petals and stars, marigold swags round the rim
-    const ceilT = ceilingTexture();
-    const ceil = new THREE.Mesh(new THREE.SphereGeometry(R, 64, 24, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ map: ceilT, emissiveMap: ceilT, emissive: '#ffffff', emissiveIntensity: 0.22, roughness: 0.8, side: THREE.BackSide }));
-    this.ceilMat = ceil.material;
-    ceil.position.y = 6.2; ceil.scale.y = 0.62; S.add(ceil);
-    const pendant = new THREE.Mesh(new THREE.LatheGeometry([[0, 0], [0.5, 0.05], [0.9, 0.4], [0.7, 0.55], [0.35, 0.9], [0.12, 1.1], [0, 1.15]].map(([x, y]) => new THREE.Vector2(x, -y)), 24), new THREE.MeshStandardMaterial({ color: '#e7d6b8', roughness: 0.7 }));
-    pendant.position.y = 6.2 + R * 0.62 - 0.05; S.add(pendant);
-    // pillars around the hall, leaving the sanctum and entrance open
-    const pg = pillarGeometry(6.0, 0.3); const stoneFine = stoneMat('#dfc7a0', [1, 2], { blocks: false });
-    const angles = []; for (let i = 0; i < 20; i++) { const a = i / 20 * Math.PI * 2; const deg = THREE.MathUtils.radToDeg(a); if (Math.abs(deg - 270) < 30 || Math.abs(deg - 90) < 14) continue; angles.push(a); }
-    const pil = new THREE.InstancedMesh(pg, stoneFine, angles.length); pil.castShadow = pil.receiveShadow = true;
-    const m4 = new THREE.Matrix4(); angles.forEach((a, i) => { m4.makeTranslation(Math.cos(a) * 9.7, 0, Math.sin(a) * 9.7); pil.setMatrixAt(i, m4); }); S.add(pil);
-    const ringBeam = new THREE.Mesh(new THREE.TorusGeometry(9.7, 0.28, 8, 72), stoneFine); ringBeam.rotation.x = Math.PI / 2; ringBeam.position.y = 6.05; S.add(ringBeam);
-    // fresco murals in the bays between the pillars: two flank the sanctum, two the entrance, two the side walls
-    const goldB = gold.clone(); goldB.side = THREE.BackSide; this.muralMats = [];
-    for (const [a, kind, seed] of [[1.25, 'peacocks', 3], [1.75, 'elephant', 7], [0.25, 'lotus', 5], [0.75, 'mandala', 11], [0.35, 'mandala', 13], [0.65, 'peacocks', 17]]) {
-      const ang = a * Math.PI, th = Math.PI / 2 - ang, Wd = 2.4, Hd = 3.2, y = 3.0, L = Wd / (R - 0.07);
-      const t = frescoTexture(kind, seed); t.repeat.x = -1; t.offset.x = 1;   // seen from inside, so flip it back the right way round
-      const panel = new THREE.Mesh(new THREE.CylinderGeometry(R - 0.07, R - 0.07, Hd, 12, 1, true, th - L / 2, L), new THREE.MeshStandardMaterial({ map: t, emissiveMap: t, emissive: '#ffffff', emissiveIntensity: 0.16, roughness: 0.92, side: THREE.BackSide }));
-      panel.position.y = y; panel.receiveShadow = true; S.add(panel); this.muralMats.push(panel.material);
-      for (const dy of [-Hd / 2, Hd / 2]) { const tr = new THREE.Mesh(new THREE.CylinderGeometry(R - 0.12, R - 0.12, 0.11, 12, 1, true, th - L / 2 - 0.008, L + 0.016), goldB); tr.position.y = y + dy; S.add(tr); }
-      for (const s of [-1, 1]) { const e = ang + s * (L / 2 + 0.004), sd = new THREE.Mesh(new THREE.BoxGeometry(0.1, Hd + 0.1, 0.08), gold); sd.position.set(Math.cos(e) * (R - 0.12), y, Math.sin(e) * (R - 0.12)); sd.lookAt(0, y, 0); S.add(sd); }
+    // the rock-cut shell: walls, carved pillars, corbelled ceiling, the opening, niches and the sanctum doorway
+    const R = this.rock = buildRockHall(S, Q); this.skyMat = R.sky; const stoneFine = R.stone;
+    // the floor: dark flagstones, wet and glossy, catching the lamplight
+    const floorM = pbr('flagstone', { repeat: [5, 4.4], roughness: 0.62, color: '#b9aa9c', normal: 0.8, envMapIntensity: 1.6 });
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(22, 19.4), floorM); floor.rotation.x = -Math.PI / 2; floor.position.set(0, 0, 2.05); floor.receiveShadow = true; floor.userData.floor = true; S.add(floor); this.floor = floor;
+    // the shaft of light and the dust drifting in it
+    const beamM = this.beamMat = new THREE.MeshBasicMaterial({ map: TX.beam(), color: '#ffe2b0', transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false });
+    const card = new THREE.PlaneGeometry(1.25, 10.4); card.translate(0, -5.2, 0); this.beams = [];
+    for (const r of [0, Math.PI / 2]) { const b = new THREE.Mesh(card, beamM); b.position.copy(O).add(V(0, 0.5, 0)); b.quaternion.setFromUnitVectors(V(0, -1, 0), dir); b.rotateY(r); b.renderOrder = 5; S.add(b); this.beams.push(b); }
+    this.dust = dustMotes(low ? 120 : 260, new THREE.Box3(V(-1, 0, -9), V(1, 9, -3)), '#ffe6b8'); S.add(this.dust);
+    { const p = this.dust.geometry.attributes.position, side = V(1, 0, 0), perp = new THREE.Vector3().crossVectors(dir, side).normalize();
+      for (let i = 0; i < p.count; i++) { const t = Math.random() * 9.6, q = O.clone().addScaledVector(dir, t).addScaledVector(side, (Math.random() - 0.5) * 0.9).addScaledVector(perp, (Math.random() - 0.5) * 0.9); p.setXYZ(i, q.x, q.y, q.z); }
+      p.needsUpdate = true; this.dust.geometry.computeBoundingSphere(); }
+    // oil lamps everywhere: on the wall ledges, in the niches, at the pillar feet, on the sanctum steps, and two tall lamp towers
+    const spots = [];
+    for (const s of [-1, 1]) for (let z = -6.0; z <= 10.3; z += 0.92) spots.push({ p: V(s * 10.87, R.ledgeY, z), wall: V(-s, 0, 0), inset: 0.12, pool: 0.95, floorY: 0, refl: 1.8 });
+    for (const s of [-1, 1]) for (let x = 4.75; x <= 10.4; x += 0.95) spots.push({ p: V(s * x, R.ledgeY, HALL.BACK + 0.13), wall: V(0, 0, 1), inset: 0.13, pool: 0.95, floorY: 0, refl: 1.8 });
+    for (const pl of R.pillars) for (const dz of [-0.52, 0.52]) spots.push({ p: V(pl.x - Math.sign(pl.x) * 0.52, 0.26, pl.z + dz), pool: 0.75, floorY: 0, refl: 1.3 });
+    for (const n of R.niches) spots.push({ p: n.p.clone(), wall: n.n, inset: 0.13, size: 1.3 });
+    for (let i = 0; i < 3; i++) { const y = 0.2 + 0.2 * i, z = -5.1 - 0.45 * i + 0.22, hw = (9 - i * 0.6) / 2 - 0.3; for (const s of [-1, 1]) spots.push({ p: V(s * hw, y, z), pool: 0.6, floorY: y }); }
+    for (const s of [-1, 1]) spots.push({ p: V(s * 3.75, 0.6, -6.3), pool: 0.6, floorY: 0.6 }, { p: V(s * 1.5, 0.6, -7.9), pool: 0.5, floorY: 0.6 });
+    this.shellFlames = spots.map((s) => ({ p: s.p.clone().add(V(0, 0.1, 0)), s: 0.3 }));
+    S.add(diyaField(spots));
+    this.towers = [];
+    for (const s of [-1, 1]) {
+      const T = lampTower(3.3); T.mesh.position.set(s * 5.7, 0, -5.75); S.add(T.mesh);
+      for (const w of T.wicks) this.shellFlames.push({ p: w.clone().add(T.mesh.position), s: 0.2 });
+      spots.push({ p: T.mesh.position.clone(), pool: 2.1, floorY: 0, refl: 3.6, noDiya: true });
+      const L = new THREE.PointLight('#ff9440', 12, 12, 1.3); L.position.set(s * 5.7, 2.4, -5.75); S.add(L); this.towers.push(L);
     }
-    // jali windows with sunbeams (west side) and a softer east window
-    // stained glass in jewel colours, lit from outside, throwing coloured light onto the marble
-    const glassT = stainedGlassTexture();
-    const glowM = this.windowGlow = new THREE.MeshBasicMaterial({ color: '#ffd9a0', map: glassT, fog: false }); this.windowGlowEast = new THREE.MeshBasicMaterial({ color: '#c99e70', map: glassT, fog: false });
-    const poolM = this.poolMat = new THREE.MeshBasicMaterial({ map: stainedGlassTexture(true), transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, polygonOffset: true, polygonOffsetFactor: -2 });
-    const beamM = this.beamMat = new THREE.MeshBasicMaterial({ map: TX.beam(), transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false });
-    this.beams = [];
-    for (const a of [Math.PI * 0.86, Math.PI * 1.0, Math.PI * 1.14, Math.PI * 0.0, Math.PI * 0.14, -Math.PI * 0.14]) {
-      const x = Math.cos(a) * (R - 0.08), z = Math.sin(a) * (R - 0.08), west = x < 0;
-      const win = new THREE.Group(); win.position.set(x, 3.3, z); win.lookAt(0, 3.3, 0); S.add(win);
-      const glow = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 2.4), glowM); glow.position.z = -0.06; win.add(glow); if (!west) glow.material = this.windowGlowEast;
-      const frame = new THREE.Mesh(new THREE.BoxGeometry(2.1, 2.8, 0.2), stoneFine); frame.position.z = -0.12; frame.scale.set(1, 1, 0.5); win.add(frame);
-      for (const [w, h, px, py] of [[0.06, 2.4, 0, 0], [1.7, 0.06, 0, 0.4]]) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.05), stoneFine); m.position.set(px, py, -0.02); win.add(m); }   // stone mullions
-      if (west) {
-        const beam = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 9), beamM); const dir = new THREE.Vector3(1, -0.62, 0.05).normalize();
-        const mid = new THREE.Vector3(x, 3.3, z).addScaledVector(dir, 4.5);
-        beam.position.copy(mid); beam.lookAt(mid.clone().add(new THREE.Vector3(0, 0, 1))); beam.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), dir);
-        S.add(beam); this.beams.push(beam);
-        const pool = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 3.9), poolM); pool.rotation.set(-Math.PI / 2, 0, -Math.PI / 2);
-        pool.position.set(x + 3.3 / 0.62, 0.015, z + 0.05 * 3.3 / 0.62); pool.renderOrder = 1; S.add(pool);
-        const b2 = beam.clone(); b2.rotateOnAxis(new THREE.Vector3(0, 1, 0), Math.PI / 2); S.add(b2); this.beams.push(b2);
-      }
-    }
-    this.dust = dustMotes(this.quality.level === 'low' ? 120 : 320, new THREE.Box3(new THREE.Vector3(-10, 0.3, -6), new THREE.Vector3(-1, 5, 6))); S.add(this.dust);
+    if (!low) for (const s of [-1, 1]) { const L = new THREE.PointLight('#ff8a3a', 7, 11, 1.4); L.position.set(s * 10.1, 1.2, 2.0); S.add(L); this.towers.push(L); }
+    this.glow = lampGlow(spots, { reflections: !low }); S.add(this.glow.group);
+    // petals strewn before the sanctum steps
+    { const pts = []; for (let i = 0; i < 90; i++) { const a = (Math.random() - 0.5) * 2.6, d = Math.pow(Math.random(), 1.6) * 4.2; pts.push(V(Math.sin(a) * d * 1.3, 0.012, -4.6 + Math.cos(a) * d)); }
+      for (let i = 0; i < 3; i++) for (let k = 0; k < 8; k++) pts.push(V((Math.random() - 0.5) * (8 - i * 0.6), 0.2 + 0.2 * i + 0.012, -5.1 - 0.45 * i + (Math.random() - 0.5) * 0.4));
+      const pm = new THREE.InstancedMesh(new THREE.CircleGeometry(0.045, 7).scale(1, 1.6, 1).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ roughness: 0.6, side: THREE.DoubleSide }), pts.length), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), col = new THREE.Color();
+      pts.forEach((p, i) => { m4.compose(p, q.setFromAxisAngle(V(0, 1, 0), Math.random() * 6.3), V(1, 1, 1).multiplyScalar(0.8 + Math.random() * 0.6)); pm.setMatrixAt(i, m4); pm.setColorAt(i, col.set(['#e8608c', '#f28aaa', '#d94a7a', '#f6a8c0'][i % 4])); });
+      S.add(pm); }
     // entrance doorway
-    const door = new THREE.Group(); door.position.set(0, 0, R - 0.1); S.add(door);
+    const door = new THREE.Group(); door.position.set(0, 0, HALL.FRONT); S.add(door);
     const dm = new THREE.MeshBasicMaterial({ color: '#f7dfb0', fog: false }); const opening = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 3.6), dm); opening.position.set(0, 1.8, 0.02); opening.rotation.y = Math.PI; door.add(opening);
     for (const s of [-1, 1]) { const jamb = new THREE.Mesh(new THREE.BoxGeometry(0.4, 4.0, 0.6), stoneFine); jamb.position.set(s * 1.4, 2.0, 0); door.add(jamb); }
-    const lint = new THREE.Mesh(new THREE.BoxGeometry(3.3, 0.5, 0.6), stoneFine); lint.position.set(0, 4.1, 0); door.add(lint);
+    const lint = new THREE.Mesh(new THREE.BoxGeometry(3.3, 0.5, 0.6), carved('gavaksha', 3.3, 1.2)); lint.position.set(0, 4.1, 0); door.add(lint);
     door.add(garland(new THREE.Vector3(-1.2, 3.75, -0.32), new THREE.Vector3(1.2, 3.75, -0.32), 0.35, 26));
     this.exitMarker = door;
     // spot markers
@@ -126,15 +106,14 @@ export class PrayerHall {
     this.pmrem = new THREE.PMREMGenerator(this.renderer);
   }
 
-  // light through the jalis follows the time of day; at night the hall is lit by its lamps
+  // the shaft through the rock follows the time of day; at night the shrine is lit by its lamps and a thin moonbeam
   setTimeOfDay(tod) {
-    const P = { morning: ['#ffe2b6', 2.3, 0.26, '#ffe6c2', '#d8b48a', 0.6, 1], afternoon: ['#fff3e2', 2.6, 0.2, '#fff4de', '#e0c49c', 0.65, 1], evening: ['#ffad6a', 1.8, 0.3, '#ffb27a', '#b07a58', 0.5, 0.8], night: ['#8da2e8', 0.22, 0.0, '#1a2550', '#141c3a', 0.3, 0.15] }[tod];
+    const P = { morning: ['#ffe2b0', 70, 0.2, '#fff1d6', 0.22, 1], afternoon: ['#fff4e2', 80, 0.18, '#ffffff', 0.24, 1], evening: ['#ffb070', 52, 0.22, '#ffc890', 0.2, 0.85], night: ['#9db0f0', 9, 0.06, '#1c2850', 0.12, 0.3] }[tod];
     if (!P) return;
-    const [sun, si, beam, glow, glowE, hemi, dust] = P;
+    const [sun, si, beam, sky, hemi, dust] = P;
     this.sun.color.set(sun); this.sunBase = si; this.ambientBase = hemi;
     if (!this.aarti) { this.sun.intensity = si; this.hemi.intensity = hemi; }
-    this.beamMat.opacity = beam; this.poolMat.opacity = beam * 2.4; this.windowGlow.color.set(glow); this.windowGlowEast.color.set(glowE);
-    this.ceilMat.emissiveIntensity = tod === 'night' ? 0.1 : 0.22; for (const m of this.muralMats) m.emissiveIntensity = tod === 'night' ? 0.08 : 0.16;
+    this.beamMat.opacity = beam; this.beamMat.color.set(sun); this.skyMat.color.set(sky);
     this.dust.material.uniforms.uOpacity.value = dust;
   }
 
@@ -146,33 +125,30 @@ export class PrayerHall {
     for (const L of this.altarLights || []) this.scene.remove(L);
     // reset flames (keep personal diya slots consistent)
     this.flames.count = 0; this.flames.points.geometry.setDrawRange(0, 0);
+    for (const f of this.shellFlames) this.flames.add(f.p, f.s);   // the shrine's own lamps, always burning
     this.spotState.forEach(s => { s.lit = false; s.flame = -1; s.incense = null; if (s.light) { this.scene.remove(s.light); s.light = null; } });
     this.stands.forEach(s => { s.stick.visible = false; s.ember.visible = false; });
     this.smoke.clear(); this.petals.mesh.count = 0; this.petals.flying.length = 0;
     const A = this.altar = new THREE.Group(); this.scene.add(A);
-    const stone = stoneMat(id === 'shiva' ? '#d9d0c0' : id === 'krishna' ? '#e0b9a2' : '#dcb989', [2, 1], { rows: 3 });
-    const fine = stoneMat(id === 'shiva' ? '#e4dccd' : '#e8d2ac', [1, 1], { blocks: false });
+    const stone = granite(), fine = carvedStone();   // the same dark granite as the rock-cut hall
     const add = (geo, m, x, y, z, parent = A) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = o.receiveShadow = true; parent.add(o); return o; };
     // raised platform with three steps
     for (let i = 0; i < 3; i++) add(new THREE.BoxGeometry(9 - i * 0.6, 0.2, 1.0), fine, 0, 0.1 + i * 0.2, -5.1 - i * 0.45);
     add(new THREE.BoxGeometry(8.6, 0.6, 4.6), fine, 0, 0.3, -8.4);
-    // sanctum enclosure walls + carved doorway
-    add(new THREE.BoxGeometry(2.4, 5.4, 0.8), stone, -3.1, 3.3, -7.2); add(new THREE.BoxGeometry(2.4, 5.4, 0.8), stone, 3.1, 3.3, -7.2);
-    add(new THREE.BoxGeometry(8.6, 1.4, 0.8), stone, 0, 5.3, -7.2);
-    add(new THREE.BoxGeometry(4.6, 5.4, 0.3), stone, -2.6, 3.3, -10.6).visible = false;
-    const back = add(new THREE.BoxGeometry(8.6, 6, 0.4), new THREE.MeshStandardMaterial({ color: '#3a1d14', roughness: 0.9 }), 0, 3.0, -10.4);
-    for (const s of [-1, 1]) add(new THREE.BoxGeometry(0.4, 6, 3.4), new THREE.MeshStandardMaterial({ color: '#4a2618', roughness: 0.9 }), s * 2.1, 3.0, -8.8);
-    const frameM = gold; const fr = (w, h, x, y) => add(new THREE.BoxGeometry(w, h, 0.12), frameM, x, y, -6.78);
-    fr(0.14, 4.1, -1.85, 2.65); fr(0.14, 4.1, 1.85, 2.65); fr(3.84, 0.16, 0, 4.66);
-    const bandM = bandMat('#d8b98c'); for (const s of [-1, 1]) add(new THREE.BoxGeometry(0.5, 4.3, 0.2), bandM, s * 2.2, 2.75, -6.75);
+    // the doorway, cell and carving are part of the rock-cut hall; here, the name of the deity cut in the stone over the door
     const insc = { shiva: 'ॐ नमः शिवाय', ganesha: 'श्री गणेशाय नमः', krishna: 'श्री कृष्णाय नमः' }[id];
-    const plaque = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 0.62), new THREE.MeshStandardMaterial({ map: TX.inscription(insc), roughness: 0.6, emissive: '#3a1408', emissiveIntensity: 0.25 })); plaque.position.set(0, 5.25, -6.78); A.add(plaque);
-    A.add(garland(new THREE.Vector3(-1.8, 4.5, -6.6), new THREE.Vector3(1.8, 4.5, -6.6), 0.6, 40));
-    for (const s of [-1, 1]) A.add(garland(new THREE.Vector3(s * 1.8, 4.5, -6.6), new THREE.Vector3(s * 1.7, 1.4, -6.6), 0.12, 26));
-    // prabhavali (radiant arch) behind the deity
-    const arch = new THREE.Mesh(new THREE.TorusGeometry(1.15, 0.09, 10, 40, Math.PI), gold); arch.position.set(0, 2.05, -9.6); A.add(arch);
-    const arch2 = new THREE.Mesh(new THREE.TorusGeometry(1.32, 0.035, 8, 40, Math.PI), gold); arch2.position.set(0, 2.05, -9.62); A.add(arch2);
-    for (let i = 0; i <= 12; i++) { const a = i / 12 * Math.PI; const f = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.22, 6), gold); f.position.set(Math.cos(a) * 1.42, 2.05 + Math.sin(a) * 1.42, -9.62); f.rotation.z = a - Math.PI / 2; A.add(f); }
+    const plaque = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 0.62), new THREE.MeshStandardMaterial({ map: TX.inscription(insc, { bg: '#3b3029', color: '#d9b36a' }), roughness: 0.75, emissive: '#2a1206', emissiveIntensity: 0.2 })); plaque.position.set(0, 5.5, HALL.BACK + 0.015); A.add(plaque);
+    A.add(garland(new THREE.Vector3(-1.8, 4.5, HALL.BACK + 0.35), new THREE.Vector3(1.8, 4.5, HALL.BACK + 0.35), 0.6, 40));
+    for (const s of [-1, 1]) A.add(garland(new THREE.Vector3(s * 1.8, 4.5, HALL.BACK + 0.35), new THREE.Vector3(s * 1.7, 1.4, HALL.BACK + 0.35), 0.12, 26));
+    // a brass prabhavali (radiant arch) behind Ganesha and Krishna; the lingam stands bare in its beam of light
+    if (id !== 'shiva') {
+      const arch = new THREE.Mesh(new THREE.TorusGeometry(1.15, 0.09, 10, 40, Math.PI), brass); arch.position.set(0, 2.05, -9.6); A.add(arch);
+      const arch2 = new THREE.Mesh(new THREE.TorusGeometry(1.32, 0.035, 8, 40, Math.PI), brass); arch2.position.set(0, 2.05, -9.62); A.add(arch2);
+      for (let i = 0; i <= 12; i++) { const a = i / 12 * Math.PI; const f = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.22, 6), brass); f.position.set(Math.cos(a) * 1.42, 2.05 + Math.sin(a) * 1.42, -9.62); f.rotation.z = a - Math.PI / 2; A.add(f); }
+    }
+    // an incense pot at the foot of the steps, as in the old shrines, its smoke curling up into the lamplight
+    const pot = add(new THREE.LatheGeometry([[0, 0], [0.13, 0], [0.16, 0.06], [0.2, 0.2], [0.17, 0.32], [0.11, 0.36], [0.14, 0.42], [0, 0.42]].map(([x, y]) => new THREE.Vector2(x, y)), 20), brass, -3.5, 0, -4.3); void pot;
+    for (let i = 0; i < 3; i++) { const st = add(new THREE.CylinderGeometry(0.005, 0.005, 0.5, 4), new THREE.MeshStandardMaterial({ color: '#4a2a1c', roughness: 0.9 }), -3.5 + (i - 1) * 0.04, 0.6, -4.3); st.rotation.z = (i - 1) * 0.18; }
     // deity
     if (id === 'shiva') this._shiva(A, add); else if (id === 'ganesha') this._ganesha(A, add); else this._krishna(A, add);
     // lamp stands, offering table, kalash, bell
@@ -190,17 +166,18 @@ export class PrayerHall {
     const coco = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 10), new THREE.MeshStandardMaterial({ color: '#6b4a2e', roughness: 0.95 })); coco.position.set(-1.25, 1.18, -6.0); A.add(coco);
     for (let i = 0; i < 5; i++) { const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.3, 4), new THREE.MeshStandardMaterial({ color: '#3d6b2a', roughness: 0.8 })); const a = i / 5 * Math.PI * 2; leaf.position.set(-1.25 + Math.cos(a) * 0.1, 1.08, -6.0 + Math.sin(a) * 0.1); leaf.rotation.set(Math.sin(a) * 1.2, 0, -Math.cos(a) * 1.2); A.add(leaf); }
     // altar incense (dhoop) is always burning, gently
-    this.altarSmoke = [this.smoke.addEmitter(new THREE.Vector3(1.25, 1.0, -6.0), { rate: 6, life: 1e9 })];
+    this.altarSmoke = [this.smoke.addEmitter(new THREE.Vector3(1.25, 1.0, -6.0), { rate: 6, life: 1e9 }), this.smoke.addEmitter(new THREE.Vector3(-3.5, 0.86, -4.3), { rate: 4, life: 1e9 })];
     const dhoop = add(new THREE.CylinderGeometry(0.1, 0.07, 0.4, 12), brass, 1.25, 0.8, -6.0); void dhoop;
     // the main hall bell, hung from the ceiling with a pull rope
     if (this.bell) this.scene.remove(this.bell.group);
     this.bell = new HangingBell(2.0, 1.2); this.bell.group.position.set(-2.7, 4.4, -4.2); this.bell.axis = 'z';
-    const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 3.5, 6), brass); chain.position.y = 1.75; this.bell.group.add(chain);
+    const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, HALL.CEIL - 4.4, 6), brass); chain.position.y = (HALL.CEIL - 4.4) / 2; this.bell.group.add(chain);
     this.scene.add(this.bell.group);
     this.bell.onStrike = (b, e = 1) => this.audio.bell(b.group.getWorldPosition(new THREE.Vector3()), { size: 1.45, gain: 0.62 * (0.25 + 0.75 * e * e), hall: 0.6 });
     // sanctum light
-    const sanct = new THREE.PointLight('#ffb766', 9, 9, 1.6); sanct.position.set(0, 2.6, -7.8);
-    const fill = new THREE.SpotLight('#ffcf8a', 30, 16, 0.5, 0.6, 1.4); fill.position.set(0, 5.5, -2); fill.target.position.set(0, 1.4, -9.2);
+    this.sanctBase = 4; this.fillBase = 8;   // low: the shrine is lit by its lamps and the shaft of daylight
+    const sanct = new THREE.PointLight('#ffa255', this.sanctBase, 8, 1.6); sanct.position.set(0, 2.2, -7.6);
+    const fill = new THREE.SpotLight('#ffbf80', this.fillBase, 16, 0.32, 0.7, 1.4); fill.position.set(0, 5.0, -2); fill.target.position.set(0, 1.4, -9.0);
     const lampL = new THREE.PointLight('#ff9f4a', 3, 7, 1.8); lampL.position.set(0, 2.0, -5.8);
     this.altarLights = [sanct, fill, fill.target, lampL]; this.sanct = sanct; this.fill = fill; this.lampLight = lampL;
     for (const L of this.altarLights) this.scene.add(L);
@@ -235,6 +212,15 @@ export class PrayerHall {
     const leafM = new THREE.MeshStandardMaterial({ color: '#3c6b2b', roughness: 0.7, side: THREE.DoubleSide });
     for (let i = 0; i < 9; i++) { const a = i / 9 * Math.PI * 2; for (let k = -1; k <= 1; k++) { const l = new THREE.Mesh(new THREE.CircleGeometry(0.08, 8), leafM); l.scale.set(0.6, 1.3, 1); l.position.set(Math.cos(a) * 0.55, 1.33, -8.9 + Math.sin(a) * 0.55); l.rotation.set(-Math.PI / 2, 0, a + k * 0.6); A.add(l); } }
     A.add(ringOf(0.48, 1.34, -8.9, 22, '#ffffff', 0.05));
+    // a jasmine garland draped round the lingam, a pink lotus at its heart and another on the pitha, and a brass lamp beside it
+    A.add(ringOf(0.335, 1.66, -8.9, 40, '#fbf5e6', 0.038, 0.3)); A.add(ringOf(0.36, 1.6, -8.9, 36, '#f4ecd6', 0.03, 0.34));
+    const lotusM = new THREE.MeshStandardMaterial({ color: '#ef7fa3', roughness: 0.55, side: THREE.DoubleSide }), heart = new THREE.MeshStandardMaterial({ color: '#f2c43a', roughness: 0.6 });
+    for (const [x, y, z, sc] of [[0, 1.33, -8.52, 1], [0, 1.27, -8.24, 1.25]]) {
+      const lo = new THREE.Mesh(mergeGeos([petalRing(0.025, 8, 0.075, { lean: 0.45, rows: 2 })]), lotusM); lo.position.set(x, y, z); lo.scale.setScalar(sc); lo.rotation.x = 0.5; A.add(lo);
+      const c = new THREE.Mesh(new THREE.SphereGeometry(0.018, 8, 6), heart); c.position.set(x, y + 0.03, z); A.add(c);
+    }
+    const samai = lampStand(0.85); samai.position.set(1.3, 0.6, -8.35); A.add(samai);
+    for (const w of samai.userData.wicks) this.flames.add(w.clone().add(samai.position).add(new THREE.Vector3(0, 0.05, 0)), 0.26);
     // copper dhara-patra above the lingam
     const pot = add(new THREE.SphereGeometry(0.28, 20, 12, 0, Math.PI * 2, Math.PI * 0.35, Math.PI * 0.65), copper, 0, 3.2, -8.9); pot.scale.y = 1.1;
     for (const s of [-1, 1]) add(new THREE.CylinderGeometry(0.006, 0.006, 1.6, 4), brass, s * 0.25, 4.0, -8.9);
@@ -407,6 +393,8 @@ export class PrayerHall {
     this.smoke.enabled = ctx.incense; this.smoke.density = this.quality.level === 'low' ? 0.5 : 1;
     this.smoke.update(dt, t); this.petals.update(dt);
     this.dust.material.uniforms.uTime.value = t; this.dust.visible = !ctx.reducedMotion || true;
+    if (this.glow.streakMat) this.glow.streakMat.uniforms.uTime.value = t;
+    for (let i = 0; i < this.towers.length; i++) this.towers[i].intensity = (i < 2 ? 12 : 7) * (0.93 + Math.sin(t * 8.3 + i * 2.1) * 0.04 + Math.sin(t * 13.7 + i) * 0.03);
     this.bell.update(dt, t);
     // markers pulse softly
     const pulse = ctx.reducedMotion ? 1 : 0.85 + Math.sin(t * 2.2) * 0.15;
@@ -438,8 +426,8 @@ export class PrayerHall {
       const A = this.aarti; A.t += dt; const k = A.t;
       const warm = smooth(2, 10, k) * (1 - smooth(A.dur - 6, A.dur, k));
       this.hemi.intensity = this.ambientBase * (1 - 0.45 * warm); this.sun.intensity = this.sunBase * (1 - 0.6 * warm);
-      this.sanct.intensity = 9 + 14 * warm; this.sanct.color.set('#ffb766').lerp(new THREE.Color('#ff9a3c'), warm);
-      this.fill.intensity = 30 + 40 * warm;
+      this.sanct.intensity = this.sanctBase + 10 * warm; this.sanct.color.set('#ffa255').lerp(new THREE.Color('#ff9a3c'), warm);
+      this.fill.intensity = this.fillBase + 22 * warm;
       const active = k > 10 && k < A.dur - 9;
       const lampOn = smooth(9, 11, k) * (1 - smooth(A.dur - 9, A.dur - 7, k));
       this.priest.lampAngle = (this.priest.lampAngle || 0) + dt * (active ? 2.3 : 0.4);
@@ -462,7 +450,7 @@ export class PrayerHall {
 }
 
 function smooth(a, b, x) { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); }
-function fine2() { return stoneMat('#e8d6b4', [1, 1], { blocks: false }); }
+function fine2() { return carvedStone(); }
 function ringOf(r, y, z, n, color, size = 0.05, drop = 0) {
   const im = new THREE.InstancedMesh(new THREE.SphereGeometry(size, 7, 5), new THREE.MeshStandardMaterial({ color, roughness: 0.85 }), n);
   const m = new THREE.Matrix4();
@@ -472,7 +460,7 @@ function ringOf(r, y, z, n, color, size = 0.05, drop = 0) {
 function nandi() {
   const m = darkStone, grp = new THREE.Group();
   const add = (geo, x, y, z, sx = 1, sy = 1, sz = 1, mat = m) => { const o = new THREE.Mesh(geo, mat); o.position.set(x, y, z); o.scale.set(sx, sy, sz); o.castShadow = true; grp.add(o); return o; };
-  add(new THREE.BoxGeometry(1.4, 0.25, 2.0), 0, 0.125, 0, 1, 1, 1, stoneMat('#cfc2ad', [1, 1], { blocks: false }));
+  add(new THREE.BoxGeometry(1.4, 0.25, 2.0), 0, 0.125, 0, 1, 1, 1, carvedStone());
   add(new THREE.SphereGeometry(0.5, 20, 14), 0, 0.68, 0, 0.95, 0.78, 1.55);
   add(new THREE.SphereGeometry(0.28, 14, 10), 0, 1.06, -0.38, 1.0, 0.9, 1.0);
   add(new THREE.SphereGeometry(0.24, 14, 10), 0, 1.08, -0.92, 0.85, 1.0, 1.25).rotation.x = 0.4;
