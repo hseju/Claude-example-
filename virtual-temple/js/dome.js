@@ -57,7 +57,7 @@ export class PrayerHall {
 
   buildShell() {
     const S = this.scene, Q = this.quality, low = Q.level === 'low', V = (x, y, z) => new THREE.Vector3(x, y, z);
-    this.hemi = new THREE.HemisphereLight('#e6d6c4', '#2a2018', 0.26); S.add(this.hemi);
+    this.hemi = new THREE.HemisphereLight('#e6d6c4', '#6a4426', 0.26);   // the ground colour is lamplight thrown up off the floor onto the dome and the soffits S.add(this.hemi);
     this.ambientBase = 0.26; this.sunBase = 70;
     // daylight falling through the opening in the rock, onto the lingam in the sanctum
     // the cave hewn from the rock: walls, ceiling and the opening, pillars, carved panels, benches and the niche shrine
