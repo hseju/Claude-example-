@@ -80,25 +80,26 @@ export class PrayerHall {
     // oil lamps everywhere: on the rock benches under the carvings, at the pillar feet, on the sanctum steps, and two tall lamp towers
     const spots = [], Bn = R.bench;
     for (const s of [-1, 1]) for (let z = -6.1; z <= 10.3; z += 0.9) spots.push({ p: V(s * Bn.sideX, Bn.y, z), wall: V(-s, 0, 0), inset: -0.3, pool: 0.95, floorY: 0, refl: 1.8 });
-    for (const s of [-1, 1]) for (let x = 3.4; x <= 10.4; x += 0.9) spots.push({ p: V(s * x, Bn.y, Bn.backZ), wall: V(0, 0, 1), inset: 0.14, pool: 0.95, floorY: 0, refl: 1.8 });
+    for (const s of [-1, 1]) for (let x = 3.75; x <= 10.4; x += 0.9) spots.push({ p: V(s * x, Bn.y, Bn.backZ), wall: V(0, 0, 1), inset: 0.14, pool: 0.95, floorY: 0, refl: 1.8 });
     for (const pl of R.pillars) for (const dz of [-0.72, 0.72]) spots.push({ p: V(pl.x - Math.sign(pl.x) * 0.86, 0, pl.z + dz), pool: 0.8, floorY: 0, refl: 1.4 });
     for (let i = 0; i < 3; i++) { const y = 0.2 + 0.2 * i, z = -5.1 - 0.45 * i + 0.22, hw = (7.2 - i * 0.4) / 2 - 0.28; for (const s of [-1, 1]) spots.push({ p: V(s * hw, y, z), pool: 0.6, floorY: y }); }
     for (const s of [-1, 1]) spots.push({ p: V(s * 2.95, 0.6, -6.3), pool: 0.6, floorY: 0.6 });
     for (let k = 0; k < 16; k++) { const a = k / 16 * Math.PI * 2; if (Math.sin(a) > 0.55) continue; spots.push({ p: V(Math.cos(a) * 2.58, 0.62, HALL.AIM.z + Math.sin(a) * 2.58), pool: 0.55, floorY: 0.62 }); }   // round the pradakshina path
-    for (const [x, z] of [[-2.2, -3.9], [2.3, -4.1], [-4.6, -3.2], [4.4, -3.4]]) spots.push({ p: V(x, 0, z), pool: 0.8, floorY: 0, refl: 1.5 });   // a few set on the floor before the steps
+    for (const [x, z] of [[-2.2, -3.9], [2.3, -4.1], [-4.4, -4.1], [4.3, -4.2]]) spots.push({ p: V(x, 0, z), pool: 0.8, floorY: 0, refl: 1.5 });   // a few set on the floor before the steps
     this.shellFlames = spots.map((s) => ({ p: s.p.clone().add(V(0, 0.1, 0)), s: 0.3 }));
     S.add(diyaField(spots));
     this.towers = [];
     for (const s of [-1, 1]) {
-      const T = lampTower(3.3); T.mesh.position.set(s * 4.45, 0, -5.35); S.add(T.mesh);
+      const T = lampTower(3.3); T.mesh.position.set(s * 5.55, 0, -5.25); S.add(T.mesh);
       for (const w of T.wicks) this.shellFlames.push({ p: w.clone().add(T.mesh.position), s: 0.2 });
       spots.push({ p: T.mesh.position.clone(), pool: 2.1, floorY: 0, refl: 3.6, noDiya: true });
-      const L = new THREE.PointLight('#ffa65a', 18, 14, 1.3); L.position.set(s * 4.45, 2.4, -5.35); S.add(L); this.towers.push(L);
+      const L = new THREE.PointLight('#ffa65a', 18, 14, 1.3); L.position.set(s * 5.55, 2.4, -5.25); S.add(L); this.towers.push(L);
     }
     if (!low) for (const s of [-1, 1]) { const L = new THREE.PointLight('#ff9c52', 10, 13, 1.35); L.position.set(s * 9.2, 1.6, 2.4); S.add(L); this.towers.push(L); }
     this.glow = lampGlow(spots, { reflections: !low }); S.add(this.glow.group);
     // petals strewn before the sanctum steps
     { const pts = []; for (let i = 0; i < 90; i++) { const a = (Math.random() - 0.5) * 2.6, d = Math.pow(Math.random(), 1.6) * 4.2; pts.push(V(Math.sin(a) * d * 1.3, 0.012, -4.6 + Math.cos(a) * d)); }
+      for (let i = 0; i < 70; i++) { const a = Math.random() * Math.PI * 2, r = HALL.RING_IN + 0.08 + Math.random() * (HALL.RING_OUT - HALL.RING_IN - 0.16); pts.push(V(Math.cos(a) * r, 0.648, HALL.AIM.z + Math.sin(a) * r)); }   // on the path round the deity
       for (let i = 0; i < 3; i++) for (let k = 0; k < 8; k++) pts.push(V((Math.random() - 0.5) * (6.6 - i * 0.4), 0.2 + 0.2 * i + 0.012, -5.1 - 0.45 * i + (Math.random() - 0.5) * 0.4));
       const pm = new THREE.InstancedMesh(new THREE.CircleGeometry(0.045, 7).scale(1, 1.6, 1).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ roughness: 0.6, side: THREE.DoubleSide }), pts.length), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), col = new THREE.Color();
       pts.forEach((p, i) => { m4.compose(p, q.setFromAxisAngle(V(0, 1, 0), Math.random() * 6.3), V(1, 1, 1).multiplyScalar(0.8 + Math.random() * 0.6)); pm.setMatrixAt(i, m4); pm.setColorAt(i, col.set(['#e8608c', '#f28aaa', '#d94a7a', '#f6a8c0'][i % 4])); });
@@ -200,8 +201,8 @@ export class PrayerHall {
     });
     this.bell = this.bells[0];
     // sanctum light
-    this.sanctBase = 4; this.fillBase = 8;   // low: the shrine is lit by its lamps and the shaft of daylight
-    const sanct = new THREE.PointLight('#ffa255', this.sanctBase, 8, 1.6); sanct.position.set(0, 2.2, -7.6);
+    this.sanctBase = 6.5; this.fillBase = 8;   // low: the shrine is lit by its lamps and the shaft of daylight
+    const sanct = new THREE.PointLight('#ffa255', this.sanctBase, 9, 1.5); sanct.position.set(0, 3.3, -8.4);
     const fill = new THREE.SpotLight('#ffbf80', this.fillBase, 16, 0.32, 0.7, 1.4); fill.position.set(0, 5.0, -2); fill.target.position.set(0, 1.4, -9.0);
     const lampL = new THREE.PointLight('#ff9f4a', 3, 7, 1.8); lampL.position.set(0, 2.0, -5.8);
     this.altarLights = [sanct, fill, fill.target, lampL]; this.sanct = sanct; this.fill = fill; this.lampLight = lampL;
