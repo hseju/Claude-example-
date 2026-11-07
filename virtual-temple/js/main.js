@@ -301,7 +301,7 @@ function act(name) {
   if (app.mode !== 'hall' || app.hallState !== 'seated' || app.aarti) return;
   const now = performance.now(); if (now - lastAct < 350) return; lastAct = now;
   const av = me.avatar, i = hall.mySpot;
-  if (name === 'namaste') { av.setState('bow'); setTimeout(() => av.state === 'bow' && av.setState('namaste'), 2500); const n = hall.greetFrom(av.root.position); if (n) toast(n === 1 ? 'The devotee beside you returns your namaste' : `${n} devotees around you return your namaste`, 2400); }
+  if (name === 'namaste') { av.setState('bow'); setTimeout(() => av.state === 'bow' && av.setState('namaste'), 2500); const who = hall.greetFrom(av); if (who) toast(`${who.config.name || 'The devotee beside you'} returns your namaste`, 2400); }
   if (name === 'bell' || name === 'flowers' || name === 'pradakshina') { startErrand(name); return; }
   if (name === 'diya') {
     if (hall.spotState[i].lit) { toast('Your diya is already burning'); return; }
@@ -461,11 +461,13 @@ function receivePrasad() {
 function worldPranam() {
   if (app.mode !== 'world') return;
   input.auto = []; const av = me.avatar; av.setState('bow'); app.pranamUntil = app.time + 2.6;
-  const T = nearShrine(), who = !T && world.nearestDevotee(av.root.position, 6);
-  const at = T ? T.pos : who ? who.avatar.root.position : Object.values(TEMPLES).sort((a, b) => a.pos.distanceTo(av.root.position) - b.pos.distanceTo(av.root.position))[0].pos;
+  // to the devotee nearest you (within a few steps, or close beside you at a shrine), who turns to face you and bows back;
+  // otherwise to the shrine you stand before, or the nearest temple
+  const T = nearShrine(), who = world.nearestDevotee(av.root.position, 4.5), dWho = who ? who.avatar.root.position.distanceTo(av.root.position) : 99;
+  const toWho = who && (!T || dWho < 2.6);
+  const at = toWho ? who.avatar.root.position : T ? T.pos : Object.values(TEMPLES).sort((a, b) => a.pos.distanceTo(av.root.position) - b.pos.distanceTo(av.root.position))[0].pos;
   const d = at.clone().sub(av.root.position); av.root.rotation.y = Math.atan2(d.x, d.z);
-  const n = world.greetFrom(av.root.position, av.root.rotation.y);
-  if (n) toast(n === 1 ? 'A devotee returns your pranam' : `${n} devotees return your pranam`, 2400);
+  if (toWho) { world.greet(who, av); toast(`${who.avatar.config.name || 'A devotee'} returns your pranam`, 2400); }
 }
 function nearShrine() {
   for (const T of Object.values(TEMPLES)) if (T.entrance.distanceTo(me.avatar.root.position) < 3.4) return T;

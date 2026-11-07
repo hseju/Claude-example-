@@ -9,6 +9,7 @@ import { HUT, buildHut } from './hut.js';
 import { relief, petalRing } from './ornament.js';
 import { dressWorld } from './dressing.js';
 import { PRASAD, buildPrasad } from './prasad.js';
+import { greetStep } from './greet.js';
 import { sunShafts } from './sunbeams.js';
 import { pbr, triplanar } from './pbr.js';
 
@@ -757,14 +758,8 @@ export class World {
         av.update(dt, t); continue;
       }
       if (npc.queued) { av.update(dt, t); continue; }   // the prasad line moves them
-      // returning your pranam: stop, turn to you, bow, and carry on
-      if (npc.greet) {
-        const G = npc.greet; av.speed = 0; if (av.state === 'walk') av.setState('idle');
-        av.root.rotation.y = lerpAngle(av.root.rotation.y, Math.atan2(G.to.x - p.x, G.to.z - p.z), 1 - Math.exp(-dt * 7));
-        if (!G.bowed && this._clock > G.at) { av.setState('bow'); G.bowed = true; }
-        if (G.bowed && this._clock > G.at + 2.6) { av.setState('namaste'); npc.greet = null; npc.wait = Math.max(npc.wait, 0.9 + Math.random()); }
-        av.update(dt, t); continue;
-      }
+      // returning your pranam: stop, turn to face you, bow, and carry on
+      if (av.greet) { if (greetStep(av, dt, this._clock)) { av.greet = null; npc.wait = Math.max(npc.wait, 0.9 + Math.random()); } av.update(dt, t); continue; }
       if (npc.wait > 0) { npc.wait -= dt; av.speed = 0; if (npc.wait <= 0) { av.setState('idle'); this._npcPlan(npc); } }
       else if (npc.path.length) {
         const tgt = npc.path[0]; const d = new THREE.Vector3(tgt.x - p.x, 0, tgt.z - p.z); const dist = d.length();
@@ -782,16 +777,13 @@ export class World {
     }
   }
 
-  // you bow: the devotees in front of you (or right beside you) turn to you and return your pranam, one after another
-  greetFrom(pos, facing) {
-    const fwd = new THREE.Vector3(Math.sin(facing), 0, Math.cos(facing)), now = this._clock || 0;
-    const near = this.npcs.filter((n) => !n.follow && !n.queued && !n.greet).map((n) => { const d = n.avatar.root.position.clone().sub(pos); d.y = 0; const dist = d.length(); return { n, dist, dot: dist > 0.01 ? d.divideScalar(dist).dot(fwd) : 1 }; })
-      .filter((c) => c.dist < 7 && (c.dot > 0.3 || c.dist < 2.6)).sort((a, b) => a.dist - b.dist).slice(0, 6);
-    near.forEach((c, i) => { c.n.greet = { at: now + 0.4 + i * 0.25 + Math.random() * 0.3, to: pos.clone() }; });
-    if (this.prasad) for (const q of this.prasad.queue) if (!q.player && q.avatar.root.position.distanceTo(pos) < 4 && q.avatar.state !== 'offer') q.avatar.setState('bow');
-    return near.length;
+  // you bow to the devotee nearest you: they turn to face you and return your pranam
+  greet(npc, me) { npc.avatar.greet = { at: (this._clock || 0) + 0.25, target: me.root.position }; }
+  nearestDevotee(pos, within = 4.5) {
+    let best = null, bd = within;
+    for (const n of this.npcs) { if (n.follow || n.avatar.greet || n.avatar.state === 'offer') continue; const d = n.avatar.root.position.distanceTo(pos); if (d < bd) { bd = d; best = n; } }
+    return best;
   }
-  nearestDevotee(pos, within = 7) { let best = null, bd = within; for (const n of this.npcs) { if (n.follow) continue; const d = n.avatar.root.position.distanceTo(pos); if (d < bd) { bd = d; best = n; } } return best; }
 
   resolve(p, r) {
     for (const c of this.colliders.circles) { const dx = p.x - c.x, dz = p.z - c.z, d = Math.hypot(dx, dz), m = c.r + r; if (d < m && d > 1e-4) { p.x = c.x + dx / d * m; p.z = c.z + dz / d * m; } }

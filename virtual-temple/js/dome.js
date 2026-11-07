@@ -3,6 +3,7 @@ import * as TX from './textures.js';
 import { brass, gold, copper, clay, darkStone, HangingBell, diyaGeometry, lampStand, kalasha, garland } from './architecture.js';
 import { FlameField, SmokeSystem, PetalOffering, dustMotes } from './fx.js';
 import { mergeGeos, petalRing } from './ornament.js';
+import { greetStep } from './greet.js';
 import { Avatar } from './avatar.js';
 import { HALL, buildRockHall, lampTower, lampGlow, diyaField, granite, carvedStone, carved, roughBox } from './rockhall.js';
 import { pbr } from './pbr.js';
@@ -366,10 +367,11 @@ export class PrayerHall {
 
   // ---------- actions ----------
   // the devotees near you turn to you, return your namaste with a bow, and turn back to the deity
-  greetFrom(pos) {
-    let n = 0, i = 0;
-    for (const [, a] of this.occupants) { if (a.walkPts || a.greet || a.root.position.distanceTo(pos) > 4.6) continue; a.greet = { at: (this._t || 0) + 0.45 + i++ * 0.3 + Math.random() * 0.25, to: pos.clone() }; n++; }
-    return n;
+  greetFrom(me) {
+    let best = null, bd = 3.4;
+    for (const [, a] of this.occupants) { if (a.walkPts || a.greet) continue; const d = a.root.position.distanceTo(me.root.position); if (d < bd) { bd = d; best = a; } }
+    if (best) best.greet = { at: (this._t || 0) + 0.3, target: me.root.position };
+    return best;
   }
 
   // a simulated devotee leaves their place for a moment, and comes back
@@ -487,10 +489,9 @@ export class PrayerHall {
         else a.setState(Math.random() < 0.5 ? 'namaste' : 'idle');
       }
       if (a.greet) {
-        const G = a.greet, P = a.root.position, back = G.bowed && t > G.at + 2.5, want = back ? Math.PI : Math.atan2(G.to.x - P.x, G.to.z - P.z);
-        a.root.rotation.y = lerpA(a.root.rotation.y, want, 1 - Math.exp(-dt * 6));
-        if (!G.bowed && t > G.at) { a.setState('bow'); G.bowed = true; }
-        if (back && Math.abs(Math.atan2(Math.sin(a.root.rotation.y - Math.PI), Math.cos(a.root.rotation.y - Math.PI))) < 0.04) { a.root.rotation.y = Math.PI; a.greet = null; a.setState('namaste'); }
+        const G = a.greet;
+        if (!G.done) { if (greetStep(a, dt, t)) G.done = true; }
+        else { a.root.rotation.y = lerpA(a.root.rotation.y, Math.PI, 1 - Math.exp(-dt * 6)); if (Math.abs(Math.atan2(Math.sin(a.root.rotation.y - Math.PI), Math.cos(a.root.rotation.y - Math.PI))) < 0.04) { a.root.rotation.y = Math.PI; a.greet = null; } }   // and back to the deity
         a.update(dt, t); continue;
       }
       if (a.walkPts && a.walkPts.length) {

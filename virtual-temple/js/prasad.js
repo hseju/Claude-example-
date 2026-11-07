@@ -4,6 +4,7 @@ import { pillarGeometry, garland, kalasha, lampStand, brass, copper, stoneMat, b
 import { pbr } from './pbr.js';
 import { mergeGeos } from './ornament.js';
 import * as TX from './textures.js';
+import { greetStep } from './greet.js';
 
 // The prasad centre: a small pavilion in the south-east garden where a sevak shares prasad, the blessed food offered at
 // the shrines, with everyone who comes: a besan laddoo and a spoon of sweet pongal in a cup of leaves. Devotees come to it
@@ -105,13 +106,14 @@ class PrasadCounter {
     this.queue.forEach((q, i) => {
       const slot = PRASAD.slot(i), av = q.avatar, p = av.root.position;
       if (q.player) { if (q.slot !== i) { q.slot = i; q.onMove && q.onMove(slot.clone()); } q.atSlot = p.distanceTo(slot) < 0.35; if (q.atSlot && av.state !== 'walk') face(av, this.sevak.root.position, 5); return; }
+      if (av.greet) { if (greetStep(av, dt, t)) av.greet = null; return; }   // returning your pranam, then back to waiting
       q.slot = i; const d = new THREE.Vector3(slot.x - p.x, 0, slot.z - p.z), dist = d.length();
       if (dist > 0.06) { const st = Math.min(dist, 1.1 * dt); p.addScaledVector(d.normalize(), st); av.speed = 1.1; if (av.state !== 'walk') av.setState('walk'); face(av, slot); q.atSlot = false; }
       else { q.atSlot = true; av.speed = 0; if (av.state === 'walk') av.setState(Math.random() < 0.5 ? 'idle' : 'namaste'); face(av, this.sevak.root.position, 4); }
     });
     // the sevak turns to whoever is first, ladles a cup and hands it over; they take it in both hands with a namaste
     const S = this.serving, front = this.queue[0];
-    if (!S && front && front.atSlot && t > this.nextServe) { this.serving = { q: front, t0: t, cup: null }; this.sevak.setState('offer'); }
+    if (!S && front && front.atSlot && !front.avatar.greet && t > this.nextServe) { this.serving = { q: front, t0: t, cup: null }; this.sevak.setState('offer'); }
     if (this.serving) {
       const s = this.serving, k = t - s.t0, av = s.q.avatar;
       face(this.sevak, av.root.position, 6);
