@@ -220,8 +220,22 @@ export class World {
     const carved = new THREE.MeshStandardMaterial({ map: panel, normalMap: normalFromCanvas(pc, 3), roughness: 0.75 });
     void carved; const basin = new THREE.Mesh(new THREE.CylinderGeometry(2.7, 2.85, 0.6, 48, 1, true), relief('diamond', '#e3cfae', { repeat: [10, 1] })); basin.position.y = 0.3; basin.castShadow = basin.receiveShadow = true; S.add(basin);
     const lip = new THREE.Mesh(new THREE.TorusGeometry(2.75, 0.14, 8, 40), stone); lip.rotation.x = Math.PI / 2; lip.position.y = 0.6; S.add(lip);
-    this.water = new THREE.MeshStandardMaterial({ color: '#3d7d7a', roughness: 0.22, metalness: 0.2, normalMap: TX.waterNormal(), normalScale: new THREE.Vector2(0.35, 0.35), transparent: true, opacity: 0.92 });
-    this.pondWater = this.water.clone(); this.pondWater.opacity = 0.66; this.pondWater.roughness = 0.38; this.pondWater.color.set('#2c6a62');
+    // water: mirrors the surroundings (a 360° snapshot of the campus, see captureReflections), with two layers of ripples
+    // drifting different ways so the reflection wobbles and the sun glints off the crests
+    this.reflectRT = new THREE.WebGLCubeRenderTarget(this.quality.level === 'low' ? 128 : 256, { type: THREE.HalfFloatType });
+    this.reflectCam = new THREE.CubeCamera(0.5, 900, this.reflectRT);
+    this.waterTime = { value: 0 };
+    const rippled = (m) => { m.onBeforeCompile = (sh) => {
+      sh.uniforms.uWaterTime = this.waterTime;
+      sh.fragmentShader = 'uniform float uWaterTime;\n' + sh.fragmentShader.replace('#include <normal_fragment_maps>', `
+        vec2 wuv = vNormalMapUv;
+        vec3 n1 = texture2D(normalMap, wuv * 1.0 + vec2(uWaterTime * 0.020, uWaterTime * 0.013)).xyz * 2.0 - 1.0;
+        vec3 n2 = texture2D(normalMap, wuv * 2.3 + vec2(-uWaterTime * 0.031, uWaterTime * 0.024)).xyz * 2.0 - 1.0;
+        vec3 mapN = normalize(vec3((n1.xy + n2.xy * 0.7) * normalScale, n1.z * n2.z));
+        normal = normalize(tbn * mapN);`); };
+      m.customProgramCacheKey = () => 'rippled'; return m; };
+    this.water = rippled(new THREE.MeshStandardMaterial({ color: '#2f6f72', roughness: 0.06, metalness: 0.0, envMap: this.reflectRT.texture, envMapIntensity: 1.25, normalMap: TX.waterNormal(), normalScale: new THREE.Vector2(0.22, 0.22), transparent: true, opacity: 0.93 }));
+    this.pondWater = rippled(new THREE.MeshStandardMaterial({ color: '#245e58', roughness: 0.08, metalness: 0.0, envMap: this.reflectRT.texture, envMapIntensity: 1.1, normalMap: this.water.normalMap, normalScale: new THREE.Vector2(0.16, 0.16), transparent: true, opacity: 0.82 }));
     const w = new THREE.Mesh(new THREE.CircleGeometry(2.7, 40), this.water); w.rotation.x = -Math.PI / 2; w.position.y = 0.5; S.add(w);
     const ped = new THREE.Mesh(lampPostGeometry(1.3).scale(1.6, 1, 1.6), stone); ped.position.y = 0.3; S.add(ped);
     { const pr = new THREE.Mesh(petalRing(0.95, 18, 0.45, { lean: 0.75, rows: 2 }), stone); pr.position.y = 1.32; pr.castShadow = true; S.add(pr); }
@@ -661,7 +675,17 @@ export class World {
   }
 
   // Time of day: morning, afternoon, evening, night. Presets blend smoothly over a few seconds.
+  // take the 360° snapshot the water reflects: from above the plaza, with the water itself hidden (and no shadow re-render)
+  captureReflections() {
+    const r = this.renderer, wv = [this.water.visible, this.pondWater.visible], au = r.shadowMap.autoUpdate;
+    this.water.visible = this.pondWater.visible = false; r.shadowMap.autoUpdate = false;
+    this.reflectCam.position.set(0, 2.2, 14); this.reflectCam.update(r, this.scene);
+    this.water.visible = wv[0]; this.pondWater.visible = wv[1]; r.shadowMap.autoUpdate = au;
+    this.reflectRT.texture.needsPMREMUpdate = true;
+  }
   setTimeOfDay(name, instant = false) {
+    // re-take the reflection as the sky changes: shortly, midway and once the new light has settled
+    const now = this._clock || 0; (this._reflectAt = this._reflectAt || []).push(now + 0.5, now + 3, now + 7);
     const P = TOD_PRESETS[name]; if (!P) return;
     this.todName = name;
     const el = THREE.MathUtils.degToRad(P.elev), az = THREE.MathUtils.degToRad(P.az);
@@ -690,13 +714,17 @@ export class World {
   }
 
   update(dt, t, focus, ctx) {
+    this._clock = t; this.waterTime.value = t * (ctx.reducedMotion ? 0.3 : 1);
+    if (!this._reflectAt) this._reflectAt = [];
+    if (!this._reflectBoot) { this._reflectBoot = true; this._reflectAt.push(t + 1, t + 4, t + 9); }   // after load, as textures arrive
+    if (this._reflectAt.length && t >= this._reflectAt[0]) { this._reflectAt.shift(); while (this._reflectAt.length && t >= this._reflectAt[0]) this._reflectAt.shift(); this.captureReflections(); }
     if (this.todTarget && this.tod) this._blendTOD(ctx.reducedMotion ? 1 : 1 - Math.exp(-dt * 0.9));
     this.scenery.update(dt, t, focus, this.tod, ctx.reducedMotion ? 0.35 : 1);
     this.flora.update(dt, t * (ctx.reducedMotion ? 0.5 : 1), 1 - this.tod.night);
     this.windTime.value = t * (ctx.reducedMotion ? 0.3 : 1);
     this.flames.update(t);
     for (const a of this.hutSitters || []) if (a.root.position.distanceToSquared(focus) < 2500) a.update(dt, t);
-        if (this.water.normalMap) { this.water.normalMap.offset.x = t * 0.012; this.water.normalMap.offset.y = t * 0.008; }
+        // (the water's ripples drift in its shader, driven by waterTime)
     // sun follows the focus so the shadow map stays crisp near the player
     this.sun.position.copy(focus).addScaledVector(this.sunDir, 70); this.sun.target.position.copy(focus);
     this.sky.position.copy(focus).setY(0);

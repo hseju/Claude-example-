@@ -171,6 +171,21 @@ export class Scenery {
     this.fallMats = this.fallTex.map((t, i) => new THREE.MeshBasicMaterial({ map: t, transparent: true, opacity: i ? 0.55 : 0.9, depthWrite: false, side: THREE.DoubleSide, color: '#ffffff' }));
     const rockM = hazy(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, flatShading: true }), 0.7);
     const mistPts = [], mistSeed = [];
+    // foam: soft white blobs of churning water, two layers turning opposite ways
+    const foamTex = (() => { const S = 256, c = document.createElement('canvas'); c.width = c.height = S; const x = c.getContext('2d'); x.translate(S / 2, S / 2);
+      for (let i = 0; i < 260; i++) { const a = Math.random() * Math.PI * 2, r = Math.pow(Math.random(), 0.7) * S * 0.46, rr = 4 + Math.random() * 14, al = 0.25 + 0.55 * (1 - r / (S * 0.46));
+        const g = x.createRadialGradient(Math.cos(a) * r, Math.sin(a) * r, 0, Math.cos(a) * r, Math.sin(a) * r, rr); g.addColorStop(0, `rgba(255,255,255,${al})`); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(-S / 2, -S / 2, S, S); }
+      const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.center.set(0.5, 0.5); return t; })();
+    this.foamMats = [0, 1].map((i) => { const t = foamTex.clone(); t.needsUpdate = true; t.center.set(0.5, 0.5); return new THREE.MeshBasicMaterial({ map: t, transparent: true, opacity: i ? 0.55 : 0.85, depthWrite: false, color: '#ffffff' }); });
+    this.lipMat = new THREE.MeshBasicMaterial({ map: this.fallTex[0], transparent: true, opacity: 0.55, depthWrite: false, color: '#ffffff' });
+    this.cloudMistMat = new THREE.SpriteMaterial({ map: softDot(), color: '#ffffff', transparent: true, opacity: 0.32, depthWrite: false });
+    this.fallMists = [];
+    this.rainbowMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.0, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+      map: (() => { const W = 256, H = 128, c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d');
+        const bands = ['#ff3b30', '#ff9500', '#ffd60a', '#34c759', '#32ade6', '#5856d6', '#af52de'];
+        bands.forEach((col, i) => { x.strokeStyle = col; x.globalAlpha = 0.55; x.lineWidth = 3.2; x.beginPath(); x.arc(W / 2, H * 1.15, H * 0.98 - i * 3.1, Math.PI * 1.08, Math.PI * 1.92); x.stroke(); });
+        x.globalCompositeOperation = 'destination-in'; const g = x.createLinearGradient(0, 0, 0, H); g.addColorStop(0, 'rgba(0,0,0,0.2)'); g.addColorStop(0.5, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(0, 0, W, H);
+        const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })() });
     FALLS.forEach((fa, fi) => {
       const rTop = 128 + fi * 6, rBase = 112 + fi * 4;
       const top = this.nearHeight(rTop, fa, true), height = Math.max(40, top - 1), width = fi === 0 ? 16 : 11;
@@ -190,7 +205,21 @@ export class Scenery {
       }
       // plunge pool and the river that winds away from it
       const pool = new THREE.Mesh(new THREE.CircleGeometry(width * 1.1, 28), this.water); pool.rotation.x = -Math.PI / 2; pool.position.copy(dir).multiplyScalar(rTop - 7).setY(0.25); this.group.add(pool);
-      for (let i = 0; i < 70; i++) { const base = dir.clone().multiplyScalar(rTop - 6 + (Math.random() - 0.5) * 6); base.x += (Math.random() - 0.5) * width; base.z += (Math.random() - 0.5) * width * 0.5; mistPts.push(base.x, 0.5, base.z); mistSeed.push(Math.random()); }
+      for (let i = 0; i < 110; i++) { const base = dir.clone().multiplyScalar(rTop - 6 + (Math.random() - 0.5) * 6); base.x += (Math.random() - 0.5) * width; base.z += (Math.random() - 0.5) * width * 0.5; mistPts.push(base.x, 0.5, base.z); mistSeed.push(Math.random()); }
+      // white water: churning foam where the fall lands, a bright lip where it spills over, and mist billowing up
+      const poolC = dir.clone().multiplyScalar(rTop - 7).setY(0.3), toC = Math.atan2(-dir.x, -dir.z);
+      for (const [rad, mat, y] of [[width * 0.75, this.foamMats[0], 0.32], [width * 1.05, this.foamMats[1], 0.3]]) {
+        const f = new THREE.Mesh(new THREE.CircleGeometry(rad, 32).rotateX(-Math.PI / 2), mat); f.position.copy(poolC).setY(y); f.renderOrder = 4; this.group.add(f); }
+      const lipG = new THREE.CylinderGeometry(0.9, 0.9, width * 1.05, 10, 1, false, 0, Math.PI); lipG.rotateZ(Math.PI / 2);
+      const lip = new THREE.Mesh(lipG, this.lipMat); lip.position.copy(dir).multiplyScalar(rTop - 1.2).setY(height - 1.0); lip.rotation.y = toC; lip.renderOrder = 4; this.group.add(lip);
+      // soft spray puffs where the water tumbles over the edge, and a veil of mist down the face of the fall
+      const across = new THREE.Vector3(-dir.z, 0, dir.x);
+      for (let k = 0; k < 6; k++) { const sp = new THREE.Sprite(this.cloudMistMat); const w2 = width * (0.35 + Math.random() * 0.2); sp.scale.set(w2, w2 * 0.6, 1);
+        sp.position.copy(dir).multiplyScalar(rTop - 2.4).addScaledVector(across, (k / 5 - 0.5) * width * 0.9).setY(height - 1.2 + Math.random()); sp.renderOrder = 5; this.group.add(sp); this.fallMists.push({ s: sp, y0: sp.position.y, ph: Math.random() * 6 }); }
+      for (let k = 0; k < 10; k++) { const sp = new THREE.Sprite(this.cloudMistMat); const w2 = width * (1.3 + Math.random() * 0.9) * (1 - k * 0.04); sp.scale.set(w2, w2 * 0.7, 1);
+        sp.position.copy(dir).multiplyScalar(rTop - 6 + (Math.random() - 0.5) * 4).addScaledVector(across, (Math.random() - 0.5) * width).setY(3 + k * height * 0.045); sp.renderOrder = 5; this.group.add(sp); this.fallMists.push({ s: sp, y0: sp.position.y, ph: Math.random() * 6 }); }
+      if (fi === 0) {   // a faint rainbow in the spray of the main fall, in daylight
+        const rb = new THREE.Mesh(new THREE.PlaneGeometry(width * 3.2, width * 1.6), this.rainbowMat); rb.position.copy(dir).multiplyScalar(rTop - 6).setY(height * 0.36); rb.lookAt(0, rb.position.y, 0); rb.renderOrder = 6; this.group.add(rb); }
       if (fi === 0) this._river(fa, rTop - 7, width);
     });
     // spray and mist at the foot of each fall, animated on the GPU
@@ -406,6 +435,11 @@ export class Scenery {
     this.mistMat.color.copy(tod.cloud).lerp(new THREE.Color('#ffffff'), 0.4 * day); this.mistMat.opacity = tod.mist * 0.55;
     this.mistU.uColor.value.copy(tod.cloud).lerp(new THREE.Color('#ffffff'), 0.6 * day); this.mistU.uOpacity.value = 0.35 + 0.45 * day;
     for (const m of this.fallMats) m.color.setScalar(0.12 + 0.88 * day);
+    // foam churns, the lip glows with the fall, mist billows and drifts, the rainbow shows only in daylight
+    if (this.foamMats) { this.foamMats[0].map.rotation = t * 0.25 * motion; this.foamMats[1].map.rotation = -t * 0.15 * motion; for (const m of this.foamMats) m.color.setScalar(0.15 + 0.85 * day);
+      this.lipMat.color.setScalar(0.15 + 0.85 * day); this.cloudMistMat.color.copy(tod.cloud).lerp(new THREE.Color('#ffffff'), 0.7 * day); this.cloudMistMat.opacity = 0.2 + 0.24 * day;
+      for (const f of this.fallMists) { f.s.position.y = f.y0 + Math.sin(t * 0.3 * motion + f.ph) * 1.5; f.s.material.rotation = 0; }
+      this.rainbowMat.opacity = Math.max(0, day - (tod.warm || 0) * 0.6) * 0.75; }
     this.starU.uOpacity.value = tod.stars; this.flyU.uOpacity.value = Math.max(tod.night, 0.3 + tod.warm * 0.7);
     HAZE.value = 0.35 + (tod.mist || 0) * 0.45;
     this.moon.material.opacity = tod.night; this.moon.position.copy(tod.moonDir).multiplyScalar(650);
