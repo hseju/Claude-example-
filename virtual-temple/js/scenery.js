@@ -21,7 +21,7 @@ const dAng = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 export const FALLS = [-Math.PI * 0.5, -Math.PI * 0.68, -Math.PI * 0.31]; // north, north-west, north-east
 // aerial perspective: beyond the campus, each layer further away fades a little more into the colour of the haze, so ridges
 // read one behind another the way they do in a painting
-const HAZE = { value: 0.5 };
+const HAZE = { value: 0.5 }, FAR_TINT = { value: new THREE.Color('#b6c8f0') };
 function hazeShader(sh, k = 1) {
   sh.uniforms.uHaze = HAZE;
   sh.fragmentShader = 'uniform float uHaze;\n' + sh.fragmentShader.replace('#include <fog_fragment>', `#include <fog_fragment>
@@ -84,12 +84,30 @@ export class Scenery {
     this.nearMat = hazy(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }), 0.55);   // smooth, rolling slopes
     const nm = new THREE.Mesh(near, this.nearMat); nm.receiveShadow = false; this.group.add(nm);
     // far range: tall blue peaks with snow, fading into haze
-    const far = this._ring(240, 360, low ? 120 : 180, low ? 8 : 12, (r, a) => {
-      const rise = smooth(240, 290, r);
-      return rise * (60 + 130 * ridged(a * 2.4 + 11, r * 0.008, 5)) * (0.75 + 0.35 * fbm(a * 3 + 7, 1.3, 3));
-    }, (c, h) => { c.set('#5b6f72').lerp(tmp.set('#7d8a84'), smooth(40, 120, h)); if (h > 125) c.lerp(tmp.set('#f2f4f6'), smooth(125, 150, h)); });
-    this.farMat = hazy(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, flatShading: true }), 0.8);
+    // far ranges, in two layers: forested foothills rising to violet-grey rock and snowy peaks, and behind them a taller,
+    // paler range that fades into the haze. Colour follows height and steepness: forest low down, bare rock on steep faces,
+    // snow on the gentler high ground and in streaks down the gullies.
+    const slopeOf = (fn, r, a) => { const h = fn(r, a), d = 3; return Math.hypot((fn(r + d, a) - h) / d, (fn(r, a + d / r) - h) / d); };
+    const paint = (fn, { forest, rock, snow, line, warm }) => (c, h, r, a) => {
+      const sl = slopeOf(fn, r, a), n = fbm(a * 40 + r * 0.05, r * 0.03, 3), snowLine = line + 22 * (n - 0.5);
+      c.set(forest[0]).lerp(tmp.set(forest[1]), smooth(0.35, 0.7, fbm(a * 18, r * 0.02, 2)));
+      c.lerp(tmp.set(rock), Math.min(1, smooth(line * 0.35, line * 0.75, h) + smooth(0.9, 1.6, sl) * 0.8));
+      c.lerp(tmp.set(warm), smooth(0.45, 0.75, n) * 0.25 * smooth(line * 0.3, line * 0.8, h));
+      const snowy = smooth(snowLine - 8, snowLine + 6, h) * (1 - smooth(1.15, 1.9, sl) * 0.85) + smooth(snowLine + 10, snowLine + 30, h) * smooth(0.6, 0.8, fbm(a * 120, r * 0.2, 2)) * 0.6;
+      c.lerp(tmp.set(snow), Math.min(1, snowy));
+    };
+    const farH = (r, a) => smooth(238, 290, r) * (60 + 135 * ridged(a * 2.4 + 11, r * 0.008, 5)) * (0.75 + 0.35 * fbm(a * 3 + 7, 1.3, 3));
+    const far = this._ring(236, 360, low ? 150 : 260, low ? 10 : 18, farH, paint(farH, { forest: ['#3e5f4c', '#4a6a50'], rock: '#6f6880', snow: '#f6f7fb', line: 116, warm: '#a8907a' }));
+    // both ranges take a fixed share of the haze colour instead of the full fog, so rock and snow stay crisp in the distance
+    // toward the colour of the sky, so distance reads as the soft blue (or dusk pink) air of a painting
+    const heldHaze = (k) => { const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }); m.onBeforeCompile = (sh) => { sh.uniforms.uFarTint = FAR_TINT; sh.fragmentShader = 'uniform vec3 uFarTint;\n' + sh.fragmentShader.replace('#include <fog_fragment>', `gl_FragColor.rgb = mix(gl_FragColor.rgb, uFarTint, ${k.toFixed(2)});`); }; m.customProgramCacheKey = () => 'heldHaze' + k; return m; };
+    this.farMat = heldHaze(0.26);
     this.group.add(new THREE.Mesh(far, this.farMat));
+    const backH = (r, a) => smooth(380, 430, r) * (55 + 120 * ridged(a * 1.7 + 3, r * 0.006, 5)) * (0.8 + 0.3 * fbm(a * 2.2 + 1, 2.1, 3));
+    const back = this._ring(380, 520, low ? 120 : 200, low ? 8 : 12, backH, paint(backH, { forest: ['#5f7790', '#6a809a'], rock: '#8a8fac', snow: '#f7f8fc', line: 120, warm: '#b8a4a0' }));
+    // the back range is held at a fixed share of the haze colour, so its snow still reads through the distance
+    const backMat = heldHaze(0.45);
+    this.group.add(new THREE.Mesh(back, backMat));
     // forest on the near slopes: thousands of painted canopy cards that always face you, packed so the crowns overlap into one
     // continuous, lumpy forest (lit from the sun's side, darker underneath), with groves of pink blossom. Cheap on phones:
     // one draw for the whole forest.
@@ -253,7 +271,7 @@ export class Scenery {
   ridgeAbove(r, a) { let top = this.nearHeight(r, a); for (let rr = 100; rr < r; rr += 4) { const k = (rr - 30) / (r - 30); top = Math.max(top, this.nearHeight(rr, a) / k - 4); } return Math.min(top, this.nearHeight(r, a) + 30); }
   _palace() {
     const a = PALACE_A, r = 172, h = this.ridgeAbove(r, a), g = new THREE.Group();
-    g.position.set(Math.cos(a) * r, h + 2, Math.sin(a) * r); g.rotation.y = Math.atan2(-g.position.x, -g.position.z); this.group.add(g);
+    g.position.set(Math.cos(a) * r, h + 2, Math.sin(a) * r); g.rotation.y = Math.atan2(-g.position.x, -g.position.z); this.group.add(g); this.palaceAt = g.position.clone();
     const ivory = new THREE.MeshStandardMaterial({ color: '#f4e6cc', roughness: 0.8 }), gold = new THREE.MeshStandardMaterial({ color: '#e6b85c', metalness: 0.6, roughness: 0.4 });
     const glow = this.palaceGlow = new THREE.MeshStandardMaterial({ color: '#ffd59a', emissive: '#ffb050', emissiveIntensity: 1.6 });
     const box = (w, hh, d, x, y, z, m = ivory) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, hh, d), m); b.position.set(x, y + hh / 2, z); g.add(b); return b; };
@@ -370,6 +388,7 @@ export class Scenery {
       { n: 10, color: '#4c9a3c', scale: 0.9, cx: 10, cz: 10, R: 34, H: 15, w: -0.13, v: false },      // parakeets
       { n: 6, color: '#8f9294', scale: 0.9, cx: 0, cz: -31, R: 9, H: 22, w: 0.22, v: false },          // pigeons round the Shiva spire
       { n: 6, color: '#2d2723', scale: 1.6, cx: -60, cz: -40, R: 80, H: 45, w: 0.035, v: false },
+      ...(this.palaceAt ? [{ n: 9, color: '#f4f2ea', scale: 2.2, cx: this.palaceAt.x, cz: this.palaceAt.z, R: 24, H: this.palaceAt.y + 40, w: 0.06, v: false }] : []),   // doves circling the palace
     ];
     const total = flocks.reduce((s, f) => s + f.n, 0);
     this.birds = new THREE.InstancedMesh(geo, mat, total); this.birds.frustumCulled = false;
@@ -441,7 +460,7 @@ export class Scenery {
       for (const f of this.fallMists) { f.s.position.y = f.y0 + Math.sin(t * 0.3 * motion + f.ph) * 1.5; f.s.material.rotation = 0; }
       this.rainbowMat.opacity = Math.max(0, day - (tod.warm || 0) * 0.6) * 0.75; }
     this.starU.uOpacity.value = tod.stars; this.flyU.uOpacity.value = Math.max(tod.night, 0.3 + tod.warm * 0.7);
-    HAZE.value = 0.35 + (tod.mist || 0) * 0.45;
+    HAZE.value = 0.35 + (tod.mist || 0) * 0.45; FAR_TINT.value.copy(tod.mid).lerp(tod.sky, 0.35).lerp(tod.hor, 0.2);
     this.moon.material.opacity = tod.night; this.moon.position.copy(tod.moonDir).multiplyScalar(650);
     for (const c of this.clouds) { c.a += c.sp * dt * motion; c.s.position.x = Math.cos(c.a) * c.r; c.s.position.z = Math.sin(c.a) * c.r; }
     for (const m of this.mists) m.s.position.y = 10 + Math.sin(t * 0.05 + m.a * 3) * 2;

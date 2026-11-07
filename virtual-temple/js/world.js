@@ -107,14 +107,19 @@ export class World {
   }
 
   _sky() {
-    const u = this.skyU = { mid: { value: new THREE.Color('#f0b8a8') }, top: { value: new THREE.Color('#7fa7c9') }, bottom: { value: new THREE.Color('#f3d9ae') }, sunDir: { value: new THREE.Vector3(0, 1, 0) }, sunCol: { value: new THREE.Color('#ffd9a0') } };
+    const u = this.skyU = { mid: { value: new THREE.Color('#f0b8a8') }, top: { value: new THREE.Color('#7fa7c9') }, bottom: { value: new THREE.Color('#f3d9ae') }, sunDir: { value: new THREE.Vector3(0, 1, 0) }, sunCol: { value: new THREE.Color('#ffd9a0') }, uRays: { value: 0 } };
     const m = new THREE.ShaderMaterial({
       uniforms: u, side: THREE.BackSide, depthWrite: false, fog: false,
       vertexShader: 'varying vec3 vW; void main(){ vW = normalize(position); gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
-      fragmentShader: `uniform vec3 top; uniform vec3 mid; uniform vec3 bottom; uniform vec3 sunDir; uniform vec3 sunCol; varying vec3 vW;
+      fragmentShader: `uniform vec3 top; uniform vec3 mid; uniform vec3 bottom; uniform vec3 sunDir; uniform vec3 sunCol; uniform float uRays; varying vec3 vW;
         void main(){ float h = clamp(vW.y*1.3+0.08, 0.0, 1.0);
           vec3 c = h < 0.3 ? mix(bottom, mid, h/0.3) : mix(mid, top, pow((h-0.3)/0.7, 0.8));
           float s = max(dot(normalize(vW), normalize(sunDir)), 0.0); c += sunCol*(smoothstep(0.9993, 0.9997, s)*6.0 + pow(s, 10.0)*0.5 + pow(s, 3.0)*0.12);
+          // rays of light fanning out from the sun at golden hour
+          vec3 sd = normalize(sunDir), v = normalize(vW), ax = normalize(cross(abs(sd.y) < 0.99 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0), sd)), ay = cross(sd, ax);
+          float ang = atan(dot(v, ay), dot(v, ax));
+          float rays = (0.5 + 0.5 * sin(ang * 13.0 + sin(ang * 4.0) * 2.0)) * (0.55 + 0.45 * sin(ang * 29.0 + 1.7));
+          c += sunCol * uRays * rays * pow(s, 5.0) * 0.4 * smoothstep(-0.02, 0.2, v.y);
           gl_FragColor = vec4(c, 1.0); }`,
     });
     this.sky = new THREE.Mesh(new THREE.SphereGeometry(800, 32, 16), m); this.scene.add(this.sky);
@@ -703,7 +708,7 @@ export class World {
   _applyTOD() {
     const s = this.tod;
     this.skyU.top.value.copy(s.sky); this.skyU.mid.value.copy(s.mid); this.skyU.bottom.value.copy(s.hor); this.skyU.sunCol.value.copy(s.sun).multiplyScalar(1 - s.night * 0.6);
-    this.sunDir = s.sunDir; this.skyU.sunDir.value.copy(s.sunDir);
+    this.sunDir = s.sunDir; this.skyU.sunDir.value.copy(s.sunDir); this.skyU.uRays.value = Math.min(1, (s.warm || 0) * 1.6) * (1 - (s.night || 0));
     this.sun.color.copy(s.sun); this.sun.intensity = s.sunI;
     this.hemi.intensity = s.hemi; this.hemi.color.copy(s.hor).lerp(new THREE.Color('#ffffff'), 0.4 * (1 - s.night)); this.hemi.groundColor.copy(s.ground);
     this.scene.fog.color.copy(s.hor).lerp(s.mid, 0.45); this.scene.fog.near = s.fogNear; this.scene.fog.far = s.fogFar;
