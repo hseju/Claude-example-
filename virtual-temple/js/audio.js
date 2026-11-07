@@ -471,6 +471,7 @@ export class TempleAudio {
     this.playStation(true);
     this.applyZone(this.zone, 1);
     setTimeout(() => this._loadBuffer('aarti'), 20000);   // ready well before the first aarti
+    this._loadBuffer('bell');   // a recorded brass temple bell, small, so it is ready for the first strike
   }
   _hasRec(key) { return !!(this.manifest && this.manifest[key]); }
   _loadBuffer(key) {
@@ -572,6 +573,12 @@ export class TempleAudio {
     const ctx = this.ctx, t = ctx.currentTime + when, fund = 560 / size;
     const p = pos ? this._panner(pos) : ctx.createGain();
     p.connect(dest || this.buses.effects); this._send(p, { hall, stone });
+    // the recorded bell when it has loaded: a larger bell rings a little lower, and no two strikes are quite alike
+    const rec = this.library.bell;
+    if (rec) {
+      const src = ctx.createBufferSource(); src.buffer = rec; src.playbackRate.value = (1.25 / size) * (1 + (Math.random() - 0.5) * 0.025);
+      const g = ctx.createGain(); g.gain.value = gain * 1.5; src.connect(g).connect(p); src.start(t); return;
+    }
     const bus = ctx.createGain(); bus.gain.value = gain; bus.connect(p);
     for (const [r, a, dec] of BELL_PARTIALS) for (const det of [-1.2, 1.2]) {
       const o = ctx.createOscillator(); o.frequency.value = fund * r + det * r * 0.6;
@@ -586,6 +593,11 @@ export class TempleAudio {
   ghanti(when, gain = 0.25, dest) {
     const ctx = this.ctx, t = ctx.currentTime + when;
     const g0 = ctx.createGain(); g0.gain.value = gain; g0.connect(dest || this.buses.effects); this._send(g0, { hall: 0.35 });
+    const rec = this.library.bell;
+    if (rec) {   // the little hand bell of the aarti: the same brass, smaller and higher, damped quickly by the hand
+      const src = ctx.createBufferSource(); src.buffer = rec; src.playbackRate.value = 1.85 * (1 + (Math.random() - 0.5) * 0.03);
+      const e = ctx.createGain(); e.gain.setValueAtTime(1.4, t); e.gain.setTargetAtTime(0, t + 0.15, 0.22); src.connect(e).connect(g0); src.start(t); src.stop(t + 1.4); return;
+    }
     for (const [r, a, d] of [[1, 1, 0.9], [2.76, 0.5, 0.5], [5.4, 0.3, 0.25], [8.9, 0.15, 0.12]]) {
       const o = ctx.createOscillator(); o.frequency.value = 1850 * r * (1 + (Math.random() - 0.5) * 0.004); const g = ctx.createGain();
       g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(a * 0.1, t + 0.002); g.gain.exponentialRampToValueAtTime(0.0001, t + d);

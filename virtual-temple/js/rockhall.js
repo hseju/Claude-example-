@@ -14,7 +14,7 @@ import { brass, clay, diyaGeometry } from './architecture.js';
 
 const NAVE = 6.2, AISLE = 5.3, TOPY = 8.6;
 export const ceilY = (x) => Math.abs(x) >= NAVE ? AISLE : AISLE + (TOPY - AISLE) * Math.pow(Math.cos(Math.abs(x) / NAVE * Math.PI / 2), 0.8);
-export const HALL = { X: 11, BACK: -6.8, FRONT: 10.9, PIL_X: NAVE, PIL_Z: [-3.8, 0.4, 4.6, 8.6], NICHE_W: 1.5, NICHE_TOP: 3.5, BENCH: 0.45,
+export const HALL = { X: 11, BACK: -6.8, FRONT: 10.9, PIL_X: NAVE, PIL_Z: [-3.8, 0.4, 4.6, 8.6], NICHE_W: 1.5, NICHE_TOP: 3.5, BENCH: 0.45, CELL_W: 2.75, CELL_BACK: -12.0, RING_IN: 1.5, RING_OUT: 2.45, RING_R: 2.0,
   OCULUS: new THREE.Vector3(0, TOPY, -0.4), AIM: new THREE.Vector3(0, 1.4, -8.9), ceilY };
 export const ROCK = '#615a54', SHRINE = '#5f5852', DEEP = '#3f3832', CARVE = '#a69c92';   // CARVE is given to relief(), which treats it as linear
 
@@ -356,9 +356,14 @@ export function buildRockHall(S, quality) {
   mesh(roughBox(5.6, 0.45, 0.9, { amp: 0.03, seed: 33 }), shrine, 0, NT + 0.85 + 0.225, B + 0.45);
   mesh(roughBox(4.2, 0.6, 0.5, { amp: 0.03, seed: 35 }), shrine, 0, NT + 1.3 + 0.3, B + 0.25);
   { const band = new THREE.Mesh(new THREE.BoxGeometry(3.9, 0.42, 0.04), carved('lotus', 3.9, 1.3)); band.position.set(0, NT + 1.6, B + 0.515); g.add(band); }
-  // the cell behind the doorway: dark rock on three sides and a low roof
-  for (const s of [-1, 1]) mesh(roughBox(0.5, 4.4, 3.9, { amp: 0.04, seed: 41 + s }), deep, s * (NW + 0.35), 0.6 + 2.2, -8.75);
-  mesh(roughBox(4.3, 4.8, 0.5, { amp: 0.04, seed: 45 }), deep, 0, 2.9, -10.95); mesh(roughBox(4.3, 0.5, 4.5, { amp: 0.04, seed: 47 }), deep, 0, 5.05, -8.75);
+  // the sanctum chamber behind the doorway, wide enough for a path all round the deity: dark rock on three sides and a low roof
+  const CW = H.CELL_W, CB = H.CELL_BACK, CD = B - CB, CZ = (B + CB) / 2;
+  for (const s of [-1, 1]) mesh(roughBox(0.5, 4.5, CD + 0.2, { amp: 0.04, seed: 41 + s }), deep, s * (CW + 0.25), 0.6 + 2.25, CZ);
+  mesh(roughBox(CW * 2 + 1.0, 4.9, 0.5, { amp: 0.04, seed: 45 }), deep, 0, 2.95, CB - 0.25); mesh(roughBox(CW * 2 + 1.0, 0.5, CD + 0.6, { amp: 0.04, seed: 47 }), deep, 0, 5.1, CZ - 0.2);
+  // the pradakshina path: a ring of pale paving round the deity, edged with stone
+  const ringM = triplanar('flagstone', { tint: '#7d7064', tile: 1.4, roughness: 0.7, normal: 0.9, cacheKey: 'ring', polygonOffset: true, polygonOffsetFactor: -2 });
+  const ring = new THREE.Mesh(new THREE.RingGeometry(H.RING_IN, H.RING_OUT, 72, 1).rotateX(-Math.PI / 2), ringM); ring.position.set(0, 0.632, H.AIM.z); ring.receiveShadow = true; g.add(ring);
+  for (const r of [H.RING_IN, H.RING_OUT]) { const t = new THREE.Mesh(new THREE.TorusGeometry(r, 0.035, 6, 96).rotateX(Math.PI / 2), shrine); t.position.set(0, 0.64, H.AIM.z); g.add(t); }
   return { group: g, pillars, sky: skyM, rock, shrine, deep, lightPos: top.clone().addScaledVector(dirUp, -0.15), ceilAt, bench: { sideX: X - 0.8, backZ: B + 0.5, y: H.BENCH } };
 }
 

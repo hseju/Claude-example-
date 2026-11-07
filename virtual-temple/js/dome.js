@@ -16,6 +16,30 @@ for (const z of [-1.4, 1.6, 4.6]) for (const x of [-4.5, -1.5, 1.5, 4.5]) SPOTS.
 export const ENTRANCE = new THREE.Vector3(0, 0, 9.6);
 const ALTAR_FOCUS = new THREE.Vector3(0, 1.75, -8.6);
 
+// the height of the floor underfoot: three steps up to the sanctum platform, which runs back into the chamber
+export function hallFloor(x, z) {
+  const ax = Math.abs(x);
+  if (ax < 3.2 && z < -5.5) return 0.6;
+  if (ax < 3.4 && z < -5.05) return 0.4;
+  if (ax < 3.6 && z < -4.6) return 0.2;
+  return 0;
+}
+// where a devotee walks from their place: to the nearer bell, to the foot of the steps to offer flowers, or up into the
+// sanctum and once round the deity, keeping it on the right (pradakshina). Returns the way out, the circuit, where to face and what to frame.
+export function hallRoute(kind, spot) {
+  const V = THREE.Vector3, s = SPOTS[spot], side = s.x < 0 ? -1 : 1, ax = s.x > 0 ? s.x - 1.5 : s.x + 1.5;
+  const out = [new V(ax, 0, s.z)];
+  if (ax === 0) out.push(new V(0, 0, -2.0), new V(side * 1.5, 0, -2.95)); else out.push(new V(ax, 0, -1.9));
+  if (kind === 'bell') { out.push(new V(side * 2.9, 0, -2.58)); return { out, side, bell: side < 0 ? 0 : 1, face: new V(side * 2.9, 0, -3.2), focus: new V(side * 2.9, 2.0, -3.0) }; }
+  if (ax !== 0) out.push(new V(side * 1.5, 0, -2.95));
+  out.push(new V(side * 1.12, 0, -4.32));
+  if (kind === 'flowers') return { out, side, face: new V(0, 0, -5.75), focus: new V(0, 0.8, -5.6) };
+  out.push(new V(side * 0.83, 0, -6.25), new V(side * 0.82, 0, -7.05));
+  const R = HALL.RING_R, C = HALL.AIM.z, a0 = Math.PI / 2 + (side < 0 ? 0.42 : -0.42), ring = [];
+  for (let k = 1; k <= 32; k++) { const a = a0 + k / 32 * Math.PI * 2; ring.push(new V(Math.cos(a) * R, 0, C + Math.sin(a) * R)); }
+  return { out, ring, side, face: new V(0, 0, C), focus: new V(0, 1.3, C) };
+}
+
 export class PrayerHall {
   constructor(renderer, quality, audio) {
     this.renderer = renderer; this.quality = quality; this.audio = audio;
@@ -59,7 +83,8 @@ export class PrayerHall {
     for (const s of [-1, 1]) for (let x = 3.4; x <= 10.4; x += 0.9) spots.push({ p: V(s * x, Bn.y, Bn.backZ), wall: V(0, 0, 1), inset: 0.14, pool: 0.95, floorY: 0, refl: 1.8 });
     for (const pl of R.pillars) for (const dz of [-0.72, 0.72]) spots.push({ p: V(pl.x - Math.sign(pl.x) * 0.86, 0, pl.z + dz), pool: 0.8, floorY: 0, refl: 1.4 });
     for (let i = 0; i < 3; i++) { const y = 0.2 + 0.2 * i, z = -5.1 - 0.45 * i + 0.22, hw = (7.2 - i * 0.4) / 2 - 0.28; for (const s of [-1, 1]) spots.push({ p: V(s * hw, y, z), pool: 0.6, floorY: y }); }
-    for (const s of [-1, 1]) spots.push({ p: V(s * 2.95, 0.6, -6.3), pool: 0.6, floorY: 0.6 }, { p: V(s * 1.25, 0.6, -7.45), pool: 0.5, floorY: 0.6 });
+    for (const s of [-1, 1]) spots.push({ p: V(s * 2.95, 0.6, -6.3), pool: 0.6, floorY: 0.6 });
+    for (let k = 0; k < 16; k++) { const a = k / 16 * Math.PI * 2; if (Math.sin(a) > 0.55) continue; spots.push({ p: V(Math.cos(a) * 2.58, 0.62, HALL.AIM.z + Math.sin(a) * 2.58), pool: 0.55, floorY: 0.62 }); }   // round the pradakshina path
     for (const [x, z] of [[-2.2, -3.9], [2.3, -4.1], [-4.6, -3.2], [4.4, -3.4]]) spots.push({ p: V(x, 0, z), pool: 0.8, floorY: 0, refl: 1.5 });   // a few set on the floor before the steps
     this.shellFlames = spots.map((s) => ({ p: s.p.clone().add(V(0, 0.1, 0)), s: 0.3 }));
     S.add(diyaField(spots));
@@ -134,7 +159,7 @@ export class PrayerHall {
     const add = (geo, m, x, y, z, parent = A) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = o.receiveShadow = true; parent.add(o); return o; };
     // raised platform with three steps
     for (let i = 0; i < 3; i++) add(roughBox(7.2 - i * 0.4, 0.2, 1.0, { amp: 0.022, seed: i * 3 }), stone, 0, 0.1 + i * 0.2, -5.1 - i * 0.45);
-    add(roughBox(6.4, 0.6, 4.6, { amp: 0.025, seed: 9 }), stone, 0, 0.3, -8.4);
+    add(roughBox(6.4, 0.6, 6.0, { amp: 0.02, seed: 9 }), stone, 0, 0.3, -9.1);   // the platform, running back into the sanctum chamber
     // a brass prabhavali (radiant arch) behind Ganesha and Krishna; the lingam stands bare in its beam of light
     if (id !== 'shiva') {
       const arch = new THREE.Mesh(new THREE.TorusGeometry(1.15, 0.09, 10, 40, Math.PI), brass); arch.position.set(0, 2.05, -9.6); A.add(arch);
@@ -164,11 +189,16 @@ export class PrayerHall {
     this.altarSmoke = [this.smoke.addEmitter(new THREE.Vector3(1.25, 1.0, -6.0), { rate: 6, life: 1e9 }), this.smoke.addEmitter(new THREE.Vector3(-3.5, 0.86, -4.3), { rate: 4, life: 1e9 })];
     const dhoop = add(new THREE.CylinderGeometry(0.1, 0.07, 0.4, 12), brass, 1.25, 0.8, -6.0); void dhoop;
     // the main hall bell, hung from the ceiling with a pull rope
-    if (this.bell) this.scene.remove(this.bell.group);
-    this.bell = new HangingBell(2.0, 1.2); this.bell.group.position.set(-2.7, 4.4, -4.2); this.bell.axis = 'z';
-    const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, this.rock.ceilAt(-2.7, -4.2) - 4.3, 6), brass); chain.position.y = (this.rock.ceilAt(-2.7, -4.2) - 4.3) / 2; this.bell.group.add(chain);
-    this.scene.add(this.bell.group);
-    this.bell.onStrike = (b, e = 1) => this.audio.bell(b.group.getWorldPosition(new THREE.Vector3()), { size: 1.45, gain: 0.62 * (0.25 + 0.75 * e * e), hall: 0.6 });
+    // two bells hung on long chains either side of the approach, low enough for a devotee to reach the rope
+    for (const b of this.bells || []) this.scene.remove(b.group);
+    this.bells = [-1, 1].map((s) => {
+      const b = new HangingBell(1.6, 0.9), x = s * 2.9, z = -3.0, top = this.rock.ceilAt(x, z) - 3.1; b.group.position.set(x, 3.1, z); b.axis = 'z';
+      const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, top, 6), brass); chain.position.y = top / 2; b.group.add(chain);
+      this.scene.add(b.group);
+      b.onStrike = (bb, e = 1) => this.audio.bell(bb.group.getWorldPosition(new THREE.Vector3()), { size: 1.25, gain: 0.66 * (0.3 + 0.7 * e * e), hall: 0.6 });
+      return b;
+    });
+    this.bell = this.bells[0];
     // sanctum light
     this.sanctBase = 4; this.fillBase = 8;   // low: the shrine is lit by its lamps and the shaft of daylight
     const sanct = new THREE.PointLight('#ffa255', this.sanctBase, 8, 1.6); sanct.position.set(0, 2.2, -7.6);
@@ -218,7 +248,7 @@ export class PrayerHall {
       const lo = new THREE.Mesh(mergeGeos([petalRing(0.025, 8, 0.075, { lean: 0.45, rows: 2 })]), lotusM); lo.position.set(x, y, z); lo.scale.setScalar(sc); lo.rotation.x = 0.5; A.add(lo);
       const c = new THREE.Mesh(new THREE.SphereGeometry(0.018, 8, 6), heart); c.position.set(x, y + 0.03, z); A.add(c);
     }
-    const samai = lampStand(0.85); samai.position.set(1.15, 0.6, -8.0); A.add(samai);
+    const samai = lampStand(0.85); samai.position.set(0.85, 0.6, -7.95); A.add(samai);
     for (const w of samai.userData.wicks) this.flames.add(w.clone().add(samai.position).add(new THREE.Vector3(0, 0.05, 0)), 0.26);
     // copper dhara-patra above the lingam
     const pot = add(new THREE.SphereGeometry(0.28, 20, 12, 0, Math.PI * 2, Math.PI * 0.35, Math.PI * 0.65), copper, 0, 3.2, -8.9); pot.scale.y = 1.1;
@@ -228,7 +258,7 @@ export class PrayerHall {
     this.stream = new THREE.Mesh(streamGeo, new THREE.MeshStandardMaterial({ color: '#dcefff', transparent: true, opacity: 0.0, roughness: 0.05, metalness: 0.1 }));
     this.stream.position.copy(this.dripFrom); this.stream.scale.y = 0.8; A.add(this.stream);
     // trishul to one side
-    const tri = new THREE.Group(); tri.position.set(-1.22, 0.6, -9.45); A.add(tri);
+    const tri = new THREE.Group(); tri.position.set(-2.2, 0.6, -11.4); A.add(tri);
     tri.add(new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 2.6, 8), gold)).position.y = 1.3;
     for (const x of [-0.18, 0, 0.18]) { const p = new THREE.Mesh(new THREE.ConeGeometry(0.045, x === 0 ? 0.45 : 0.32, 6), gold); p.position.set(x, 2.75 + (x === 0 ? 0.05 : 0), 0); tri.add(p); }
     const cross = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.025, 6, 16, Math.PI), gold); cross.rotation.z = Math.PI; cross.position.y = 2.65; tri.add(cross);
@@ -313,12 +343,12 @@ export class PrayerHall {
       this.scene.add(a.root); this.occupants.set(i, a);
     });
     for (const [i, a] of this.occupants) if (!keep.has(i)) {
-      this.scene.remove(a.root); this.occupants.delete(i);
+      this.scene.remove(a.root); this.occupants.delete(i); if (this.simWalker === a) this.simWalker = null;
       const st = this.spotState[i]; if (st.lit && i !== this.mySpot) this._extinguish(i);
     }
     this.hall = hall; this.playerId = playerId; this.refreshMarkers();
   }
-  clearOccupants() { for (const a of this.occupants.values()) this.scene.remove(a.root); this.occupants.clear(); }
+  clearOccupants() { for (const a of this.occupants.values()) this.scene.remove(a.root); this.occupants.clear(); this.simWalker = null; }
 
   refreshMarkers() {
     if (!this.hall) return;
@@ -334,9 +364,23 @@ export class PrayerHall {
   }
 
   // ---------- actions ----------
+  // a simulated devotee leaves their place for a moment, and comes back
+  _simErrand(i, a, kind) {
+    const r = hallRoute(kind, i), home = SPOTS[i].clone(), V = THREE.Vector3; this.simWalker = a;
+    const faceTo = (p) => { a.root.rotation.y = Math.atan2(p.x - a.root.position.x, p.z - a.root.position.z); };
+    const back = () => { if (!this.occupants.has(i)) { this.simWalker = null; return; } a.walkPts = [...r.out].reverse().map((v) => v.clone()).concat([home]); a.walkDone = () => { this.simWalker = null; a.root.rotation.y = Math.PI; a.setState('namaste'); a.nextAct = 8 + Math.random() * 10; }; };
+    a.walkPts = r.out.map((v) => v.clone());
+    a.walkDone = () => {
+      faceTo(r.face);
+      if (kind === 'bell') { a.setState('ring'); setTimeout(() => this.bells[r.bell].strike(0.9), 420); setTimeout(back, 1700); }
+      else if (kind === 'flowers') { a.setState('offer'); setTimeout(() => this.petals.throw(a.chestWorld().add(new V(0, 0.05, -0.2)), this.thaliTop, 16), 450); setTimeout(back, 1900); }
+      else { a.walkPts = r.ring.map((v) => v.clone()); a.walkDone = () => { faceTo(r.face); a.setState('namaste'); setTimeout(back, 1300); }; }
+    };
+  }
+
   ringBell(avatar) {
     if (avatar) { avatar.setState('ring'); setTimeout(() => avatar.state === 'ring' && avatar.setState('namaste'), 1600); }
-    this.bell.strike(1.1);
+    const p = avatar ? avatar.root.position : null; (p && p.x > 0 ? this.bells[1] : this.bells[0]).strike(1.1);
   }
   lightDiya(i, { sound = true } = {}) {
     const st = this.spotState[i]; if (st.lit) return false;
@@ -364,7 +408,7 @@ export class PrayerHall {
   }
 
   pickMarker(ray) { const hits = ray.intersectObjects(this.markers.filter(m => m.visible), false); return hits.length ? hits[0].object.userData.spot : -1; }
-  pickBell(ray) { const h = ray.intersectObject(this.bell.group, true); return h.length > 0; }
+  pickBell(ray) { return this.bells.some((b) => ray.intersectObject(b.group, true).length > 0); }
 
   // ---------- aarti ----------
   startAarti(duration = 60) {
@@ -379,6 +423,23 @@ export class PrayerHall {
 
   cameraFor(mode, t, player) {
     if (mode === 'select') return { pos: new THREE.Vector3(0, 7.6, 8.4), target: new THREE.Vector3(0, 0.2, -1.4), fov: 58 };
+    const V = THREE.Vector3;
+    // close on your own lamp stand: your hands, the wick catching, the incense
+    if (mode === 'diya') { const sd = player.x <= 0 ? 1 : -1; return { pos: new V(player.x + sd * 0.85, 1.0, player.z - 2.3), target: new V(player.x, 0.55, player.z - 0.75), fov: 40 }; }
+    if (mode === 'abhishek') return { pos: new V(0.7, 2.4, -5.3), target: new V(0, 1.85, -8.9), fov: 40 };
+    // walking to the bell or the steps: keep both you and what you are going to in frame, from the side and a little above
+    const framing = (F) => {
+      const P = player.clone().setY(player.y + 0.7), mid = P.clone().add(F).multiplyScalar(0.5), dx = F.x - P.x, dz = F.z - P.z, d = Math.hypot(dx, dz) || 1;
+      let nx = -dz / d, nz = dx / d; if (nz < 0) { nx = -nx; nz = -nz; }
+      const back = 2.3 + d * 0.5; return { pos: new V(mid.x + nx * back, mid.y + 1.2 + d * 0.12, mid.z + nz * back), target: mid, fov: 52 };
+    };
+    if (mode === 'errand') return framing(this.errandFocus || new V(0, 0.8, -5.6));
+    // walking round the deity: from the far side of the chamber, high, looking down past the lingam at you
+    if (mode === 'pradakshina') {
+      if (player.z > HALL.BACK - 0.2) return framing(new V(0, 1.3, HALL.AIM.z));
+      const a = Math.atan2(player.z - HALL.AIM.z, player.x) + Math.PI - 0.6;
+      return { pos: new V(Math.cos(a) * 1.6, 3.9, HALL.AIM.z + Math.sin(a) * 1.6), target: player.clone().add(new V(0, 0.75, 0)), fov: 64 };
+    }
     if (mode === 'walk') return { pos: player.clone().add(new THREE.Vector3(0, 3.2, 4.8)), target: player.clone().add(new THREE.Vector3(0, 0.8, -3)), fov: 50 };
     if (mode === 'aarti') { const a = Math.sin(t * 0.06) * 0.5; return { pos: new THREE.Vector3(Math.sin(a) * 9, 4.4 + Math.sin(t * 0.09) * 0.4, 9.0 + Math.cos(a) * 0.6), target: new THREE.Vector3(0, 1.4, -4.2), fov: 50 }; }
     if (mode === 'darshan') return { pos: new THREE.Vector3(0, 1.75, -4.4), target: ALTAR_FOCUS.clone(), fov: 38 };
@@ -394,7 +455,7 @@ export class PrayerHall {
     this.dust.material.uniforms.uTime.value = t; this.dust.visible = !ctx.reducedMotion || true;
     if (this.glow.streakMat) this.glow.streakMat.uniforms.uTime.value = t;
     for (let i = 0; i < this.towers.length; i++) this.towers[i].intensity = (i < 2 ? 18 : 10) * (0.93 + Math.sin(t * 8.3 + i * 2.1) * 0.04 + Math.sin(t * 13.7 + i) * 0.03);
-    this.bell.update(dt, t);
+    for (const b of this.bells) b.update(dt, t);
     // markers pulse softly
     const pulse = ctx.reducedMotion ? 1 : 0.85 + Math.sin(t * 2.2) * 0.15;
     this.markers.forEach(m => { m.material.opacity = (m.userData.base ?? 0.7) * pulse; });
@@ -413,11 +474,18 @@ export class PrayerHall {
         a.nextAct = 9 + Math.random() * 16; const r = Math.random();
         if (r < 0.35) a.setState('bow'); else if (r < 0.55 && !this.spotState[i].lit) { a.setState('offer'); setTimeout(() => this.lightDiya(i, { sound: false }), 900); }
         else if (r < 0.62 && ctx.incense) { a.setState('offer'); this.offerIncense(i); }
-        else if (r < 0.66) { this.ringBell(null); a.setState('namaste'); }
+        else if (r < 0.72 && !this.simWalker && !this.playerErrand) this._simErrand(i, a, r < 0.66 ? 'bell' : r < 0.69 ? 'flowers' : 'pradakshina');
         else a.setState(Math.random() < 0.5 ? 'namaste' : 'idle');
+      }
+      if (a.walkPts && a.walkPts.length) {
+        const P = a.root.position, T = a.walkPts[0], dx = T.x - P.x, dz = T.z - P.z, dist = Math.hypot(dx, dz);
+        if (dist < 0.08) { a.walkPts.shift(); if (!a.walkPts.length) { a.walkPts = null; const f = a.walkDone; a.walkDone = null; f && f(); } }
+        else { const st = Math.min(dist, 1.3 * dt); P.x += dx / dist * st; P.z += dz / dist * st; a.speed = 1.3; if (a.state !== 'walk') a.setState('walk'); a.root.rotation.y = lerpA(a.root.rotation.y, Math.atan2(dx, dz), 1 - Math.exp(-dt * 10)); }
+        a.root.position.y += (hallFloor(a.root.position.x, a.root.position.z) - a.root.position.y) * (1 - Math.exp(-dt * 14));
       }
       if (a.state === 'bow' && a.stateTime > 2.5) a.setState('namaste');
       if (a.state === 'offer' && a.stateTime > 1.8) a.setState('namaste');
+      if (a.state === 'ring' && a.stateTime > 1.6 && !a.walkPts) a.setState('namaste');
       a.update(dt, t);
     }
     // aarti choreography
@@ -448,6 +516,7 @@ export class PrayerHall {
   }
 }
 
+function lerpA(a, b, t) { const d = Math.atan2(Math.sin(b - a), Math.cos(b - a)); return a + d * t; }
 function smooth(a, b, x) { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); }
 function fine2() { return carvedStone(); }
 function ringOf(r, y, z, n, color, size = 0.05, drop = 0) {

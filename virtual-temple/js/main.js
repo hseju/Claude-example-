@@ -1,6 +1,6 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 import { World, TEMPLES, lerpAngle } from './world.js';
-import { PrayerHall, SPOTS, ENTRANCE } from './dome.js';
+import { PrayerHall, SPOTS, ENTRANCE, hallRoute, hallFloor } from './dome.js';
 import { Avatar, defaultConfig, randomConfig, SKIN_TONES, HAIR_COLORS, HAIR_STYLES, OUTFITS, CLOTH_COLORS, PRESENTATIONS, BUILDS, AGES, FACIAL, MARKS, JEWELLERY, HEADWEAR } from './avatar.js';
 import { TempleAudio } from './audio.js';
 import { HallDirectory, LocalSimulation, HALL_CAPACITY } from './presence.js';
@@ -231,6 +231,7 @@ function goHall(h, spot = -1) {
     $('spotSub').textContent = freeText(h);
     audio.applyZone({ entrance: 0, courtyard: 0, corridor: 0.2, dome: 1, garden: 0, ganesha: +(h.templeId === 'ganesha'), shiva: +(h.templeId === 'shiva'), krishna: +(h.templeId === 'krishna') }, 1.4);
     snapCamera();
+    if (!app.lookHinted) { app.lookHinted = true; setTimeout(() => toast('Drag to look around the hall, pinch to zoom', 3200), 900); }
     if (spot >= 0) setTimeout(() => chooseSpot(spot), 600);
   });
 }
@@ -272,6 +273,7 @@ function leaveHall() {
     $('spotSheet').hidden = true; $('actions').hidden = true; $('fullSheet').hidden = true;
     setMode('world'); app.camMode = 'world'; snapCamera();
   });
+  if (app.errand) { app.errand = null; hall.playerErrand = null; hall.errandFocus = null; app.onArrive = null; input.auto = []; $('actions').classList.remove('busy'); app.leftSpot = hall.mySpot; directory.release(me.id); hall.mySpot = -1; back(); return; }
   if (app.hallState === 'seated') {
     const s = SPOTS[hall.mySpot], aisle = s.x > 0 ? s.x - 1.5 : s.x + 1.5;
     app.leftSpot = hall.mySpot; directory.release(me.id); hall.mySpot = -1; hall.refreshMarkers();
@@ -299,18 +301,44 @@ function act(name) {
   const now = performance.now(); if (now - lastAct < 350) return; lastAct = now;
   const av = me.avatar, i = hall.mySpot;
   if (name === 'namaste') { av.setState('bow'); setTimeout(() => av.state === 'bow' && av.setState('namaste'), 2500); }
-  if (name === 'bell') hall.ringBell(av);
+  if (name === 'bell' || name === 'flowers' || name === 'pradakshina') { startErrand(name); return; }
   if (name === 'diya') {
     if (hall.spotState[i].lit) { toast('Your diya is already burning'); return; }
-    av.setState('offer'); setTimeout(() => { hall.lightDiya(i); $('aDiya').classList.add('done'); }, 800); setTimeout(() => av.state === 'offer' && av.setState('namaste'), 1800);
+    showShot('diya', 3.6);
+    av.setState('offer'); setTimeout(() => { hall.lightDiya(i); $('aDiya').classList.add('done'); }, 1000); setTimeout(() => av.state === 'offer' && av.setState('namaste'), 2200);
   }
-  if (name === 'flowers') hall.offerFlowers(av);
   if (name === 'incense') {
-    av.setState('offer'); setTimeout(() => { hall.offerIncense(i); $('aIncense').classList.add('done'); }, 700); setTimeout(() => av.state === 'offer' && av.setState('namaste'), 1800);
+    showShot('diya', 3.4);
+    av.setState('offer'); setTimeout(() => { hall.offerIncense(i); $('aIncense').classList.add('done'); }, 900); setTimeout(() => av.state === 'offer' && av.setState('namaste'), 2100);
     if (!settings.incense) toast('Incense offered. Smoke effects are turned off in settings.');
   }
-  if (name === 'abhishek' && app.templeId === 'shiva') { av.setState('offer'); hall.abhishek(); setTimeout(() => av.state === 'offer' && av.setState('namaste'), 1800); }
+  if (name === 'abhishek' && app.templeId === 'shiva') { showShot('abhishek', 5); av.setState('offer'); hall.abhishek(); setTimeout(() => av.state === 'offer' && av.setState('namaste'), 1800); }
   if (name === 'darshan') { app.camMode = app.camMode === 'darshan' ? 'prayer' : 'darshan'; $('aDarshan').setAttribute('aria-pressed', String(app.camMode === 'darshan')); }
+}
+
+// a few seconds close on what you are doing, then back to your view of the sanctum
+function showShot(mode, dur) { app.shot = { mode, until: app.time + dur, ret: app.camMode === 'darshan' ? 'darshan' : 'prayer' }; app.camMode = mode; }
+// leave your place for a moment: walk to the nearer bell and ring it, to the foot of the steps to shower flowers into the
+// thali, or up into the sanctum and once round the deity (pradakshina); then back to your place
+function startErrand(kind) {
+  const r = hallRoute(kind, hall.mySpot), E = { kind, r, home: SPOTS[hall.mySpot].clone() };
+  app.errand = E; app.shot = null; hall.playerErrand = kind; hall.errandFocus = r.focus;
+  app.hallState = 'errand'; app.camMode = kind === 'pradakshina' ? 'pradakshina' : 'errand';
+  $('actions').classList.add('busy');
+  input.auto = r.out.map((v) => v.clone()); app.onArrive = errandArrived;
+}
+function errandArrived() {
+  const E = app.errand; if (!E) return; const av = me.avatar, r = E.r;
+  const face = () => { const p = av.root.position; av.root.rotation.y = Math.atan2(r.face.x - p.x, r.face.z - p.z); };
+  const goHome = () => { if (app.errand !== E) return; app.camMode = 'walk'; input.auto = [...r.out].reverse().map((v) => v.clone()).concat([E.home.clone()]); app.onArrive = errandDone; };
+  face();
+  if (E.kind === 'bell') { av.setState('ring'); setTimeout(() => { if (app.errand === E) hall.bells[r.bell].strike(1.15); }, 420); setTimeout(goHome, 2000); }
+  else if (E.kind === 'flowers') { av.setState('offer'); setTimeout(() => { if (app.errand !== E) return; hall.petals.throw(av.chestWorld().add(new THREE.Vector3(0, 0.05, -0.2)), hall.thaliTop, 32); audio.shimmer(hall.thaliTop); }, 450); setTimeout(goHome, 2300); }
+  else { input.auto = r.ring.map((v) => v.clone()); app.onArrive = () => { if (app.errand !== E) return; face(); av.setState('namaste'); setTimeout(goHome, 1500); }; }
+}
+function errandDone() {
+  if (!app.errand) return; app.errand = null; hall.playerErrand = null; hall.errandFocus = null;
+  app.hallState = 'seated'; app.camMode = 'prayer'; me.avatar.setState('namaste'); $('actions').classList.remove('busy');
 }
 
 // ---------------------------------------------------------------- aarti
@@ -446,7 +474,7 @@ function bindInput() {
       if (k === 'p') worldPranam();
       if (k === 'enter') { const T = nearShrine(); if (T) enterTemple(T.id); else if (nearHut()) enterHut(); }
     }
-    if (app.mode === 'hall') { const map = { 1: 'namaste', 2: 'bell', 3: 'diya', 4: 'flowers', 5: 'incense', 6: 'abhishek' }; if (map[k]) act(map[k]); }
+    if (app.mode === 'hall') { const map = { 1: 'namaste', 2: 'bell', 3: 'diya', 4: 'flowers', 5: 'incense', 6: 'abhishek', 7: 'pradakshina' }; if (map[k]) act(map[k]); if (k === 'q') look.tYaw += 0.4; if (k === 'e') look.tYaw -= 0.4; }
     if (k === 'escape') closeAllPanels();
     if (app.mode === 'hut' && k === 'escape') { if (!$('doneCard').hidden) showHutPanel(); else if (hutState.session) endSession(); else leaveHut(); }
     if (app.mode === 'hut' && k === ' ' && hutState.session) togglePause();
@@ -459,6 +487,7 @@ function bindInput() {
     const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
     if (Math.hypot(e.clientX - p.sx, e.clientY - p.sy) > 8) input.drag = true;
     if (input.pointers.size === 2) { const d = pinchDist(); if (input.pinch) zoom((input.pinch - d) * 0.06); input.pinch = d; return; }
+    if (input.drag && app.mode === 'hall') { look.tYaw -= dx * 0.005; look.tPitch = THREE.MathUtils.clamp(look.tPitch - dy * 0.004, -1.25, 1.25); }   // drag to look round the hall, up to the carvings and the opening in the rock
     if (input.drag && (app.mode === 'world' || app.mode === 'welcome')) { cam.tYaw -= dx * 0.006; cam.tPitch = THREE.MathUtils.clamp(cam.tPitch + dy * 0.004, -0.6, 1.35); }   // drag up to look up at the sky, down to look down on the ground
     if (input.drag && app.mode === 'creator' && preview.avatar) preview.avatar.root.rotation.y += dx * 0.012;
   });
@@ -477,7 +506,7 @@ function bindInput() {
   joy.addEventListener('pointerup', jend); joy.addEventListener('pointercancel', jend);
 }
 function pinchDist() { const a = [...input.pointers.values()]; return a.length < 2 ? 0 : Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y); }
-function zoom(d) { if (app.mode === 'creator') { preview.dist = THREE.MathUtils.clamp((preview.dist || 4.4) + d * 0.25, 1.1, 5); return; } cam.tDist = THREE.MathUtils.clamp(cam.tDist + d * Math.max(0.25, cam.tDist / 22), 2.1, 44); }
+function zoom(d) { if (app.mode === 'hall') { look.tZoom = THREE.MathUtils.clamp(look.tZoom + d * 0.04, 0.5, 1.3); return; } if (app.mode === 'creator') { preview.dist = THREE.MathUtils.clamp((preview.dist || 4.4) + d * 0.25, 1.1, 5); return; } cam.tDist = THREE.MathUtils.clamp(cam.tDist + d * Math.max(0.25, cam.tDist / 22), 2.1, 44); }
 const ray = new THREE.Raycaster(), occRay = new THREE.Raycaster();
 function tap(x, y) {
   ray.setFromCamera(new THREE.Vector2(x / innerWidth * 2 - 1, -(y / innerHeight) * 2 + 1), camera);
@@ -565,7 +594,7 @@ function bindUI() {
   // prayer
   $('aNamaste').onclick = () => act('namaste'); $('aBell').onclick = () => act('bell'); $('aDiya').onclick = () => act('diya');
   $('aFlowers').onclick = () => act('flowers'); $('aIncense').onclick = () => act('incense'); $('aAbhishek').onclick = () => act('abhishek');
-  $('aDarshan').onclick = () => act('darshan'); $('aAarti').onclick = () => beginAarti();
+  $('aDarshan').onclick = () => act('darshan'); $('aAarti').onclick = () => beginAarti(); $('aPradakshina').onclick = () => act('pradakshina');
   $('exitBtn').onclick = leaveHall; $('cancelSpot').onclick = leaveHall; $('autoSpot').onclick = autoSpot;
   // settings
   for (const k of ['Master', 'Ambience', 'Effects', 'Ceremony']) {
@@ -931,7 +960,8 @@ function aimShafts(amount = 1) {
 
 // ---------------------------------------------------------------- per-frame
 let last = 0, stepIdx = 0;
-const tmp = new THREE.Vector3();
+const tmp = new THREE.Vector3(), lookDir = new THREE.Vector3(), lookAt = new THREE.Vector3();
+const look = { yaw: 0, pitch: 0, zoom: 1, tYaw: 0, tPitch: 0, tZoom: 1, mode: null };   // your own turn of the head inside a prayer hall
 function loop(now) {
   requestAnimationFrame(loop);
   const dt = Math.min(0.05, (now - last) / 1000); last = now; app.time += dt; const t = app.time;
@@ -1064,10 +1094,13 @@ function updateHall(dt, t, ctx) {
   const av = me.avatar, p = av.root.position;
   if (input.auto.length) {
     const tgt = input.auto[0]; const d = new THREE.Vector3(tgt.x - p.x, 0, tgt.z - p.z); const dist = d.length();
-    if (dist < 0.08) { input.auto.shift(); if (!input.auto.length) { if (app.hallState === 'walking') seated(); else if (app.hallState === 'leaving' && app.onArrive) { const f = app.onArrive; app.onArrive = null; f(); } } }
+    if (dist < 0.08) { input.auto.shift(); if (!input.auto.length) { if (app.hallState === 'walking') seated(); else if (app.onArrive) { const f = app.onArrive; app.onArrive = null; f(); } } }
     else { d.normalize(); const step = Math.min(dist, 1.5 * dt); p.addScaledVector(d, step); av.speed = 1.5; av.setState('walk'); av.root.rotation.y = lerpAngle(av.root.rotation.y, Math.atan2(d.x, d.z), 1 - Math.exp(-dt * 10)); }
   }
   if (app.hallState === 'seated') av.root.rotation.y = lerpAngle(av.root.rotation.y, Math.PI, 1 - Math.exp(-dt * 6));
+  p.y += (hallFloor(p.x, p.z) - p.y) * (1 - Math.exp(-dt * 14));   // up and down the sanctum steps
+  if (app.errand && av.state === 'ring' && !input.auto.length && av.stateTime > 1.7) av.setState('idle');
+  if (app.shot && app.time > app.shot.until) { if (app.camMode === app.shot.mode && app.hallState === 'seated' && !app.aarti) app.camMode = app.shot.ret; app.shot = null; }
   av.update(dt, t); footsteps(av);
   hall.update(dt, t, ctx);
   if (app.aarti) { app.aarti.t += dt; }
@@ -1075,9 +1108,14 @@ function updateHall(dt, t, ctx) {
   const k = 1 - Math.exp(-dt * (settings.reducedMotion ? 10 : app.camMode === 'aarti' ? 1.2 : 2.4));
   if (!cam.hallInit) { camera.position.copy(want.pos); cam.target.copy(want.target); camera.fov = want.fov; cam.hallInit = true; }
   camera.position.lerp(want.pos, k); cam.target.lerp(want.target, k);
-  const wantFov = camera.aspect < 1 ? Math.min(82, want.fov * (1 + (1 - camera.aspect) * 0.75)) : want.fov; camera.fov += (wantFov - camera.fov) * k;
-  camera.lookAt(cam.target); camera.updateProjectionMatrix();
-  if (audio.ctx) audio.setListener(camera.position, tmp.copy(cam.target).sub(camera.position).normalize());
+  if (look.mode !== app.camMode) { look.mode = app.camMode; look.tYaw = 0; look.tPitch = 0; look.tZoom = 1; }
+  const lk = 1 - Math.exp(-dt * 9); look.yaw += (look.tYaw - look.yaw) * lk; look.pitch += (look.tPitch - look.pitch) * lk; look.zoom += (look.tZoom - look.zoom) * lk;
+  const wantFov = (camera.aspect < 1 ? Math.min(82, want.fov * (1 + (1 - camera.aspect) * 0.75)) : want.fov) * look.zoom; camera.fov += (wantFov - camera.fov) * k;
+  { const d = lookDir.copy(cam.target).sub(camera.position), L = d.length() || 1, y0 = Math.atan2(d.x, d.z), p0 = Math.asin(THREE.MathUtils.clamp(d.y / L, -1, 1));
+    const yy = y0 + look.yaw, pp = THREE.MathUtils.clamp(p0 + look.pitch, -1.45, 1.45);
+    lookAt.set(camera.position.x + Math.sin(yy) * Math.cos(pp) * L, camera.position.y + Math.sin(pp) * L, camera.position.z + Math.cos(yy) * Math.cos(pp) * L); }
+  camera.lookAt(lookAt); camera.updateProjectionMatrix();
+  if (audio.ctx) audio.setListener(camera.position, tmp.copy(lookAt).sub(camera.position).normalize());
   post.tilt.amount = app.camMode === 'select' ? 0.3 : 0.22; post.tilt.band = app.camMode === 'select' ? 0.3 : 0.34; post.tilt.focus = 0.5;
   if (!Q.post) post.tilt.amount = 0;
   post.bloom.strength = Q.bloom * 1.7; post.bloom.threshold = 1.0; post.shafts.strength = 0;
