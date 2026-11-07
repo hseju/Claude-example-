@@ -63,30 +63,36 @@ const LEAF_KINDS = {
   jacaranda: { greens: ['#4b7a33', '#5b8a3a'], leaves: 60, len: [10, 16], wid: [3, 5], bloom: ['#8f6ad6', '#a07fe0', '#7a58c4', '#b394ec'], blooms: 80 },
 };
 // the shadowed inside of each crown: the darker greens, or the darker blossom where a tree is in flower
-const CORE_TONE = { neem: '#3a6a2c', gulmohar: '#b03a1c', bougainvillea: '#b02a6c', jacaranda: '#7458b4' };
-function leafTexture(kind) {
-  const K = LEAF_KINDS[kind], S = 512, c = cv(S), x = c.getContext('2d');
-  x.scale(2, 2);
-  for (let i = 0; i < K.leaves * 1.6; i++) {
-    const r = Math.sqrt(rnd()) * 112, a = rnd() * Math.PI * 2; x.save(); x.translate(128 + Math.cos(a) * r, 128 + Math.sin(a) * r);
-    x.rotate(K.droop ? Math.PI + (rnd() - 0.5) * 0.6 : rnd() * Math.PI * 2);
-    const len = K.len[0] + rnd() * (K.len[1] - K.len[0]), wid = K.wid[0] + rnd() * (K.wid[1] - K.wid[0]);
-    // twig the leaf hangs from
-    x.strokeStyle = 'rgba(70,52,30,0.6)'; x.lineWidth = 0.8; x.beginPath(); x.moveTo(0, 4); x.lineTo(0, 0); x.stroke();
-    const col = new THREE.Color(pick(K.greens)).offsetHSL(0, 0, (rnd() - 0.5) * 0.06);
-    const g = x.createLinearGradient(0, 0, 0, -len); g.addColorStop(0, '#' + col.clone().offsetHSL(0, 0, -0.06).getHexString()); g.addColorStop(1, '#' + col.clone().offsetHSL(0, 0.05, 0.06).getHexString());
-    x.fillStyle = g; leafShape(x, len, wid); x.fill();
-    x.strokeStyle = 'rgba(220,240,180,0.35)'; x.lineWidth = 0.7; x.beginPath(); x.moveTo(0, 0); x.lineTo(0, -len * 0.9); x.stroke();
-    x.strokeStyle = 'rgba(200,230,160,0.18)'; x.lineWidth = 0.4;
-    for (let v = 0.2; v < 0.85; v += 0.13) { x.beginPath(); x.moveTo(0, -len * v); x.lineTo(wid * 0.7, -len * (v + 0.1)); x.moveTo(0, -len * v); x.lineTo(-wid * 0.7, -len * (v + 0.1)); x.stroke(); }
-    // a soft edge highlight where light catches the leaf
-    x.strokeStyle = 'rgba(255,255,220,0.12)'; x.lineWidth = 0.6; leafShape(x, len, wid); x.stroke();
-    x.restore();
-  }
-  if (K.bloom) for (let i = 0; i < K.blooms * 2.4; i++) {
-    const r = Math.sqrt(rnd()) * 105, a = rnd() * Math.PI * 2, cx = 128 + Math.cos(a) * r, cy = 128 + Math.sin(a) * r, col = pick(K.bloom);
-    for (let k = 0; k < 4 + Math.floor(rnd() * 4); k++) { const pa = rnd() * Math.PI * 2, d = 3 + rnd() * 6; x.fillStyle = col; x.beginPath(); x.ellipse(cx + Math.cos(pa) * d, cy + Math.sin(pa) * d, 4 + rnd() * 3, 3 + rnd() * 2, pa, 0, Math.PI * 2); x.fill(); }
-    x.fillStyle = 'rgba(255,240,200,0.8)'; x.beginPath(); x.arc(cx, cy, 1.2, 0, Math.PI * 2); x.fill();
+const CORE_TONE = { neem: '#5a8a44', gulmohar: '#d8582c', bougainvillea: '#d24a8a', jacaranda: '#9478d0' };
+// leaves painted the way the hillside forest is: billows of small leaf dabs, darker underneath and lit from the upper left,
+// with the flowering trees' blossom painted into the sunlit dabs. Ashoka hangs in long, drooping strokes.
+const BLOOM_SHARE = { gulmohar: 0.62, bougainvillea: 0.58, jacaranda: 0.6 };
+function leafTexture(kind, solid = false) {
+  const K = LEAF_KINDS[kind], S = 512, c = cv(S), x = c.getContext('2d'), R = S / 2;
+  const shade = (hex, k) => { const col = new THREE.Color(hex); return `rgb(${Math.min(255, col.r * 255 * k) | 0},${Math.min(255, col.g * 255 * k) | 0},${Math.min(255, col.b * 255 * k) | 0})`; };
+  const billows = [];
+  const nB = kind === 'shrub' ? 9 : solid ? 20 : 12;
+  // solid: an opaque, edge-to-edge version for the inside of a crown (no see-through gaps), wrapping seamlessly
+  if (solid) { x.fillStyle = shade(K.greens[0], 0.85); x.fillRect(0, 0, S, S); }
+  for (let i = 0; i < nB; i++) { if (solid) { billows.push([rnd() * S, rnd() * S, R * (0.22 + rnd() * 0.12)]); continue; } const a = rnd() * Math.PI * 2, d = Math.sqrt(rnd()) * R * 0.56; billows.push([R + Math.cos(a) * d, R + Math.sin(a) * d * 0.92, R * (0.26 + rnd() * 0.14)]); }   // fill the card
+  billows.sort((p, q) => p[1] - q[1]);   // back (top) to front (bottom)
+  const share = K.bloom ? BLOOM_SHARE[kind] || 0.5 : 0;
+  const wrapped = solid ? billows.flatMap(([bx, by, br]) => [-S, 0, S].flatMap((ox) => [-S, 0, S].map((oy) => [bx + ox, by + oy, br]))).filter(([bx, by, br]) => bx > -br && bx < S + br && by > -br && by < S + br) : billows;
+  for (const [bx, by, br] of wrapped) {
+    const col = pick(K.greens);
+    x.fillStyle = shade(col, 0.8); x.beginPath(); x.arc(bx, by, br * 0.9, 0, Math.PI * 2); x.fill();
+    const n = kind === 'ashoka' ? 130 : 190;
+    for (let d = 0; d < n; d++) {
+      const ang = rnd() * Math.PI * 2, rad = Math.sqrt(rnd()) * br * 1.05, dx = Math.cos(ang) * rad, dy = Math.sin(ang) * rad;
+      const lit = Math.max(0, Math.min(1, 0.55 - (dx + dy * 1.2) / (2.2 * br) + (rnd() - 0.5) * 0.3));
+      const flower = share && lit > 0.3 && rnd() < share;
+      x.fillStyle = flower ? shade(pick(K.bloom), 0.8 + lit * 0.35) : shade(lit > 0.82 ? '#9cc06a' : col, 0.82 + lit * 0.45);
+      x.beginPath();
+      if (kind === 'ashoka') x.ellipse(bx + dx, by + dy, br * 0.05, br * (0.22 + rnd() * 0.12), (rnd() - 0.5) * 0.4, 0, Math.PI * 2);
+      else if (flower) x.ellipse(bx + dx, by + dy, br * (0.08 + rnd() * 0.06), br * (0.07 + rnd() * 0.05), rnd() * Math.PI, 0, Math.PI * 2);
+      else x.ellipse(bx + dx, by + dy, br * (0.1 + rnd() * 0.09), br * (0.06 + rnd() * 0.05), rnd() * Math.PI, 0, Math.PI * 2);
+      x.fill();
+    }
   }
   return tex(c);
 }
@@ -161,7 +167,7 @@ function foliageMaterial(map, windTime, { amp = 0.08, freq = 1.4, vertexColors =
       transformed.z += cos(uWindTime * ${(freq * 0.8).toFixed(2)} + wph * 1.3 + position.x) * ${(amp * 0.7).toFixed(3)} * wk;`);
     // keep the outward canopy normals on both faces so leaves never go black from behind
     sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\n normal = normalize( vNormal );')
-      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance += diffuseColor.rgb * 0.07;');
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance += diffuseColor.rgb * 0.13;');
   };
   m.customProgramCacheKey = () => `foliage${amp}${freq}${vertexColors}`;
   return m;
@@ -211,9 +217,11 @@ export class Flora {
     clusters.push(centre.clone().add(new V(0, o.h * 0.14, 0)));
     // a soft, lumpy mass inside every main cluster, in the canopy's shadow tone, so the crown reads full rather than see-through
     const cores = [];
-    for (const cc of clusters) { const rr = o.spread * (cores.length % 3 === 0 ? 0.33 : 0.25), g = new THREE.SphereGeometry(rr, 14, 10), p = g.attributes.position, sd = rnd() * 10;   // smooth, so it reads as soft foliage, not facets
+    for (const cc of clusters) { const rr = o.spread * (cores.length % 3 === 0 ? 0.28 : 0.21), g = new THREE.SphereGeometry(rr, 14, 10), p = g.attributes.position, sd = rnd() * 10;   // smooth, so it reads as soft foliage, not facets
       for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i), k = 1 + 0.18 * Math.sin(x * 5 + sd) * Math.sin(y * 6 + sd) * Math.sin(z * 5.5 + sd); p.setXYZ(i, x * k + cc.x, y * k * 0.8 + cc.y, z * k + cc.z); }
-      g.computeVertexNormals(); const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 3, uv.getY(i) * 1.6); cores.push(g); }   // leaf clusters tiled over it
+      g.computeVertexNormals();
+      { const nn = g.attributes.normal; for (let i = 0; i < nn.count; i++) { const v = new V(nn.getX(i), nn.getY(i) * 0.6 + 0.45, nn.getZ(i)).normalize(); nn.setXYZ(i, v.x, v.y, v.z); } }   // lit a little from above even underneath, as sky light fills a crown
+      cores.push(g); }
     for (const cc of clusters) for (let k = 0; k < o.cards; k++) {
       const d = new V(rnd() - 0.5, (rnd() - 0.5) * 0.7, rnd() - 0.5).normalize().multiplyScalar(o.spread * 0.34 * Math.cbrt(rnd()));
       leaves.push(card(o.card * (0.7 + rnd() * 0.35), cc.clone().add(d), centre));
@@ -264,8 +272,17 @@ export class Flora {
       const leafM = foliageMaterial(kind === 'palm' ? frondTexture() : leafTexture(kind), this.windTime, { amp: kind === 'palm' ? 0.18 : 0.07, freq: kind === 'palm' ? 1.1 : 1.5 });
       const variants = [0, 1].map(() => (o.type === 'palm' ? this._palm(o) : o.type === 'ashoka' ? this._ashoka(o) : this._broadleaf(o)));
       // the inner mass wears the same leaves (tiled, a shade darker, as the inside of a crown is) so it reads as dense foliage
-      const coreLeaf = (kind === 'palm' ? frondTexture() : leafTexture(kind)); coreLeaf.wrapS = coreLeaf.wrapT = THREE.RepeatWrapping;
-      const coreLeafM = foliageMaterial(coreLeaf, this.windTime, { amp: 0.07, freq: 1.5 }); coreLeafM.color.set(CORE_TONE[kind] || '#2f5a26').lerp(new THREE.Color('#ffffff'), 0.55);
+      const coreLeaf = (kind === 'palm' ? frondTexture() : leafTexture(kind, true)); coreLeaf.wrapS = coreLeaf.wrapT = THREE.RepeatWrapping;
+      const coreLeafM = foliageMaterial(coreLeaf, this.windTime, { amp: 0.07, freq: 1.5, alphaTest: 0 });
+      { // the leaves are laid on from three sides and blended per pixel by the surface direction, so they never stretch or seam
+        const prev = coreLeafM.onBeforeCompile, tpS = { value: 1 / (o.spread * 0.5) };
+        coreLeafM.onBeforeCompile = (sh, r) => { prev(sh, r); sh.uniforms.uTpS = tpS;
+          sh.vertexShader = 'varying vec3 vTpP; varying vec3 vTpN;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vTpP = position; vTpN = normal;');
+          sh.fragmentShader = 'uniform float uTpS; varying vec3 vTpP; varying vec3 vTpN;\n' + sh.fragmentShader.replace('#include <map_fragment>', `
+            vec3 tw = pow(abs(normalize(vTpN)), vec3(4.0)); tw /= (tw.x + tw.y + tw.z);
+            vec4 tc = texture2D(map, vTpP.zy * uTpS) * tw.x + texture2D(map, vTpP.xz * uTpS) * tw.y + texture2D(map, vTpP.xy * uTpS) * tw.z;
+            diffuseColor *= tc;`); };
+        coreLeafM.customProgramCacheKey = () => 'coreTriplanar'; } coreLeafM.color.set(CORE_TONE[kind] || '#2f5a26').lerp(new THREE.Color('#ffffff'), 0.7);
       variants.forEach((v, vi) => {
         const mine = list.filter((_, i) => i % 2 === vi); if (!mine.length) return;
         const wood = new THREE.InstancedMesh(v.wood, o.type === 'palm' ? palmBarkM : barkM, mine.length);
