@@ -9,6 +9,7 @@ import { PostFX } from './postfx.js';
 import { setAnisotropy } from './textures.js';
 import { setPBRAnisotropy } from './pbr.js';
 import { HUT } from './hut.js';
+import { PRASAD } from './prasad.js';
 import { BREATHWORK, MEDITATIONS, TIMER, Guide, Session, PracticeLog } from './practice.js';
 import { meditatorSVG, MeditatorVisual } from './meditator.js';
 
@@ -300,7 +301,7 @@ function act(name) {
   if (app.mode !== 'hall' || app.hallState !== 'seated' || app.aarti) return;
   const now = performance.now(); if (now - lastAct < 350) return; lastAct = now;
   const av = me.avatar, i = hall.mySpot;
-  if (name === 'namaste') { av.setState('bow'); setTimeout(() => av.state === 'bow' && av.setState('namaste'), 2500); }
+  if (name === 'namaste') { av.setState('bow'); setTimeout(() => av.state === 'bow' && av.setState('namaste'), 2500); const n = hall.greetFrom(av.root.position); if (n) toast(n === 1 ? 'The devotee beside you returns your namaste' : `${n} devotees around you return your namaste`, 2400); }
   if (name === 'bell' || name === 'flowers' || name === 'pradakshina') { startErrand(name); return; }
   if (name === 'diya') {
     if (hall.spotState[i].lit) { toast('Your diya is already burning'); return; }
@@ -438,23 +439,33 @@ function positionLabels() {
 }
 
 // ---------------------------------------------------------------- navigation
-const DEST = (id) => TEMPLES[id] || (id === 'hut' ? HUT : null);
+const DEST = (id) => TEMPLES[id] || (id === 'hut' ? HUT : id === 'prasad' ? PRASAD : null);
 function goTo(id) {
   if (app.mode !== 'world') return;
   const D = DEST(id); if (!D) return;
   audio.uiTap();
   input.auto = world.route(me.avatar.root.position, id).slice(1);
-  if (input.auto.length === 0 || me.avatar.root.position.distanceTo(D.entrance) < 2) { input.auto = []; if (id === 'hut') enterHut(); else enterTemple(id); return; }
+  if (input.auto.length === 0 || me.avatar.root.position.distanceTo(D.entrance) < 2) { input.auto = []; if (id === 'hut') enterHut(); else if (id === 'prasad') receivePrasad(); else enterTemple(id); return; }
   app.arriveShrine = id;
   $('map').classList.remove('on'); $('mapBtn').setAttribute('aria-pressed', 'false');
-  toast(`Walking to the ${D.name.toLowerCase().startsWith('meditation') ? 'meditation hut' : D.name}`, 2000);
+  toast(`Walking to the ${D.name.toLowerCase().startsWith('meditation') ? 'meditation hut' : id === 'prasad' ? 'prasad centre' : D.name}`, 2000);
 }
 function nearHut() { return HUT.entrance.distanceTo(me.avatar.root.position) < 2.8; }
+function nearPrasad() { return world.prasad && PRASAD.front.distanceTo(me.avatar.root.position) < 3.2; }
+function receivePrasad() {
+  if (!world.prasad || world.prasad.has(me.avatar)) return;
+  world.prasad.join(me.avatar, { player: true, onMove: (slot) => { input.auto = [slot]; app.arriveShrine = null; }, done: () => toast('You received prasad · a besan laddoo and sweet pongal in a leaf cup', 3800) });
+  const ahead = world.prasad.position(me.avatar);
+  toast(ahead > 0 ? `You join the line for prasad · ${ahead} ahead of you` : 'The sevak turns to you with prasad', 2400);
+}
 function worldPranam() {
   if (app.mode !== 'world') return;
   input.auto = []; const av = me.avatar; av.setState('bow'); app.pranamUntil = app.time + 2.6;
-  const T = nearShrine() || Object.values(TEMPLES).sort((a, b) => a.pos.distanceTo(av.root.position) - b.pos.distanceTo(av.root.position))[0];
-  const d = T.pos.clone().sub(av.root.position); av.root.rotation.y = Math.atan2(d.x, d.z);
+  const T = nearShrine(), who = !T && world.nearestDevotee(av.root.position, 6);
+  const at = T ? T.pos : who ? who.avatar.root.position : Object.values(TEMPLES).sort((a, b) => a.pos.distanceTo(av.root.position) - b.pos.distanceTo(av.root.position))[0].pos;
+  const d = at.clone().sub(av.root.position); av.root.rotation.y = Math.atan2(d.x, d.z);
+  const n = world.greetFrom(av.root.position, av.root.rotation.y);
+  if (n) toast(n === 1 ? 'A devotee returns your pranam' : `${n} devotees return your pranam`, 2400);
 }
 function nearShrine() {
   for (const T of Object.values(TEMPLES)) if (T.entrance.distanceTo(me.avatar.root.position) < 3.4) return T;
@@ -579,7 +590,7 @@ function bindUI() {
   $('musicSeg').querySelectorAll('button').forEach(b => b.onclick = () => setMusicStyle(b.dataset.m));
   const hold = (id, fn) => { const b = $(id); let t; b.addEventListener('pointerdown', () => { fn(); t = setInterval(fn, 120); }); for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, () => clearInterval(t)); b.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') fn(); }); };
   hold('camLeft', () => (cam.tYaw += 0.12)); hold('camRight', () => (cam.tYaw -= 0.12)); hold('zoomIn', () => zoom(-1.5)); hold('zoomOut', () => zoom(1.5));
-  $('enterBtn').addEventListener('click', () => { const T = nearShrine(); if (T) enterTemple(T.id); else if (nearHut()) enterHut(); });
+  $('enterBtn').addEventListener('click', () => { const T = nearShrine(); if (T) enterTemple(T.id); else if (nearHut()) enterHut(); else if (nearPrasad()) receivePrasad(); });
   bindHut();
   $('pranamBtn').addEventListener('click', worldPranam);
   $('closeBtn').setAttribute('aria-pressed', 'true');
@@ -589,6 +600,7 @@ function bindUI() {
     const r = e.target.getBoundingClientRect(); const x = (e.clientX - r.left) / r.width * 100 - 50, z = (e.clientY - r.top) / r.height * 100 - 50;
     for (const T of Object.values(TEMPLES)) if (Math.hypot(T.pos.x - x, T.pos.z - z) < 10) return goTo(T.id);
     if (Math.hypot(HUT.pos.x - x, HUT.pos.z - z) < 7) return goTo('hut');
+    if (Math.hypot(PRASAD.pos.x - x, PRASAD.pos.z - z) < 6) return goTo('prasad');
     input.auto = [world.resolve(new THREE.Vector3(x, 0, z), 0.4)]; app.arriveShrine = null;
   });
   // prayer
@@ -663,6 +675,8 @@ function drawMap() {
   }
   { const hx = X(HUT.pos.x), hz = Z(HUT.pos.z); g.fillStyle = '#c99a4a'; g.beginPath(); for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2 + Math.PI / 8; g[i ? 'lineTo' : 'moveTo'](hx + Math.cos(a) * 4.4 * s, hz + Math.sin(a) * 4.4 * s); } g.closePath(); g.fill();
     g.fillStyle = '#2a160f'; g.fillText('Meditation', hx, hz + 8 * s); }
+  { const px = X(PRASAD.pos.x), pz = Z(PRASAD.pos.z); g.save(); g.translate(px, pz); g.rotate(-PRASAD.rot); g.fillStyle = '#d9a64a'; g.fillRect(-3.2 * s, -2.3 * s, 6.4 * s, 4.6 * s); g.restore();
+    g.fillStyle = '#2a160f'; g.fillText('Prasad', px, pz + 8 * s); }
   g.fillStyle = 'rgba(246,236,218,.55)'; for (const n of world.npcs) { const p = n.avatar.root.position; g.beginPath(); g.arc(X(p.x), Z(p.z), 4, 0, Math.PI * 2); g.fill(); }
   const p = me.avatar.root.position, a = me.avatar.root.rotation.y;
   g.save(); g.translate(X(p.x), Z(p.z)); g.rotate(-a + Math.PI); g.fillStyle = '#e98a1f'; g.beginPath(); g.moveTo(0, -14); g.lineTo(9, 9); g.lineTo(-9, 9); g.closePath(); g.fill(); g.restore();
@@ -1025,7 +1039,13 @@ function updateWorld(dt, t, ctx) {
     } else if (nearHut() && $('fullSheet').hidden) {
       $('promptTitle').textContent = 'Meditation hut'; $('promptSub').textContent = 'Dhyana Kutir · breathwork and short guided meditations';
       $('enterBtn').textContent = 'Enter hut'; $('prompt').classList.add('on');
+    } else if (nearPrasad() && !world.prasad.has(me.avatar) && $('fullSheet').hidden) {
+      const q = world.prasad.length;
+      $('promptTitle').textContent = 'Prasad centre'; $('promptSub').textContent = `A sevak shares prasad: a laddoo and sweet pongal in a leaf cup · ${q ? q + ' in line' : 'no one waiting'}`;
+      $('enterBtn').textContent = 'Receive prasad'; $('prompt').classList.add('on');
     } else $('prompt').classList.remove('on');
+    // stepping out of the prasad line
+    if (world.prasad && world.prasad.has(me.avatar) && !input.auto.length) { const slot = PRASAD.slot(world.prasad.position(me.avatar)); if (p.distanceTo(slot) > 1.6) world.prasad.leave(me.avatar); }
     if ($('map').classList.contains('on') && Math.floor(t * 10) % 3 === 0) drawMap();
   }
   if (tapMarker && tapMarker.visible) { tapMarker.userData.t += dt; const k = tapMarker.userData.t; tapMarker.scale.setScalar(1 + k * 1.5); tapMarker.material.opacity = Math.max(0, 1 - k * 1.4); if (k > 0.8) tapMarker.visible = false; }

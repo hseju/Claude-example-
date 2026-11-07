@@ -365,6 +365,13 @@ export class PrayerHall {
   }
 
   // ---------- actions ----------
+  // the devotees near you turn to you, return your namaste with a bow, and turn back to the deity
+  greetFrom(pos) {
+    let n = 0, i = 0;
+    for (const [, a] of this.occupants) { if (a.walkPts || a.greet || a.root.position.distanceTo(pos) > 4.6) continue; a.greet = { at: (this._t || 0) + 0.45 + i++ * 0.3 + Math.random() * 0.25, to: pos.clone() }; n++; }
+    return n;
+  }
+
   // a simulated devotee leaves their place for a moment, and comes back
   _simErrand(i, a, kind) {
     const r = hallRoute(kind, i), home = SPOTS[i].clone(), V = THREE.Vector3; this.simWalker = a;
@@ -450,6 +457,7 @@ export class PrayerHall {
   }
 
   update(dt, t, ctx) {
+    this._t = t;
     this.flames.update(t);
     this.smoke.enabled = ctx.incense; this.smoke.density = this.quality.level === 'low' ? 0.5 : 1;
     this.smoke.update(dt, t); this.petals.update(dt);
@@ -477,6 +485,13 @@ export class PrayerHall {
         else if (r < 0.62 && ctx.incense) { a.setState('offer'); this.offerIncense(i); }
         else if (r < 0.72 && !this.simWalker && !this.playerErrand) this._simErrand(i, a, r < 0.66 ? 'bell' : r < 0.69 ? 'flowers' : 'pradakshina');
         else a.setState(Math.random() < 0.5 ? 'namaste' : 'idle');
+      }
+      if (a.greet) {
+        const G = a.greet, P = a.root.position, back = G.bowed && t > G.at + 2.5, want = back ? Math.PI : Math.atan2(G.to.x - P.x, G.to.z - P.z);
+        a.root.rotation.y = lerpA(a.root.rotation.y, want, 1 - Math.exp(-dt * 6));
+        if (!G.bowed && t > G.at) { a.setState('bow'); G.bowed = true; }
+        if (back && Math.abs(Math.atan2(Math.sin(a.root.rotation.y - Math.PI), Math.cos(a.root.rotation.y - Math.PI))) < 0.04) { a.root.rotation.y = Math.PI; a.greet = null; a.setState('namaste'); }
+        a.update(dt, t); continue;
       }
       if (a.walkPts && a.walkPts.length) {
         const P = a.root.position, T = a.walkPts[0], dx = T.x - P.x, dz = T.z - P.z, dist = Math.hypot(dx, dz);
