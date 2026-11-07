@@ -1,9 +1,9 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 import { softDot } from './textures.js';
-import { shikhara } from './architecture.js';
+import { shikhara, amalaka, kalasha } from './architecture.js';
 
-// The living backdrop around the campus: layered mountain ranges, three great waterfalls with
-// mist and a river, drifting clouds and valley mist, flocks of egrets, crows and parakeets,
+// The living backdrop around the campus: layered mountain ranges, three great waterfalls pouring off the rim of a
+// flat-topped escarpment with mist and a river, a temple on the clifftop, drifting clouds and valley mist, flocks of egrets, crows and parakeets,
 // pigeons around the spires, butterflies over the flower beds, golden motes of light (fireflies by night), stars
 // and the moon. Everything reacts to the time-of-day state passed to `update()`.
 
@@ -30,9 +30,32 @@ function hazeShader(sh, k = 1) {
     #endif`);
 }
 function hazy(mat, k = 1) { const prev = mat.onBeforeCompile; mat.onBeforeCompile = (sh, r) => { if (prev) prev(sh, r); hazeShader(sh, k); }; mat.customProgramCacheKey = () => 'hazy' + k; return mat; }
-const PALACE_A = -Math.PI * 0.405;   // the palace on the hill, framed between the north and north-east falls
-const CASCADES = [-Math.PI * 0.585, -Math.PI * 0.245, -Math.PI * 0.79, -Math.PI * 0.12];   // streams tumbling down the near slopes
-const HILL_TEMPLES = [[-Math.PI * 0.9, 158, 1.0], [-Math.PI * 0.06, 162, 0.9], [-Math.PI * 0.66, 186, 0.75]];   // smaller temples on the far hills
+const PALACE_A = -Math.PI * 0.405;   // the temple on the clifftop, framed between the north and north-east falls
+const CASCADES = [-Math.PI * 0.57, -Math.PI * 0.245, -Math.PI * 0.79, -Math.PI * 0.12];   // streams tumbling down the near slopes
+// smaller temples: two on the far hills, and one on the rim of the escarpment between the north-west and north falls
+const HILL_TEMPLES = [[-Math.PI * 0.9, 158, 1.0], [-Math.PI * 0.06, 162, 0.9], [-Math.PI * 0.615, 0, 0.75, true]];
+
+// The falls pour off the rim of a broad, flat-topped escarpment of stepped basalt, like the Western Ghats in the monsoon:
+// a wall of cliffs across the northern arc with forest along its top and snowy peaks rising behind it. Each river
+// crosses the plateau in a shallow valley and spills over the back of an amphitheatre it has worn into the cliff.
+const FALL_R = [128, 134, 140], FALL_W = [16, 11, 11];   // how far each fall's lip is from the centre of the campus, and its width
+const FALL_SIG = [0.085, 0.065, 0.065];                   // the angular width of the gorge each has cut in front of it
+const SCARP_C = -Math.PI / 2, SCARP_HALF = Math.PI * 0.27;
+const scarpMask = (a) => 1 - smooth(SCARP_HALF - 0.04, SCARP_HALF + 0.22, Math.abs(dAng(a, SCARP_C)));
+function nearFall(a, s) { let m = 0; for (const fa of FALLS) m = Math.max(m, Math.exp(-Math.pow(dAng(a, fa) / s, 2))); return m; }
+// the cliff edge: wandering in and out between the falls, held steady at each one
+function rimR(a) {
+  let ws = 0, rs = 0;
+  for (let i = 0; i < 3; i++) { const w = Math.exp(-Math.pow(dAng(a, FALLS[i]) / 0.3, 2)) + 1e-4; ws += w; rs += w * (FALL_R[i] - 5); }
+  return rs / ws + (3 * Math.sin(a * 13 + 1) + 6 * (fbm(a * 5 + 3, 1.7, 3) - 0.5)) * (1 - nearFall(a, 0.12));
+}
+const scarpTop = (a) => 55 + 3 * Math.sin(a * 3 + 0.5);   // the level of the plateau along its rim
+// each river wanders a little as it comes across the plateau from the far hills to its lip
+const riverA = (fi, r) => FALLS[fi] + 0.03 * Math.sin((r - FALL_R[fi]) * 0.06 + fi * 2) * smooth(FALL_R[fi], FALL_R[fi] + 25, r);
+// the cliff in profile, by distance from its edge: a talus apron, then three tiers of basalt with a ledge between each
+const cliffProfile = (x) => 0.28 * smooth(-36, -15, x) + 0.26 * smooth(-15, -11.5, x) + 0.22 * smooth(-9.5, -6.5, x) + 0.24 * smooth(-4.2, -0.5, x);
+const LEDGES = [-10.5, -5.4];   // the ledges between the tiers, by distance from the edge
+const wallHalf = (fi) => 1.9 * FALL_SIG[fi] * FALL_R[fi];   // half the span of the rock amphitheatre behind each fall
 
 export class Scenery {
   constructor(scene, quality, water, beds = []) {
@@ -52,10 +75,10 @@ export class Scenery {
   }
 
   // ------------------------------------------------------------ mountains
-  _ring(r0, r1, segA, segR, heightFn, colorFn) {
+  _ring(r0, r1, segA, segR, heightFn, colorFn, rAt = (t) => r0 + (r1 - r0) * t) {
     const pos = [], col = [], idx = [], c = new THREE.Color();
     for (let j = 0; j <= segR; j++) for (let i = 0; i <= segA; i++) {
-      const a = i / segA * Math.PI * 2, r = r0 + (r1 - r0) * j / segR, h = heightFn(r, a);
+      const a = i / segA * Math.PI * 2, r = rAt(j / segR), h = heightFn(r, a);
       pos.push(Math.cos(a) * r, h, Math.sin(a) * r); colorFn(c, h, r, a); col.push(c.r, c.g, c.b);
     }
     for (let j = 0; j < segR; j++) for (let i = 0; i < segA; i++) { const a = j * (segA + 1) + i, b = a + 1, d = a + segA + 1, e = d + 1; idx.push(a, b, d, b, e, d); }   // wound so the surface faces up (it was upside down, so the hills were culled from above)
@@ -64,23 +87,41 @@ export class Scenery {
   }
   _mountains() {
     const low = this.quality.level === 'low';
-    // near range: forested ridges with rocky cliffs where the waterfalls drop
-    this.nearHeight = (r, a, cliff = false) => {   // cliff: the height before the gorge is carved (the top of a waterfall)
+    // near range: forested ridges, and across the north the escarpment the waterfalls pour from
+    this.nearHeight = (r, a, cliff = false) => {   // cliff: the height before the gorges are carved (the top of a waterfall)
       const rise = smooth(92, 150, r) * (1 - smooth(185, 215, r) * 0.35);
       const south = 0.45 + 0.55 * smooth(0.3, 1.4, Math.abs(dAng(a, Math.PI / 2)));      // lower toward the gate side
-      let h = (22 + 58 * ridged(a * 3.2 + 4, r * 0.012, 5)) * (0.55 + 0.6 * fbm(a * 5, r * 0.03, 3)) * south;
-      for (const fa of FALLS) h += 46 * Math.exp(-Math.pow(dAng(a, fa) / 0.11, 2)) * smooth(100, 135, r);
-      // a gorge in front of each cliff, so the waterfall drops all the way to its pool in plain view
-      let gorge = 0; FALLS.forEach((fa, fi) => { const rTop = 128 + fi * 6, w = fi === 0 ? 0.085 : 0.065; gorge = Math.max(gorge, Math.exp(-Math.pow(dAng(a, fa) / w, 2)) * (1 - smooth(rTop - 5, rTop + 2, r))); });
-      return rise * h * (1 - (cliff ? 0 : gorge) * 0.94) - 2;
+      let h = rise * (22 + 58 * ridged(a * 3.2 + 4, r * 0.012, 5)) * (0.55 + 0.6 * fbm(a * 5, r * 0.03, 3)) * south;
+      const m = scarpMask(a);
+      if (m > 0) {   // a level plateau behind a stepped cliff; the foothills in front still rise where they stand taller than its apron
+        const x = r - rimR(a), top = scarpTop(a) + 7 * smooth(0, 70, x) + 5 * (fbm(a * 16 + 5, r * 0.05, 3) - 0.5);
+        let s = Math.max(top * cliffProfile(x), h * (1 - smooth(-22, -10, x)));
+        for (let i = 0; i < 3; i++) { const l = dAng(a, riverA(i, r)) * r; s -= 3.5 * Math.exp(-Math.pow(l / (FALL_W[i] * 0.55), 2)) * smooth(-3, 2, x); }
+        h += (s - h) * m;
+      }
+      // a gorge in front of each fall, so the water drops all the way to its pool in plain view
+      if (!cliff) { let gorge = 0; for (let i = 0; i < 3; i++) gorge = Math.max(gorge, Math.exp(-Math.pow(dAng(a, FALLS[i]) / FALL_SIG[i], 2)) * (1 - smooth(FALL_R[i] - 5, FALL_R[i] + 2, r))); h *= 1 - gorge * 0.94; }
+      return h - 2;
     };
     const greens = [new THREE.Color('#4c8a36'), new THREE.Color('#3b7430'), new THREE.Color('#6da444')], rock = new THREE.Color('#8a7a66'), tmp = new THREE.Color();
-    const near = this._ring(92, 215, low ? 140 : 220, low ? 14 : 22, this.nearHeight, (c, h, r, a) => {
+    // rows of the near ring packed closest where the cliffs stand, so their tiers and ledges keep a crisp edge
+    const knots = [[0, 92], [0.12, 106], [0.78, 152], [1, 215]];
+    const rAt = (t) => { for (let k = 1; k < knots.length; k++) if (t <= knots[k][0]) { const [t0, r0] = knots[k - 1], [t1, r1] = knots[k]; return r0 + (r1 - r0) * (t - t0) / (t1 - t0); } return 215; };
+    const basalt = [new THREE.Color('#4f4b47'), new THREE.Color('#77706a'), new THREE.Color('#353331')];
+    const near = this._ring(92, 215, low ? 170 : 300, low ? 32 : 52, this.nearHeight, (c, h, r, a) => {
       // broad, soft patches of forest green and lighter meadow (no per-triangle speckle), greener and darker low down
       const pn = fbm(a * 14 + 2, r * 0.04, 3); c.copy(greens[1]).lerp(greens[0], smooth(0.3, 0.6, pn)).lerp(greens[2], smooth(0.55, 0.8, pn) * 0.7 + smooth(0, 40, h) * 0.2); void hash;
-      const cliff = Math.max(...FALLS.map(fa => Math.exp(-Math.pow(dAng(a, fa) / 0.07, 2)))) * smooth(10, 40, h);
-      c.lerp(rock, Math.min(1, cliff * 1.2 + smooth(55, 85, h) * 0.6 + (fbm(a * 30, r * 0.1, 2) > 0.62 ? 0.3 : 0)));
-    });
+      c.lerp(rock, Math.min(1, smooth(58, 88, h) * 0.6 + (fbm(a * 30, r * 0.1, 2) > 0.62 ? 0.3 : 0)));
+      const m = scarpMask(a);
+      if (m > 0.02) {
+        // bare basalt on the cliff faces, in bands: paler on the harder layers, darker where water seeps down from the rim;
+        // the ledges between the tiers stay green with moss and scrub
+        const d = 1.2, H = this.nearHeight, sl = Math.hypot(H(r + d, a) - H(r - d, a), H(r, a + d / r) - H(r, a - d / r)) / (2 * d);
+        const band = smooth(0.35, 0.65, (h / 8 + 0.6 * fbm(a * 40, h * 0.08, 2)) % 1), seep = smooth(0.58, 0.74, fbm(a * 26 + 4, 1.3, 2));
+        tmp.copy(basalt[0]).lerp(basalt[1], band * 0.8).lerp(basalt[2], seep * 0.7);
+        c.lerp(tmp, smooth(0.55, 1.25, sl) * m);
+      }
+    }, rAt);
     this.nearMat = hazy(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }), 0.55);   // smooth, rolling slopes
     const nm = new THREE.Mesh(near, this.nearMat); nm.receiveShadow = false; this.group.add(nm);
     // far range: tall blue peaks with snow, fading into haze
@@ -115,7 +156,8 @@ export class Scenery {
     const tex = this._canopyAtlas();
     const card = new THREE.PlaneGeometry(1, 1); card.translate(0, 0.42, 0);
     { const nr = card.attributes.normal; for (let i = 0; i < nr.count; i++) nr.setXYZ(i, 0, 1, 0); }   // lit like the ground it stands on
-    const cell = new Float32Array(n), mat = new THREE.MeshLambertMaterial({ map: tex, alphaTest: 0.5, transparent: false });
+    const shrubs = low ? 200 : 480;   // scrub and small trees clinging to the ledges of the cliffs
+    const cell = new Float32Array(n + shrubs), mat = new THREE.MeshLambertMaterial({ map: tex, alphaTest: 0.5, transparent: false });
     mat.onBeforeCompile = (sh) => { hazeShader(sh, 0.45);
       sh.vertexShader = 'attribute float aCell;\n' + sh.vertexShader
         .replace('#include <uv_vertex>', '#include <uv_vertex>\n  #ifdef USE_MAP\n  vMapUv = (uv + vec2(mod(aCell, 2.0), floor(aCell / 2.0))) * 0.5;\n  #endif')
@@ -125,19 +167,41 @@ export class Scenery {
           vec4 mvPosition = mvCenter + vec4(transformed.x * bsx, transformed.y * bsy, 0.0, 0.0);
           gl_Position = projectionMatrix * mvPosition;`);
     };
-    const trees = new THREE.InstancedMesh(card, mat, n);
+    const trees = new THREE.InstancedMesh(card, mat, n + shrubs);
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), c = new THREE.Color(); let k = 0;
     const groveAt = (a) => fbm(a * 9 + 3, 0.5, 2) > 0.62;   // blossom grows in groves, not scattered
     for (let i = 0; k < n && i < n * 4; i++) {
       const a = Math.random() * Math.PI * 2, r = 100 + Math.pow(Math.random(), 0.8) * 100, h = this.nearHeight(r, a);
-      if (h < 0.5 || h > 64 || FALLS.some(fa => Math.abs(dAng(a, fa)) < 0.1) || (Math.abs(dAng(a, PALACE_A)) < 0.17 && r > 135) || CASCADES.some(ca => Math.abs(dAng(a, ca)) < 0.035) || HILL_TEMPLES.some(([ta]) => Math.abs(dAng(a, ta)) < 0.09)) continue;
+      if (h < 0.5 || h > 68 || !this._treeOK(r, a) || CASCADES.some(ca => Math.abs(dAng(a, ca)) < 0.035) || HILL_TEMPLES.some(([ta]) => Math.abs(dAng(a, ta)) < 0.09)) continue;
       const s2 = (6.5 + Math.random() * 5.5) * (0.8 + r / 400), bloom = groveAt(a) && Math.random() < 0.5;
       m.compose(new THREE.Vector3(Math.cos(a) * r, h - s2 * 0.12, Math.sin(a) * r), q, new THREE.Vector3(s2 * (0.95 + Math.random() * 0.3), s2, 1)); trees.setMatrixAt(k, m);
       cell[k] = bloom ? 3 : Math.floor(Math.random() * 3);
       const v = 1.0 + Math.random() * 0.28; trees.setColorAt(k++, c.setRGB(v, v * (0.98 + Math.random() * 0.06), v * 0.92));
     }
+    // scrub and small trees in clumps along the ledges of the escarpment, with bare rock between
+    for (let i = 0, k0 = k; k < k0 + shrubs && i < shrubs * 8; i++) {
+      const a = SCARP_C + (Math.random() * 2 - 1) * (SCARP_HALF + 0.05), x = LEDGES[i % 2] + (Math.random() - 0.5) * 1.4, r = rimR(a) + x, h = this.nearHeight(r, a);
+      if (scarpMask(a) < 0.6 || h < 4 || fbm(a * 30 + i % 2 * 5, 0.7, 2) < 0.45 || FALLS.some((fa, fi) => Math.abs(dAng(a, fa)) * r < wallHalf(fi) + 3) || CASCADES.some((ca) => Math.abs(dAng(a, ca)) < 0.035)) continue;
+      const s2 = 2.6 + Math.random() * 2.8;
+      m.compose(new THREE.Vector3(Math.cos(a) * r, h - s2 * 0.15, Math.sin(a) * r), q, new THREE.Vector3(s2 * (0.9 + Math.random() * 0.4), s2, 1)); trees.setMatrixAt(k, m);
+      cell[k] = Math.random() < 0.5 ? 2 : Math.floor(Math.random() * 3);
+      const v = 0.85 + Math.random() * 0.2; trees.setColorAt(k++, c.setRGB(v, v, v * 0.9));
+    }
     card.setAttribute('aCell', new THREE.InstancedBufferAttribute(cell, 1));
     trees.count = k; trees.frustumCulled = false; this.group.add(trees); this.hillForest = trees;
+  }
+  // where the hill forest may grow: not on the cliff faces, in the gorges and the amphitheatres behind the falls, in the
+  // rivers on the plateau, or in front of the clifftop temple; on the plateau, only along the rim where it can be seen
+  _treeOK(r, a) {
+    for (let i = 0; i < 3; i++) {
+      const l = Math.abs(dAng(a, FALLS[i])) * r;
+      if (l < wallHalf(i) + 4 && r < FALL_R[i] + 6) return false;
+      if (r < FALL_R[i] - 5 && Math.abs(dAng(a, FALLS[i])) < FALL_SIG[i] * 1.6) return false;
+      if (r > FALL_R[i] - 8 && Math.abs(dAng(a, riverA(i, r))) * r < FALL_W[i] * 0.85) return false;
+    }
+    if (Math.abs(dAng(a, PALACE_A)) < 0.16 && r > rimR(a) - 3) return false;
+    if (scarpMask(a) > 0.2) { const x = r - rimR(a); if (x > -15 && x < 1.5) return false; if (x > 28) return false; }
+    return true;
   }
   // four painted canopies in one texture: a broad round crown, a tall crown, a lighter feathery crown, and a crown in pink blossom
   _canopyAtlas() {
@@ -187,7 +251,7 @@ export class Scenery {
     const tex = this._streakTexture();
     this.fallTex = [tex, tex.clone()]; this.fallTex[1].needsUpdate = true; this.fallTex[1].repeat.set(1, 1.6);
     this.fallMats = this.fallTex.map((t, i) => new THREE.MeshBasicMaterial({ map: t, transparent: true, opacity: i ? 0.55 : 0.9, depthWrite: false, side: THREE.DoubleSide, color: '#ffffff' }));
-    const rockM = hazy(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, flatShading: true }), 0.7);
+    const rockM = hazy(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, flatShading: true, side: THREE.DoubleSide }), 0.7);
     const mistPts = [], mistSeed = [];
     // foam: soft white blobs of churning water, two layers turning opposite ways
     const foamTex = (() => { const S = 256, c = document.createElement('canvas'); c.width = c.height = S; const x = c.getContext('2d'); x.translate(S / 2, S / 2);
@@ -205,16 +269,11 @@ export class Scenery {
         x.globalCompositeOperation = 'destination-in'; const g = x.createLinearGradient(0, 0, 0, H); g.addColorStop(0, 'rgba(0,0,0,0.2)'); g.addColorStop(0.5, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(0, 0, W, H);
         const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })() });
     FALLS.forEach((fa, fi) => {
-      const rTop = 128 + fi * 6, rBase = 112 + fi * 4;
-      const top = this.nearHeight(rTop, fa, true), height = Math.max(40, top - 1), width = fi === 0 ? 16 : 11;
+      const rTop = FALL_R[fi], width = FALL_W[fi];
+      const height = this.nearHeight(rTop + 2, fa, true) + 1.0;   // the river's surface where it reaches the lip
       const dir = new THREE.Vector3(Math.cos(fa), 0, Math.sin(fa));
-      // a weathered rock buttress behind the fall, mossy toward the top
-      const rg = new THREE.IcosahedronGeometry(1, 4), rp = rg.attributes.position, rc = [], cc = new THREE.Color();
-      for (let i = 0; i < rp.count; i++) { const v = new THREE.Vector3().fromBufferAttribute(rp, i); const n = 1 + (fbm(v.x * 2.2 + fi * 3, v.y * 2.6 + v.z, 4) - 0.5) * 0.55; v.multiplyScalar(n); rp.setXYZ(i, v.x, v.y, v.z);
-        cc.set('#6f6455').lerp(new THREE.Color('#3f5f34'), Math.max(0, v.y) * 0.8 * (fbm(v.x * 6, v.z * 6, 2) > 0.45 ? 1 : 0.3)); rc.push(cc.r, cc.g, cc.b); }
-      rg.setAttribute('color', new THREE.Float32BufferAttribute(rc, 3)); rg.computeVertexNormals();
-      const face = new THREE.Mesh(rg, rockM); face.scale.set(width * 1.5, height * 0.62, 10);
-      face.position.copy(dir).multiplyScalar(rTop + 9).setY(height * 0.42); face.lookAt(0, face.position.y, 0); this.group.add(face);
+      this._amphitheatre(fi, rockM, height);
+      this._upperRiver(fi, height);
       // two sheets of falling water, slightly bowed, scrolling at different speeds
       for (let s = 0; s < 2; s++) {
         const g = new THREE.PlaneGeometry(width * (s ? 1.2 : 1), height, 6, 16); const gp = g.attributes.position;
@@ -229,7 +288,7 @@ export class Scenery {
       for (const [rad, mat, y] of [[width * 0.75, this.foamMats[0], 0.32], [width * 1.05, this.foamMats[1], 0.3]]) {
         const f = new THREE.Mesh(new THREE.CircleGeometry(rad, 32).rotateX(-Math.PI / 2), mat); f.position.copy(poolC).setY(y); f.renderOrder = 4; this.group.add(f); }
       const lipG = new THREE.CylinderGeometry(0.9, 0.9, width * 1.05, 10, 1, false, 0, Math.PI); lipG.rotateZ(Math.PI / 2);
-      const lip = new THREE.Mesh(lipG, this.lipMat); lip.position.copy(dir).multiplyScalar(rTop - 1.2).setY(height - 1.0); lip.rotation.y = toC; lip.renderOrder = 4; this.group.add(lip);
+      const lip = new THREE.Mesh(lipG, this.lipMat); lip.position.copy(dir).multiplyScalar(rTop - 0.9).setY(height - 0.9); lip.rotation.y = toC; lip.renderOrder = 4; this.group.add(lip);
       // soft spray puffs where the water tumbles over the edge, and a veil of mist down the face of the fall
       const across = new THREE.Vector3(-dir.z, 0, dir.x);
       for (let k = 0; k < 6; k++) { const sp = new THREE.Sprite(this.cloudMistMat); const w2 = width * (0.35 + Math.random() * 0.2); sp.scale.set(w2, w2 * 0.6, 1);
@@ -250,6 +309,43 @@ export class Scenery {
       fragmentShader: `uniform sampler2D uMap; uniform vec3 uColor; uniform float uOpacity; varying float vA; void main(){ float a = texture2D(uMap, gl_PointCoord).a*vA*uOpacity*0.45; gl_FragColor = vec4(uColor, a); }` }));
     this.spray.frustumCulled = false; this.group.add(this.spray);
   }
+  // the rock behind a fall: an amphitheatre the water has worn back into the cliff, its top edge level with the plateau
+  // except for the notch the river has cut, slightly overhanging at the lip and hollowed at the foot where the plunge
+  // pool undercuts it, in ledges of dark basalt streaked wet where the spray reaches and mossy toward the top
+  _amphitheatre(fi, mat, lipY) {
+    const fa = FALLS[fi], rTop = FALL_R[fi], half = wallHalf(fi), W = FALL_W[fi], cols = 30, rows = 28;
+    const pos = [], col = [], idx = [], c = new THREE.Color(), dark = new THREE.Color('#3a3733'), wet = new THREE.Color('#2c2b29'), pale = new THREE.Color('#7b7064'), moss = new THREE.Color('#4d6a37'), stone = new THREE.Color('#5c544c');
+    for (let j = 0; j <= rows; j++) for (let i = 0; i <= cols; i++) {
+      const u = i / cols * 2 - 1, l = u * half, v = j / rows;
+      const rw = rTop + 1.5 - 9 * u * u, a = fa + l / rw;
+      const top = this.nearHeight(rw + 1, a, true);
+      const notch = Math.exp(-Math.pow(l / (W * 0.62), 2)), yTop = top + (lipY - 0.6 - top) * notch;
+      const y = -2.5 + (yTop + 2.5) * v;
+      const n = fbm(l * 0.22 + fi * 7, y * 0.2, 3), ledge = smooth(0.4, 0.6, (y / 6.5 + n * 0.8) % 1);
+      const dr = -1.3 * smooth(0.82, 1, v) + 2.2 * (1 - smooth(0, 0.3, v)) * (1 - Math.abs(u) * 0.6) - 0.8 * ledge + (n - 0.5) * 2.2;
+      const R = rw + dr;
+      pos.push(Math.cos(a) * R, y, Math.sin(a) * R);
+      c.copy(stone).lerp(pale, ledge * 0.55).lerp(dark, smooth(0.55, 0.7, fbm(l * 0.5, y * 0.05, 2)) * 0.6);
+      c.lerp(wet, Math.exp(-Math.pow(l / (W * 0.85), 2)) * 0.8 * (1 - smooth(0.88, 1, v) * 0.5));
+      c.lerp(moss, (ledge > 0.5 ? 0.45 : 0.15) * smooth(0.3, 0.9, v) * (1 - Math.exp(-Math.pow(l / W, 2))) + smooth(0.9, 1, v) * 0.5);
+      col.push(c.r, c.g, c.b);
+      if (i < cols && j < rows) { const k = j * (cols + 1) + i; idx.push(k, k + cols + 1, k + 1, k + 1, k + cols + 1, k + cols + 2); }
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setIndex(idx); g.computeVertexNormals();
+    const m = new THREE.Mesh(g, mat); this.group.add(m); return m;
+  }
+  // the river on top of the plateau, running in its shallow valley from the far hills to the lip of its fall
+  _upperRiver(fi, lipY) {
+    const rTop = FALL_R[fi], W = FALL_W[fi], N = 40, pos = [], uv = [], idx = [];
+    for (let i = 0; i <= N; i++) {
+      const t = i / N, r = rTop - 0.9 + t * (212 - rTop), a = riverA(fi, r), w = W * (0.5 - t * 0.18);
+      const y = i === 0 ? lipY : Math.min(lipY + t * 9, this.nearHeight(r, a, true) + 1.0);
+      for (const s2 of [-1, 1]) { const aa = a + s2 * w / r; pos.push(Math.cos(aa) * r, y, Math.sin(aa) * r); uv.push(s2 < 0 ? 0 : 1, t * 12); }
+      if (i < N) { const k = i * 2; idx.push(k, k + 2, k + 1, k + 1, k + 2, k + 3); }
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
+    const m = new THREE.Mesh(g, this.water); m.renderOrder = 2; this.group.add(m);
+  }
   _river(fa, r0, w) {
     // from the pool toward the campus, then curving east around the walls
     const pts = []; for (let i = 0; i <= 12; i++) { const r = r0 - i * 2.6; pts.push(new THREE.Vector3(Math.cos(fa + Math.sin(i * 0.6) * 0.03) * r, 0, Math.sin(fa + Math.sin(i * 0.6) * 0.03) * r)); }
@@ -264,36 +360,64 @@ export class Scenery {
     this.group.add(new THREE.Mesh(g, this.water));
   }
 
-  // ------------------------------------------------------------ a palace on the hill
-  // Framed between the two northern waterfalls when you look up the main approach: an ivory palace on a terrace,
-  // with domed pavilions, a tall tower, rows of warmly lit windows and a soft halo above it at dusk.
+  // ------------------------------------------------------------ the temple on the clifftop
+  // Framed between the two northern waterfalls when you look up the main approach: a nagara temple in the panchayatana
+  // plan standing on the rim of the plateau. A tall curvilinear shikhara rises over the sanctum, with a pillared hall under
+  // a stepped pyramidal roof and a porch in front of it, four smaller shrines at the corners of its terrace, a saffron
+  // flag on the spire, warmly lit doorways and lattice windows, and a soft halo above it at dusk.
   // the height a building on the hills must stand at to be seen from the campus over the ridges in front of it
   ridgeAbove(r, a) { let top = this.nearHeight(r, a); for (let rr = 100; rr < r; rr += 4) { const k = (rr - 30) / (r - 30); top = Math.max(top, this.nearHeight(rr, a) / k - 4); } return Math.min(top, this.nearHeight(r, a) + 30); }
+  // the ground level for a building on the plateau: the highest point under its footprint (its plinth reaches down to the rest)
+  _groundUnder(r, a, halfW, halfD) { let y = -Infinity; for (const dl of [-halfW, 0, halfW]) for (const dr of [-halfD, 0, halfD]) y = Math.max(y, this.nearHeight(r + dr, a + dl / r)); return y; }
   _palace() {
-    const a = PALACE_A, r = 172, h = this.ridgeAbove(r, a), g = new THREE.Group();
-    g.position.set(Math.cos(a) * r, h + 2, Math.sin(a) * r); g.rotation.y = Math.atan2(-g.position.x, -g.position.z); this.group.add(g); this.palaceAt = g.position.clone();
-    const ivory = new THREE.MeshStandardMaterial({ color: '#f4e6cc', roughness: 0.8 }), gold = new THREE.MeshStandardMaterial({ color: '#e6b85c', metalness: 0.6, roughness: 0.4 });
+    const a = PALACE_A; let rim = 0; for (let k = -4; k <= 4; k++) rim = Math.max(rim, rimR(a + k * 0.04));
+    const r = rim + 25, g = new THREE.Group();
+    g.position.set(Math.cos(a) * r, this._groundUnder(r, a, 22, 18), Math.sin(a) * r); g.rotation.y = Math.atan2(-g.position.x, -g.position.z); this.group.add(g); this.palaceAt = g.position.clone();
+    const ivory = new THREE.MeshStandardMaterial({ color: '#f4e6cc', roughness: 0.8 }), sand = new THREE.MeshStandardMaterial({ color: '#d8b98e', roughness: 0.85 });
+    const gold = new THREE.MeshStandardMaterial({ color: '#e6b85c', metalness: 0.6, roughness: 0.4 });
     const glow = this.palaceGlow = new THREE.MeshStandardMaterial({ color: '#ffd59a', emissive: '#ffb050', emissiveIntensity: 1.6 });
     const box = (w, hh, d, x, y, z, m = ivory) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, hh, d), m); b.position.set(x, y + hh / 2, z); g.add(b); return b; };
-    const cyl = (r0, hh, x, y, z, m = ivory) => { const c = new THREE.Mesh(new THREE.CylinderGeometry(r0, r0 * 1.08, hh, 14), m); c.position.set(x, y + hh / 2, z); g.add(c); return c; };
-    const dome = (rr, x, y, z, m = ivory) => { const d = new THREE.Mesh(new THREE.SphereGeometry(rr, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), m); d.scale.y = 1.3; d.position.set(x, y, z); g.add(d);
-      const f = new THREE.Mesh(new THREE.ConeGeometry(rr * 0.1, rr * 0.75, 8), gold); f.position.set(x, y + rr * 1.3 + rr * 0.3, z); g.add(f); };
-    // an arched window: a tall glowing slot with a rounded head
-    const arch = (x, y, z, w = 1.3, hh = 4) => { box(w, hh, 0.3, x, y, z, glow); const c = new THREE.Mesh(new THREE.CylinderGeometry(w / 2, w / 2, 0.3, 12, 1, false, 0, Math.PI), glow); c.rotation.set(Math.PI / 2, 0, Math.PI / 2); c.position.set(x, y + hh, z); g.add(c); };
-    const chhatri = (x, y, z, rr = 1.6) => { for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) cyl(0.16, 2.4, x + dx * rr * 0.6, y, z + dz * rr * 0.6); box(rr * 1.6, 0.3, rr * 1.6, x, y + 2.4, z); dome(rr * 0.75, x, y + 2.7, z, gold); };
-    box(52, 6, 30, 0, -2, 0); box(54, 0.8, 32, 0, 4, 0, gold);                              // terrace and its gilded lip
-    box(26, 12, 14, 0, 4.8, 0); box(28, 1, 16, 0, 16.8, 0);                                 // main hall
-    cyl(6.4, 3, 0, 17.8, 0); dome(7, 0, 20.8, 0, gold);                                      // golden central dome on its drum
-    for (const s of [-1, 1]) {
-      box(9, 9, 11, s * 18.5, 4.8, 1.5); dome(3.8, s * 18.5, 13.8, 1.5);                   // side pavilions
-      chhatri(s * 11, 17.8, 5); chhatri(s * 11, 17.8, -5);                                 // pavilions on the roof corners
-      for (const z of [-13, 13]) { cyl(0.85, 22, s * 25, 4.8, z); box(2.4, 0.5, 2.4, s * 25, 26.8, z, gold); dome(1.2, s * 25, 27.3, z); }   // minarets at the terrace corners
-      arch(s * 18.5, 7, 7.1, 1.2, 3.4);
+    const put = (o, x, y, z) => { o.position.set(x, y, z); g.add(o); return o; };
+    // a stepped pyramidal roof (phamsana): slabs narrowing upward with a moulded lip under each, crowned by a ribbed
+    // amalaka and a kalasha
+    const stepped = (w, d, y, z, tiers, x = 0) => { let yy = y;
+      for (let k = 0; k < tiers; k++) { const f = 1 - k / (tiers + 0.6); box(w * f + 0.4, 0.28, d * f + 0.4, x, yy, z, sand); box(w * f, 0.8, d * f, x, yy + 0.28, z); yy += 1.08; }
+      const ar = Math.min(w, d) * 0.16, am = put(amalaka(ar, gold), x, yy + ar * 0.45, z); am.scale.y = 1.3; put(kalasha(ar, gold), x, yy + ar * 0.9, z); };
+    const P = 4.4;   // the temple floor, on top of the terrace
+    // jagati: the broad terrace in two moulded tiers, reaching down into the hillside, with a flight of steps up the front
+    box(46, 10, 40, 0, -8, 0, sand); box(47, 0.6, 41, 0, 1.4, 0); box(40, 2.4, 34, 0, 2, 0, sand); box(41, 0.5, 35, 0, P - 0.5, 0);
+    for (let k = 0; k < 8; k++) { const front = 24.4 - k * 0.92; box(7.5, 2 + (k + 1) * P / 8, front - 17, 0, -2, (front + 17) / 2); }
+    for (const s2 of [-1, 1]) box(0.9, P + 2.6, 7.6, s2 * 4.2, -2, 20.6, sand);
+    // the sanctum, with projecting central bays on every side, under the main shikhara
+    const SZ = -8.5;
+    box(14, 1.2, 14, 0, P, SZ, sand); box(12, 9, 12, 0, P + 1.2, SZ); box(5, 9, 13.2, 0, P + 1.2, SZ); box(13.2, 9, 5, 0, P + 1.2, SZ);
+    box(14.2, 0.9, 14.2, 0, P + 10.2, SZ, sand);
+    const spire = put(shikhara(12.5, 30, ivory, gold, 12), 0, P + 11.1, SZ), top = P + 11.1 + 30;
+    put(kalasha(2.6, gold), 0, top + 0.85, SZ);
+    // the flag on its staff above the finial (it streams in the breeze, see update)
+    const staff = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 8, 6), gold); staff.position.set(0, top + 6.5, SZ); g.add(staff);
+    const fs = new THREE.Shape(); fs.moveTo(0, 0); fs.quadraticCurveTo(2.6, -0.2, 5.4, -1.1); fs.quadraticCurveTo(2.6, -1.6, 0, -2.6); fs.lineTo(0, 0);
+    const flag = this.templeFlag = new THREE.Mesh(new THREE.ShapeGeometry(fs, 8), new THREE.MeshStandardMaterial({ color: '#ff7a1a', emissive: '#7a2a00', emissiveIntensity: 0.25, roughness: 0.9, side: THREE.DoubleSide }));
+    flag.position.set(0, top + 10.4, SZ); g.add(flag);
+    // the vestibule, and the hall in front with lattice windows down its sides and a lit doorway
+    const MZ = 5.5;
+    box(7, 8.5, 5, 0, P, -0.6);
+    box(16, 1, 14, 0, P, MZ, sand); box(15, 7, 13, 0, P + 1, MZ); box(16.4, 0.7, 14.4, 0, P + 8, MZ, sand);
+    stepped(15.4, 13.4, P + 8.7, MZ, 7);
+    for (const s2 of [-1, 1]) for (let i = 0; i < 3; i++) box(0.3, 2.8, 1.7, s2 * 7.55, P + 2.8, MZ - 4 + i * 4, glow);
+    box(3.4, 5.2, 0.3, 0, P + 1, MZ + 6.56, glow);
+    // the porch: four pillars carrying a little stepped roof
+    for (const x of [-3.2, 3.2]) for (const z of [13.6, 16.4]) { box(0.95, 0.5, 0.95, x, P, z, sand); put(new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.42, 5.4, 10), ivory), x, P + 3.2, z); box(1.05, 0.6, 1.05, x, P + 5.9, z, sand); }
+    box(9, 0.6, 5.2, 0, P + 6.5, 15, sand); stepped(8.4, 4.8, P + 7.1, 15, 3);
+    // the four corner shrines of the panchayatana, each with its own shikhara and lit doorway
+    for (const x of [-15.5, 15.5]) for (const z of [-12, 11]) {
+      box(7.4, 1, 7.4, x, P, z, sand); box(6, 5.6, 6, x, P + 1, z); box(6.8, 0.6, 6.8, x, P + 6.6, z, sand);
+      put(shikhara(6, 12.5, ivory, gold, 8), x, P + 7.2, z);
+      box(1.6, 3.2, 0.3, x, P + 1, z + 3.06, glow);
     }
-    const tower = shikhara(9, 30, ivory, gold, 10); tower.position.set(0, 4.8, -12); g.add(tower);
-    for (let i = 0; i < 7; i++) arch(-9 + i * 3, 7.5, 7.1);
     const halo = this.palaceHalo = new THREE.Sprite(new THREE.SpriteMaterial({ map: softDot(), color: new THREE.Color(1.0, 0.78, 0.45), transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
-    halo.scale.set(90, 90, 1); halo.position.set(0, 30, -6); g.add(halo);
+    halo.scale.set(90, 90, 1); halo.position.set(0, 30, -4); g.add(halo);
+    void spire;
   }
 
   // ------------------------------------------------------------ cascades and hill temples
@@ -314,19 +438,30 @@ export class Scenery {
       const m = new THREE.Mesh(g, mat); m.renderOrder = 3; this.group.add(m);
     }
   }
-  // smaller temples on the far hills: a terrace, a tower, a domed hall and a lit doorway, glowing at dusk
+  // smaller temples: a terrace, a curvilinear tower, a hall under a stepped roof, two little shrines and lit doorways,
+  // glowing at dusk. Those on the far hills stand high enough to be seen over the ridges; the one on the escarpment
+  // stands on the plateau just back from its rim.
   _hillTemples() {
-    const ivory = new THREE.MeshStandardMaterial({ color: '#f1e1c6', roughness: 0.8 }), gold = new THREE.MeshStandardMaterial({ color: '#e6b85c', metalness: 0.6, roughness: 0.4 });
-    for (const [a, r, sc] of HILL_TEMPLES) {
-      const h = this.ridgeAbove(r, a), g = new THREE.Group(); g.position.set(Math.cos(a) * r, h + 1, Math.sin(a) * r); g.rotation.y = Math.atan2(-g.position.x, -g.position.z); g.scale.setScalar(sc * 1.4); this.group.add(g);
-      const box = (w, hh, d, x, y, z, m = ivory) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, hh, d), m); b.position.set(x, y + hh / 2, z); g.add(b); };
-      box(24, 4, 18, 0, -3, 0); box(25, 0.6, 19, 0, 1, 0, gold);
+    const ivory = new THREE.MeshStandardMaterial({ color: '#f1e1c6', roughness: 0.8 }), sand = new THREE.MeshStandardMaterial({ color: '#d8b98e', roughness: 0.85 });
+    const gold = new THREE.MeshStandardMaterial({ color: '#e6b85c', metalness: 0.6, roughness: 0.4 });
+    for (const [a, r0, sc, onRim] of HILL_TEMPLES) {
+      const S = sc * 1.4, r = onRim ? rimR(a) + 13 * S : r0;
+      const h = onRim ? this._groundUnder(r, a, 12.5 * S, 9.5 * S) : this.ridgeAbove(r, a) + 1;
+      const g = new THREE.Group(); g.position.set(Math.cos(a) * r, h, Math.sin(a) * r); g.rotation.y = Math.atan2(-g.position.x, -g.position.z); g.scale.setScalar(S); this.group.add(g);
+      const box = (w, hh, d, x, y, z, m = ivory) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, hh, d), m); b.position.set(x, y + hh / 2, z); g.add(b); return b; };
+      const put = (o, x, y, z) => { o.position.set(x, y, z); g.add(o); return o; };
+      box(24, onRim ? 9 : 4, 18, 0, onRim ? -8 : -3, 0, sand); box(25, 0.6, 19, 0, 1, 0);
       for (let k = 0; k < 4; k++) box(6 - k * 0.6, 0.5, 1.2, 0, -3 + k * 1, 9.2 + k * 0.4);                     // steps up to the terrace
-      box(10, 5, 8, 0, 1.6, 2.5); const dm = new THREE.Mesh(new THREE.SphereGeometry(3.4, 18, 9, 0, Math.PI * 2, 0, Math.PI / 2), ivory); dm.scale.y = 1.2; dm.position.set(0, 6.6, 2.5); g.add(dm);
+      // the hall, under a stepped roof with an amalaka and kalasha on top
+      box(10.6, 0.6, 8.6, 0, 1.6, 2.5, sand); box(10, 5, 8, 0, 2.2, 2.5); box(10.8, 0.5, 8.8, 0, 7.2, 2.5, sand);
+      let y = 7.7; for (let k = 0; k < 4; k++) { const f = 1 - k / 4.6; box(10 * f + 0.3, 0.22, 8 * f + 0.3, 0, y, 2.5, sand); box(10 * f, 0.7, 8 * f, 0, y + 0.22, 2.5); y += 0.92; }
+      const am = put(amalaka(1.0, gold), 0, y + 0.45, 2.5); am.scale.y = 1.3; put(kalasha(1.1, gold), 0, y + 0.9, 2.5);
       const tower = shikhara(6.5, 15, ivory, gold, 8); tower.position.set(0, 1.6, -4.5); g.add(tower);
-      for (const s2 of [-1, 1]) { box(2.4, 2.6, 2.4, s2 * 8.5, 1.6, 5); const d2 = new THREE.Mesh(new THREE.SphereGeometry(1.3, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), gold); d2.position.set(s2 * 8.5, 4.2, 5); g.add(d2); }
-      box(2.2, 3.2, 0.3, 0, 1.6, 6.55, this.palaceGlow);
-      for (const s2 of [-1, 1]) box(0.8, 1.8, 0.3, s2 * 3, 2.4, 6.55, this.palaceGlow);
+      put(kalasha(1.6, gold), 0, 1.6 + 15 + 0.8, -4.5);
+      // two little shrines on the front corners of the terrace, each with a small spire
+      for (const s2 of [-1, 1]) { box(2.4, 2.6, 2.4, s2 * 8.5, 1.6, 5); box(2.8, 0.3, 2.8, s2 * 8.5, 4.2, 5, sand); put(shikhara(2.2, 4.4, ivory, gold, 5), s2 * 8.5, 4.5, 5); }
+      box(2.2, 3.2, 0.3, 0, 2.2, 6.55, this.palaceGlow);
+      for (const s2 of [-1, 1]) box(0.8, 1.8, 0.3, s2 * 3, 3.0, 6.55, this.palaceGlow);
       const halo = new THREE.Sprite(this.palaceHalo.material); halo.scale.set(46, 46, 1); halo.position.set(0, 12, -2); g.add(halo);
     }
   }
@@ -447,6 +582,7 @@ export class Scenery {
     this.uTime.value = t * motion;
     this.followers.position.set(focus.x, 0, focus.z);
     for (const tex of this.fallTex) tex.offset.y = (t * (tex === this.fallTex[0] ? 0.55 : 0.8)) % 1;
+    if (this.templeFlag) { const k = t * motion; this.templeFlag.rotation.y = 0.35 + Math.sin(k * 1.3) * 0.22 + Math.sin(k * 3.1) * 0.08; this.templeFlag.scale.x = 0.94 + Math.sin(k * 2.2) * 0.06; }
     // tint by time of day
     const day = 1 - tod.night;
     this.cloudMat.color.copy(tod.cloud); this.cloudMat.opacity = 0.35 + 0.55 * day; this.bankMat.color.copy(tod.cloud); this.bankMat.opacity = 0.3 + 0.5 * day;
