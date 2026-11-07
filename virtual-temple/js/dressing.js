@@ -187,10 +187,10 @@ export function dressWorld(world, temples, HUT) {
   // ---------------------------------------------------------------- ground cover
   // moss and tiny flowers creeping in from the path edges, lying flat in the joints, and little sprigs standing up beside the curbs
   const mossTex = (() => { const N = 256, cvs = document.createElement('canvas'); cvs.width = cvs.height = N; const x = cvs.getContext('2d'); const rr = rnd(91);
-    for (let i = 0; i < 70; i++) { const a = rr() * Math.PI * 2, d = Math.sqrt(rr()) * N * 0.36, px = N / 2 + Math.cos(a) * d, py = N / 2 + Math.sin(a) * d * 0.7, r0 = 6 + rr() * 16;
-      x.fillStyle = ['#4f7a2e', '#5f8a34', '#3f6a28', '#6d9a3c'][Math.floor(rr() * 4)]; x.globalAlpha = 0.85; x.beginPath(); x.ellipse(px, py, r0, r0 * (0.6 + rr() * 0.4), rr() * 3, 0, Math.PI * 2); x.fill(); }
-    x.globalAlpha = 1;
-    for (let i = 0; i < 26; i++) { const a = rr() * Math.PI * 2, d = Math.sqrt(rr()) * N * 0.32, px = N / 2 + Math.cos(a) * d, py = N / 2 + Math.sin(a) * d * 0.7, col = ['#ffffff', '#fff2a8', '#f6a8c4', '#c8b4f0'][Math.floor(rr() * 4)];
+    // a ragged strip of small moss dabs, thickest along its middle line, running the length of the tile
+    for (let i = 0; i < 420; i++) { const px = 6 + rr() * (N - 12), edge = Math.min(px, N - px) / (N * 0.5), spread = N * 0.2 * Math.pow(edge, 0.5), py = N / 2 + (rr() + rr() - 1) * spread + Math.sin(px * 0.05) * 8, r0 = 2.5 + rr() * 5.5;
+      x.fillStyle = ['#7a9a3e', '#8aaa48', '#6a8a36', '#9ab35a', '#5f7f32'][Math.floor(rr() * 5)]; x.beginPath(); x.ellipse(px, py, r0, r0 * (0.55 + rr() * 0.4), rr() * 3, 0, Math.PI * 2); x.fill(); }
+    for (let i = 0; i < 22; i++) { const px = 20 + rr() * (N - 40), py = N / 2 + (rr() - 0.5) * N * 0.22, col = ['#ffffff', '#fff2a8', '#f6a8c4', '#c8b4f0'][Math.floor(rr() * 4)];
       for (let k = 0; k < 5; k++) { const pa = k / 5 * Math.PI * 2; x.fillStyle = col; x.beginPath(); x.ellipse(px + Math.cos(pa) * 3, py + Math.sin(pa) * 3, 2.6, 1.6, pa, 0, Math.PI * 2); x.fill(); }
       x.fillStyle = '#f2b81e'; x.beginPath(); x.arc(px, py, 1.6, 0, Math.PI * 2); x.fill(); }
     const t = new THREE.CanvasTexture(cvs); t.colorSpace = THREE.SRGBColorSpace; return t; })();
@@ -199,15 +199,15 @@ export function dressWorld(world, temples, HUT) {
   for (const [cx, cz, w, d] of STRIPS) {
     const alongZ = d > w, len = alongZ ? d : w, half = (alongZ ? w : d) / 2;
     for (let i = 0; i < len * (low ? 0.6 : 1.3); i++) {
-      const along = (alongZ ? cz : cx) + (r() - 0.5) * len, off = (half - 0.12 - Math.pow(r(), 2) * 0.9) * (r() < 0.5 ? -1 : 1);
+      const along = (alongZ ? cz : cx) + (r() - 0.5) * len, off = (half - 0.1 - Math.pow(r(), 3) * 0.45) * (r() < 0.5 ? -1 : 1);   // creeping in from the curb
       const [x, z] = alongZ ? [cx + off, along] : [along, cz + off];
       if (Math.abs(z - GATE_Z) < 1.6 || Math.hypot(x, z) < 13) continue;
-      mossSpots.push([x, z, 0.35 + r() * 0.5]);
+      mossSpots.push([x, z, 0.7 + r() * 1.0, alongZ ? Math.PI / 2 : 0]);
     }
   }
-  for (let i = 0; i < (low ? 30 : 70); i++) { const a = r() * Math.PI * 2, rr2 = 12.6 - r() * 0.6; mossSpots.push([Math.cos(a) * rr2, Math.sin(a) * rr2, 0.3 + r() * 0.4]); }
+  for (let i = 0; i < (low ? 30 : 70); i++) { const a = r() * Math.PI * 2, rr2 = 12.55 - Math.pow(r(), 3) * 0.4; mossSpots.push([Math.cos(a) * rr2, Math.sin(a) * rr2, 0.6 + r() * 0.8, -a - Math.PI / 2]); }   // along the rim
   const moss = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), mossMat, mossSpots.length);
-  mossSpots.forEach(([x, z, sc], i) => { m.compose(new THREE.Vector3(x, 0.033, z), q.setFromAxisAngle(up, r() * 6.3), new THREE.Vector3(sc * (1 + r() * 0.6), 1, sc)); moss.setMatrixAt(i, m); moss.setColorAt(i, c.setScalar(0.85 + r() * 0.3)); });
+  mossSpots.forEach(([x, z, sc, rot], i) => { m.compose(new THREE.Vector3(x, 0.033, z), q.setFromAxisAngle(up, rot + (r() - 0.5) * 0.25), new THREE.Vector3(sc, 1, 0.45 + r() * 0.3)); moss.setMatrixAt(i, m); moss.setColorAt(i, c.setScalar(0.9 + r() * 0.25)); });
   moss.receiveShadow = true; S.add(moss);
   const sprigTex = (() => { const W = 128, H = 128, cvs = document.createElement('canvas'); cvs.width = W; cvs.height = H; const x = cvs.getContext('2d'); const rr = rnd(17);
     for (let i = 0; i < 26; i++) { const bx = 14 + rr() * 100, h = 40 + rr() * 70, lean = (rr() - 0.5) * 26; x.strokeStyle = ['#4f8a34', '#5f9a3c', '#3f7a2c'][i % 3]; x.lineWidth = 2.5 + rr() * 2; x.beginPath(); x.moveTo(bx, H); x.quadraticCurveTo(bx + lean * 0.3, H - h * 0.6, bx + lean, H - h); x.stroke(); }
