@@ -1045,7 +1045,7 @@ function updateWorld(dt, t, ctx) {
       $('enterBtn').textContent = 'Receive prasad'; $('prompt').classList.add('on');
     } else $('prompt').classList.remove('on');
     // stepping out of the prasad line
-    if (world.prasad && world.prasad.has(me.avatar) && !input.auto.length) { const slot = PRASAD.slot(world.prasad.position(me.avatar)); if (p.distanceTo(slot) > 1.6) world.prasad.leave(me.avatar); }
+    if (world.prasad && world.prasad.has(me.avatar) && !input.auto.length) { const slot = PRASAD.slot(world.prasad.position(me.avatar)); if (p.distanceTo(slot) > 1.6) { world.prasad.leave(me.avatar); toast('You step out of the line', 1600); } }
     if ($('map').classList.contains('on') && Math.floor(t * 10) % 3 === 0) drawMap();
   }
   if (tapMarker && tapMarker.visible) { tapMarker.userData.t += dt; const k = tapMarker.userData.t; tapMarker.scale.setScalar(1 + k * 1.5); tapMarker.material.opacity = Math.max(0, 1 - k * 1.4); if (k > 0.8) tapMarker.visible = false; }

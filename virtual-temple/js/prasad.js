@@ -92,7 +92,11 @@ class PrasadCounter {
   get length() { return this.queue.length; }
   has(avatar) { return this.queue.some((q) => q.avatar === avatar); }
   // join the line: { player, onMove(slot), done() }
-  join(avatar, opts = {}) { if (this.has(avatar)) return; this.queue.push({ avatar, ...opts, slot: -1 }); }
+  join(avatar, opts = {}) {
+    if (this.has(avatar)) return;
+    const q = { avatar, ...opts, slot: this.queue.length }; this.queue.push(q);
+    if (q.player && q.onMove) q.onMove(PRASAD.slot(q.slot));   // set off for your place at once
+  }
   leave(avatar) { const i = this.queue.findIndex((q) => q.avatar === avatar); if (i < 0) return; if (this.serving && this.serving.q.avatar === avatar) this.serving = null; this.queue.splice(i, 1); }
   position(avatar) { return this.queue.findIndex((q) => q.avatar === avatar); }
   update(dt, t) {

@@ -681,7 +681,7 @@ export class World {
 
   _npcPlan(npc) {
     const dests = ['ganesha', 'shiva', 'krishna', 'pondW', 'pondE', 'gSW', 'gNE', 'gSE', 'gNW', 'cSE', 'cNW', 'gateIn'];
-    const goal = this.prasad && this.prasad.length < 4 && Math.random() < 0.16 ? 'prasad' : dests[Math.floor(Math.random() * dests.length)];
+    const goal = this.prasad && this.prasad.length < 3 && Math.random() < 0.07 ? 'prasad' : dests[Math.floor(Math.random() * dests.length)];
     npc.goal = goal; npc.path = this.route(npc.avatar.root.position, goal).map(p => p.add(new THREE.Vector3((Math.random() - 0.5) * 2.2, 0, (Math.random() - 0.5) * 2.2)));
   }
 
@@ -768,7 +768,8 @@ export class World {
       if (npc.wait > 0) { npc.wait -= dt; av.speed = 0; if (npc.wait <= 0) { av.setState('idle'); this._npcPlan(npc); } }
       else if (npc.path.length) {
         const tgt = npc.path[0]; const d = new THREE.Vector3(tgt.x - p.x, 0, tgt.z - p.z); const dist = d.length();
-        if (dist < 0.4 && !npc.path[1] && npc.goal === 'prasad' && this.prasad) { npc.path.length = 0; npc.queued = true; this.prasad.join(av, { done: () => { npc.queued = false; npc.goal = null; npc.wait = 1.2 + Math.random() * 1.5; } }); }
+        if (dist < 0.4 && !npc.path[1] && npc.goal === 'prasad' && this.prasad && this.prasad.length >= 4) { npc.path.length = 0; npc.goal = null; npc.wait = 1 + Math.random() * 2; }   // the line is long: come back later
+        else if (dist < 0.4 && !npc.path[1] && npc.goal === 'prasad' && this.prasad) { npc.path.length = 0; npc.queued = true; this.prasad.join(av, { done: () => { npc.queued = false; npc.goal = null; npc.wait = 1.2 + Math.random() * 1.5; } }); }
         else if (dist < 0.4) { npc.path.shift(); if (!npc.path.length) { const atShrine = TEMPLES[npc.goal]; npc.wait = atShrine ? 5 + Math.random() * 6 : 2 + Math.random() * 6; av.setState(atShrine ? 'namaste' : 'idle'); if (atShrine) { const dir = atShrine.pos.clone().sub(p); av.root.rotation.y = Math.atan2(dir.x, dir.z); } } }
         else {
           // yield to the player when close in front
