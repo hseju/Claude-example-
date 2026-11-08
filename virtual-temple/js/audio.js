@@ -685,6 +685,37 @@ export class TempleAudio {
     if (!this._guide) { this._guide = this.ctx.createGain(); this._guide.gain.value = 1; this._guide.connect(this.buses.effects); this._send(this._guide, { hall: 0.25 }); }
     return this._guide;
   }
+  // the recorded voice of the meditation guide: small clips fetched ahead of time, decoded when spoken, played straight to
+  // the output (the guide's own volume sets the level) with a breath of the hut's warmth around them
+  fetchClip(file) {
+    this._clipBytes = this._clipBytes || {};
+    if (!this._clipBytes[file]) this._clipBytes[file] = fetch(file).then((r) => (r.ok ? r.arrayBuffer() : null)).catch(() => null);
+    return this._clipBytes[file];
+  }
+  // lines queue one after another like a speaking voice; a short cue that would come late is dropped instead
+  async playClip(file, volume = 1, { droppable = false } = {}) {
+    if (!this.ctx) return;
+    const ctx = this.ctx, gen = this._clipGen = (this._clipGen || 0);
+    this._clipBufs = this._clipBufs || {}; this._clips = this._clips || new Set();
+    let buf = this._clipBufs[file];
+    if (!buf) {
+      const bytes = await this.fetchClip(file); if (!bytes) return;
+      try { buf = await ctx.decodeAudioData(bytes.slice(0)); } catch (e) { return; }
+      if (buf.duration < 3) this._clipBufs[file] = buf;   // short cues ("Breathe in") come round again and again
+    }
+    if (gen !== this._clipGen) return;   // stopped while it was loading
+    if (!this._voice) { this._voice = ctx.createGain(); this._voice.connect(this.out); this._send(this._voice, { hall: 0.08 }); }
+    const at = Math.max(ctx.currentTime + 0.02, this._clipEnd || 0);
+    if (droppable && at - ctx.currentTime > 1.2) return;
+    const src = ctx.createBufferSource(), g = ctx.createGain(); src.buffer = buf; g.gain.value = 1.35 * volume;
+    src.connect(g).connect(this._voice); src.start(at); this._clipEnd = at + buf.duration + 0.15;
+    this._clips.add(src); src.onended = () => this._clips.delete(src);
+  }
+  stopClips() {
+    this._clipGen = (this._clipGen || 0) + 1; this._clipEnd = 0;
+    for (const s of this._clips || []) { try { s.stop(); } catch (e) {} }
+    this._clips && this._clips.clear();
+  }
   // a singing bowl: inharmonic partials in slowly beating pairs, with a soft strike
   bowl(strength = 1, when = 0, pitch = 1) {
     if (!this.ctx) return;

@@ -2,8 +2,11 @@
 //
 // A session is a timeline of events (spoken lines, breath phases, singing bowls, chanted Om) that a small
 // clock plays through; the hut UI reads `session.state` every frame to draw the breathing light and captions.
-// Guidance is spoken with the browser's own speech voices (Web Speech API), so it works offline and costs
-// nothing; a recorded narration can replace any script through audio/manifest.json ("guided": { id: file }).
+// Guidance is spoken by a recorded voice: every line below is pre-rendered to a small clip in audio/voice/ (see
+// audio/voice/index.json, keyed by voiceKey(text)), played through Web Audio so it is heard on every device, including
+// in-app browsers that have no speech voices. The browser's own voices (Web Speech API) remain as an option, and fill
+// in for any line without a clip. A full narration can still replace a script through audio/manifest.json
+// ("guided": { id: file }).
 // All scripts here are original to this project.
 
 // ---------------------------------------------------------------- breathwork
@@ -177,8 +180,11 @@ export const TIMER = { id: 'timer', icon: 'timer', name: 'Silent sitting', tag: 
 // ---------------------------------------------------------------- spoken guidance
 export class Guide {
   constructor() {
-    this.ok = typeof window !== 'undefined' && 'speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined';
+    this.ok = typeof window !== 'undefined' && !!window.speechSynthesis && typeof SpeechSynthesisUtterance !== 'undefined';
     this.voiceURI = null; this.rate = 0.88; this.pitch = 0.98; this.volume = 1; this.muted = false; this.onCaption = null;
+    this.audio = null;          // the TempleAudio that plays the recorded clips
+    this.clips = null;          // { key: { file, dur } } from audio/voice/index.json
+    this.useRecorded = true;    // false when a device voice has been chosen instead
     this._list = [];
     if (this.ok) { const load = () => { this._list = speechSynthesis.getVoices(); }; load(); speechSynthesis.addEventListener?.('voiceschanged', load); }
   }
@@ -190,10 +196,18 @@ export class Guide {
     return this._list.filter(v => /^en/i.test(v.lang || '')).sort((a, b) => score(b) - score(a));
   }
   get voice() { const vs = this.voices(); return vs.find(v => v.voiceURI === this.voiceURI) || vs[0] || null; }
+  async loadClips(url = 'audio/voice/index.json') { try { const r = await fetch(url); if (r.ok) this.clips = await r.json(); } catch (e) {} return !!this.clips; }
+  get hasRecorded() { return !!this.clips; }
+  _clip(text) { return this.useRecorded && this.clips ? this.clips[voiceKey(text)] || null : null; }
+  clipDur(text) { const c = this._clip(text); return c ? c.dur : null; }
+  prefetch(texts) { if (!this.audio) return; for (const t of new Set(texts)) { const c = this._clip(t); if (c) this.audio.fetchClip(c.file); } }
   unlock() { if (!this.ok) return; try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch (e) {} }   // iOS needs a first utterance from a tap
   say(text, { caption = true } = {}) {
     if (caption && this.onCaption) this.onCaption(text);
-    if (!this.ok || this.muted) return;
+    if (this.muted) return;
+    const c = this._clip(text);
+    if (c && this.audio && this.audio.ctx) { this.audio.playClip(c.file, this.volume, { droppable: !caption }); return; }   // breath cues (no caption) give way rather than lag
+    if (!this.ok) return;
     try {
       const u = new SpeechSynthesisUtterance(text); const v = this.voice;
       if (v) { u.voice = v; u.lang = v.lang; } else u.lang = 'en-IN';
@@ -201,8 +215,17 @@ export class Guide {
       speechSynthesis.speak(u);
     } catch (e) {}
   }
-  cancel() { if (this.ok) try { speechSynthesis.cancel(); } catch (e) {} }
+  cancel() { this.audio?.stopClips?.(); if (this.ok) try { speechSynthesis.cancel(); } catch (e) {} }
 }
+// lines the session speaks besides the scripts above (each has a recorded clip too)
+export const EXTRA_LINES = {
+  sitStart: 'Let us sit together in silence. I will ring the bell when the time is complete.',
+  sitEnd: 'The time is complete. Gently open your eyes.',
+  halfway: 'Halfway. Keep going, gently.',
+  test: 'Breathe in, slowly. And let it go.',
+};
+// the key a line's recorded clip is filed under: a 32-bit FNV-1a hash of its exact text
+export function voiceKey(text) { let h = 0x811c9dc5; for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(16).padStart(8, '0'); }
 // rough speaking time, so lines never overlap
 const speakTime = (text, rate = 0.88) => 0.6 + text.split(/\s+/).length / (2.55 * rate) + (text.match(/[,.;:]/g) || []).length * 0.25;
 
@@ -217,7 +240,7 @@ export class Session {
     this._build();
     this.total = this.events.length ? Math.max(...this.events.map(e => e.t + (e.dur || 0))) : this.minutes * 60;
   }
-  _say(t, text, opts = {}) { this.events.push({ t, type: 'say', text, ...opts }); return t + speakTime(text, this.guide?.rate); }
+  _say(t, text, opts = {}) { this.events.push({ t, type: 'say', text, ...opts }); return t + (this.guide?.clipDur?.(text) ?? speakTime(text, this.guide?.rate)); }
   _build() {
     const E = this.events, speak = this.voiceMode !== 'tones';
     if (this.kind === 'meditation') {
@@ -232,10 +255,10 @@ export class Session {
     if (this.kind === 'timer') {
       const len = this.minutes * 60;
       E.push({ t: 0, type: 'bowl' });
-      this._say(2, 'Let us sit together in silence. I will ring the bell when the time is complete.', { quiet: !speak });
+      this._say(2, EXTRA_LINES.sitStart, { quiet: !speak });
       for (let m = 5; m < this.minutes; m += 5) E.push({ t: m * 60, type: 'bowl', s: 0.55 });
       E.push({ t: len - 5, type: 'bowl' }, { t: len - 2.5, type: 'bowl', s: 0.8 });
-      this._say(len - 1, 'The time is complete. Gently open your eyes.', { quiet: !speak });
+      this._say(len - 1, EXTRA_LINES.sitEnd, { quiet: !speak });
       E.push({ t: len + 4, type: 'end' });
       return;
     }
@@ -257,12 +280,16 @@ export class Session {
       // encouragement in "guide" mode, placed during a long phase so it does not crowd the cues
       if (this.voiceMode === 'guide' && ct > tipAt && c < cycles - 3 && tips.length) { E.push({ t: ct - cycleLen + 0.4, type: 'say', text: tips.shift(), tip: true }); tipAt = ct + cycleLen * 6; }
     }
-    if (this.voiceMode !== 'tones' && cycles > 8) { const half = start + Math.floor(cycles / 2) * cycleLen; E.push({ t: half + 0.3, type: 'say', text: 'Halfway. Keep going, gently.', tip: true }); }
+    if (this.voiceMode !== 'tones' && cycles > 8) { const half = start + Math.floor(cycles / 2) * cycleLen; E.push({ t: half + 0.3, type: 'say', text: EXTRA_LINES.halfway, tip: true }); }
     let tc = ct + 1;
     for (const line of this.def.close) tc = this._say(tc, line, { quiet: !speak }) + 0.8;
     E.push({ t: tc + 1, type: 'bowl' }, { t: tc + 3.5, type: 'bowl', s: 0.7 }, { t: tc + 7, type: 'end' });
   }
-  start() { this.running = true; this.events.sort((a, b) => a.t - b.t); this._fire(); }
+  start() {
+    this.running = true; this.events.sort((a, b) => a.t - b.t);
+    if (this.voiceMode !== 'tones' || this.kind === 'meditation') this.guide?.prefetch?.(this.events.flatMap((e) => e.type === 'say' && !e.quiet ? [e.text] : e.cue ? [e.cue] : []));   // the clips are on hand before they are needed
+    this._fire();
+  }
   pause() { this.running = false; this.guide?.cancel(); }
   resume() { this.running = true; }
   stop() { this.running = false; this.done = true; this.guide?.cancel(); }

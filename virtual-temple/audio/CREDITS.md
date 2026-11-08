@@ -58,3 +58,9 @@ Solo flute alapanas (free, unmetered raga exposition, no percussion) from one li
 | `bell-ghanta.mp3` | One strike of a brass ghanta, the bell of Hindu worship, from [ghanta leather mallet 2015-05-16](https://commons.wikimedia.org/wiki/File:274316_the-very-real-horst_ghanta-leather-mallet-2015-05-16.wav) (24.9–31.9 s), used for every bell in the temple: the hall bells, the gateway bells and the aarti hand bell, each played at its own pitch | the-very-real-horst (via Freesound, sound 274316) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 
 Every bell plays the recorded ghanta above (synthesised only if the file cannot load). The conch, footsteps, the diya, flowers and abhishek are synthesised in the browser.
+
+## Meditation guide voice
+
+| Files | Made with | Licence |
+| --- | --- | --- |
+| `voice/*.mp3` (179 lines, listed in `voice/index.json`) | Synthesised for this project from its own original scripts (`js/practice.js`) with [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) (model weights from the npm package `kokoro-q8-shards`, a byte-identical copy of `onnx-community/Kokoro-82M-v1.0-ONNX` `model_quantized.onnx`; voice `af_heart` from the npm package `kokoro-js`), run with `kokoro-onnx` | Kokoro-82M and its voices are [Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0); the scripts are original to this project |

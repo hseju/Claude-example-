@@ -8,9 +8,9 @@ import { ProfileStore, storageAvailable } from './profile.js';
 import { PostFX } from './postfx.js';
 import { setAnisotropy } from './textures.js';
 import { setPBRAnisotropy } from './pbr.js';
-import { HUT } from './hut.js';
+import { HUT, hutFloor, hutInside } from './hut.js';
 import { PRASAD } from './prasad.js';
-import { BREATHWORK, MEDITATIONS, TIMER, Guide, Session, PracticeLog } from './practice.js';
+import { BREATHWORK, MEDITATIONS, TIMER, Guide, Session, PracticeLog, EXTRA_LINES } from './practice.js';
 import { meditatorSVG, MeditatorVisual } from './meditator.js';
 
 const $ = (id) => document.getElementById(id);
@@ -20,7 +20,7 @@ if (isTouch) document.body.classList.add('touch');
 // ---------------------------------------------------------------- settings & quality
 const profiles = new ProfileStore();
 const prefersReduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const settings = profiles.loadSettings({ quality: 'auto', tod: 'auto', incense: true, reducedMotion: prefersReduced, master: 80, ambience: 70, effects: 85, ceremony: 80, muted: false, musicStyle: 'auto', guideMode: 'guide', voiceURI: '', practiceBg: 'auto', breathTones: true });
+const settings = profiles.loadSettings({ quality: 'auto', tod: 'auto', incense: true, reducedMotion: prefersReduced, master: 80, ambience: 70, effects: 85, ceremony: 80, muted: false, musicStyle: 'auto', guideMode: 'guide', voiceURI: '', guideVoice: 'recorded', practiceBg: 'auto', breathTones: true });
 const dpr = window.devicePixelRatio || 1;
 function qualityPreset(q) {
   if (q === 'auto') q = 'high';   // the app is made for phones: they get the full look by default
@@ -446,12 +446,19 @@ function goTo(id) {
   const D = DEST(id); if (!D) return;
   audio.uiTap();
   input.auto = world.route(me.avatar.root.position, id).slice(1);
-  if (input.auto.length === 0 || me.avatar.root.position.distanceTo(D.entrance) < 2) { input.auto = []; if (id === 'hut') enterHut(); else if (id === 'prasad') receivePrasad(); else enterTemple(id); return; }
+  if (input.auto.length === 0 || me.avatar.root.position.distanceTo(D.entrance) < 2 || (id === 'hut' && inHut())) { input.auto = []; if (id === 'hut') hutDoor(); else if (id === 'prasad') receivePrasad(); else enterTemple(id); return; }
   app.arriveShrine = id;
   $('map').classList.remove('on'); $('mapBtn').setAttribute('aria-pressed', 'false');
   toast(`Walking to the ${D.name.toLowerCase().startsWith('meditation') ? 'meditation hut' : id === 'prasad' ? 'prasad centre' : D.name}`, 2000);
 }
-function nearHut() { return HUT.entrance.distanceTo(me.avatar.root.position) < 2.8; }
+function nearHut() { const p = me.avatar.root.position; return HUT.entrance.distanceTo(p) < 2.8 || hutInside(p.x, p.z); }
+const inHut = () => { const p = me.avatar.root.position; return hutInside(p.x, p.z); };
+// walk in through the door: up the steps, across the porch, and onto the floor just behind the centre cushion
+function walkIntoHut() {
+  if (app.mode !== 'world') return;
+  input.auto = [HUT.toWorld(0, 0, 6.2), HUT.toWorld(0, 0, 4.6), HUT.toWorld(0, 0, 2.9), HUT.inside.clone().setY(0)]; app.arriveShrine = null; app.hutArrive = true;
+}
+const hutDoor = () => (inHut() ? enterHut() : walkIntoHut());
 function nearPrasad() { return world.prasad && PRASAD.front.distanceTo(me.avatar.root.position) < 3.2; }
 function receivePrasad() {
   if (!world.prasad || world.prasad.has(me.avatar)) return;
@@ -486,7 +493,7 @@ function bindInput() {
       if (k === '+' || k === '=') zoom(-3); if (k === '-') zoom(3);
       if (k === 'm') toggleMap();
       if (k === 'p') worldPranam();
-      if (k === 'enter') { const T = nearShrine(); if (T) enterTemple(T.id); else if (nearHut()) enterHut(); }
+      if (k === 'enter') { const T = nearShrine(); if (T) enterTemple(T.id); else if (nearHut()) hutDoor(); }
     }
     if (app.mode === 'hall') { const map = { 1: 'namaste', 2: 'bell', 3: 'diya', 4: 'flowers', 5: 'incense', 6: 'abhishek', 7: 'pradakshina' }; if (map[k]) act(map[k]); if (k === 'q') look.tYaw += 0.4; if (k === 'e') look.tYaw -= 0.4; }
     if (k === 'escape') closeAllPanels();
@@ -541,7 +548,7 @@ function tap(x, y) {
 let tapMarker;
 function showTapMarker(p) {
   if (!tapMarker) { tapMarker = new THREE.Mesh(new THREE.RingGeometry(0.25, 0.36, 32), new THREE.MeshBasicMaterial({ color: '#ffd27a', transparent: true, depthWrite: false })); tapMarker.rotation.x = -Math.PI / 2; world.scene.add(tapMarker); }
-  tapMarker.position.copy(p).setY(0.06); tapMarker.userData.t = 0; tapMarker.visible = true;
+  tapMarker.position.copy(p).setY(hutFloor(p.x, p.z) + 0.06); tapMarker.userData.t = 0; tapMarker.visible = true;
 }
 
 // ---------------------------------------------------------------- UI wiring
@@ -593,7 +600,7 @@ function bindUI() {
   $('musicSeg').querySelectorAll('button').forEach(b => b.onclick = () => setMusicStyle(b.dataset.m));
   const hold = (id, fn) => { const b = $(id); let t; b.addEventListener('pointerdown', () => { fn(); t = setInterval(fn, 120); }); for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, () => clearInterval(t)); b.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') fn(); }); };
   hold('camLeft', () => (cam.tYaw += 0.12)); hold('camRight', () => (cam.tYaw -= 0.12)); hold('zoomIn', () => zoom(-1.5)); hold('zoomOut', () => zoom(1.5));
-  $('enterBtn').addEventListener('click', () => { const T = nearShrine(); if (T) enterTemple(T.id); else if (nearHut()) enterHut(); else if (nearPrasad()) receivePrasad(); });
+  $('enterBtn').addEventListener('click', () => { const T = nearShrine(); if (T) enterTemple(T.id); else if (nearHut()) hutDoor(); else if (nearPrasad()) receivePrasad(); });
   bindHut();
   $('pranamBtn').addEventListener('click', worldPranam);
   $('closeBtn').setAttribute('aria-pressed', 'true');
@@ -687,6 +694,13 @@ function drawMap() {
 
 // ---------------------------------------------------------------- meditation hut
 const guide = new Guide();
+guide.audio = audio; guide.loadClips().then(() => { if (app.mode === 'hut' && !$('hutPanel').hidden) renderVoices(); });
+// the recorded temple guide by default (heard on every device); or one of the device's own speech voices if chosen
+function applyGuideVoice() {
+  const v = settings.guideVoice || 'recorded';
+  guide.useRecorded = guide.hasRecorded && (v === 'recorded' || !guide.ok || !guide.voices().some((x) => x.voiceURI === v));
+  guide.voiceURI = guide.useRecorded || v === 'recorded' ? null : v;
+}
 const hutState = { view: 'altar', session: null, def: null, kind: null, tab: 'breathe', sel: { breathe: 'calm', meditate: 'breath', sit: 'timer' }, mins: {}, voiceOff: false, paused: false, wake: null, rec: null, ui: {}, pop: null };
 const HUT_ZONE = { entrance: 0, courtyard: 0, corridor: 0, dome: 0.15, garden: 0.9, ganesha: 0, shiva: 0, krishna: 0 };
 const VIEW_NAMES = { pov: 'Your view of the altar', altar: 'Facing the altar', face: 'Facing your devotee', wide: 'The whole hut', flame: 'Looking at the lamp', focus: 'Focus: the breathing figure' };
@@ -725,11 +739,11 @@ function leaveHut() {
   fadeThrough(() => {
     const av = me.avatar; av.setState('idle'); av.breath = null; av.root.visible = true;
     camera.clearViewOffset(); cam.hutLift = 0;
-    av.root.position.copy(HUT.entrance); av.root.rotation.y = HUT.rot;
+    av.root.position.copy(HUT.inside); av.root.rotation.y = HUT.seat.rotY;   // you stand up inside the hut, free to look round and walk out
     if (playerRing) playerRing.visible = true;
     $('doneCard').hidden = true; $('hutUI').classList.remove('insession');
     setMode('world');
-    cam.tYaw = cam.yaw = HUT.rot + Math.PI; cam.tDist = cam.dist = cam.eff = CLOSE_DIST; cam.tPitch = cam.pitch = 0.2; snapCamera();
+    cam.tYaw = cam.yaw = HUT.seat.rotY + Math.PI; cam.tDist = cam.dist = cam.eff = CLOSE_DIST; cam.tPitch = cam.pitch = 0.2; snapCamera();
   });
 }
 function showHutPanel() {
@@ -771,13 +785,17 @@ function renderDetail() {
   $('pBegin').onclick = () => startSession(kind, d.id);
 }
 function renderVoices() {
-  const sel = $('voicePick'), vs = guide.voices();
-  if (!guide.ok) { sel.innerHTML = '<option>Not available here</option>'; sel.disabled = true; $('voiceTest').disabled = true; $('voiceNote').textContent = 'This browser cannot speak, so captions and breath tones will guide you instead.'; return; }
-  const cur = settings.voiceURI && vs.some(v => v.voiceURI === settings.voiceURI) ? settings.voiceURI : vs[0]?.voiceURI;
-  const html = vs.length ? vs.slice(0, 24).map(v => `<option value="${escapeHtml(v.voiceURI)}"${v.voiceURI === cur ? ' selected' : ''}>${escapeHtml(v.name.replace(/^(Microsoft|Google)\s+/, ''))} · ${escapeHtml(v.lang)}</option>`).join('') : '<option>Default voice</option>';
+  const sel = $('voicePick'), vs = guide.ok ? guide.voices() : [];
+  applyGuideVoice();
+  const cur = guide.useRecorded ? 'recorded' : guide.voiceURI || vs[0]?.voiceURI;
+  const opts = (guide.hasRecorded ? [`<option value="recorded"${cur === 'recorded' ? ' selected' : ''}>Temple guide · recorded voice</option>`] : [])
+    .concat(vs.slice(0, 24).map(v => `<option value="${escapeHtml(v.voiceURI)}"${v.voiceURI === cur ? ' selected' : ''}>${escapeHtml(v.name.replace(/^(Microsoft|Google)\s+/, ''))} · ${escapeHtml(v.lang)}</option>`));
+  if (!opts.length && !guide.ok) { sel.innerHTML = '<option>Not available here</option>'; sel.disabled = true; $('voiceTest').disabled = true; $('voiceNote').textContent = 'The guide\'s voice could not be loaded, so captions and breath tones will guide you instead.'; return; }
+  const html = opts.length ? opts.join('') : '<option>Default voice</option>';
   if (sel.dataset.html !== html) { sel.innerHTML = html; sel.dataset.html = html; }
-  sel.disabled = !vs.length;
-  $('voiceNote').textContent = 'Voices come from your device. Ones marked Natural, Neural or Enhanced, or English (India), usually sound calmest.';
+  sel.disabled = opts.length < 2; $('voiceTest').disabled = false;
+  $('voiceNote').textContent = guide.hasRecorded ? (vs.length ? 'The recorded guide plays on every device. You can also choose one of your device\'s own voices.' : 'A calm recorded voice guides every practice.')
+    : 'Voices come from your device. Ones marked Natural, Neural or Enhanced, or English (India), usually sound calmest.';
 }
 function sessionBg() { return settings.practiceBg === 'auto' ? (hutState.kind === 'breath' ? 'nature' : 'music') : settings.practiceBg; }
 function applySessionMix() {
@@ -786,8 +804,8 @@ function applySessionMix() {
 }
 function startSession(kind, id) {
   const def = practiceDef(kind, id); if (!def) return;
-  startAudioOnce(); guide.unlock();
-  guide.voiceURI = settings.voiceURI || null; guide.volume = hutState.voiceVol ?? Math.max(0.25, settings.master / 100); guide.muted = settings.muted || hutState.voiceOff;
+  startAudioOnce(); applyGuideVoice(); if (!guide.useRecorded) guide.unlock();
+  guide.volume = hutState.voiceVol ?? Math.max(0.25, settings.master / 100); guide.muted = settings.muted || hutState.voiceOff;
   guide.onCaption = showCaption;
   const minutes = hutState.mins[def.id] ?? (kind === 'meditation' ? def.min : def.def);
   const recorded = audio.manifest?.guided?.[def.id] || null;
@@ -921,8 +939,8 @@ function bindHut() {
   $('voiceMode').querySelectorAll('button').forEach(b => b.onclick = () => { settings.guideMode = b.dataset.v; persist(); renderHutPanel(); });
   $('bgMode').querySelectorAll('button').forEach(b => b.onclick = () => { settings.practiceBg = b.dataset.b; persist(); renderHutPanel(); });
   $('tTones').onclick = () => { settings.breathTones = !settings.breathTones; persist(); renderHutPanel(); };
-  $('voicePick').onchange = (e) => { settings.voiceURI = e.target.value; persist(); };
-  $('voiceTest').onclick = () => { guide.voiceURI = settings.voiceURI || null; guide.volume = Math.max(0.25, settings.master / 100); guide.muted = false; guide.cancel(); guide.say('Breathe in, slowly. And let it go.', { caption: false }); };
+  $('voicePick').onchange = (e) => { settings.guideVoice = e.target.value; persist(); applyGuideVoice(); };
+  $('voiceTest').onclick = () => { startAudioOnce(); applyGuideVoice(); if (!guide.useRecorded) guide.unlock(); guide.volume = hutState.voiceVol ?? Math.max(0.25, settings.master / 100); guide.muted = false; guide.cancel(); guide.say(EXTRA_LINES.test, { caption: false }); };
   if (guide.ok && 'speechSynthesis' in window) speechSynthesis.addEventListener?.('voiceschanged', () => { if (app.mode === 'hut' && !$('hutPanel').hidden) renderVoices(); });
   $('sPause').onclick = togglePause;
   $('sBack').onclick = () => endSession();
@@ -1011,7 +1029,8 @@ function updateWorld(dt, t, ctx) {
       const d = fw.multiplyScalar(f).add(rt.multiplyScalar(r)); const l = Math.min(1, d.length()); d.normalize().multiplyScalar(l); mx = d.x; mz = d.z;
     } else if (input.auto.length) {
       const tgt = input.auto[0]; const d = new THREE.Vector3(tgt.x - p.x, 0, tgt.z - p.z); const dist = d.length();
-      if (dist < 0.35) { input.auto.shift(); if (!input.auto.length && app.arriveShrine) { const id = app.arriveShrine; app.arriveShrine = null; const T = DEST(id); const dir = T.pos.clone().sub(p); av.root.rotation.y = Math.atan2(dir.x, dir.z); } }
+      if (dist < 0.35) { input.auto.shift(); if (!input.auto.length && app.arriveShrine) { const id = app.arriveShrine; app.arriveShrine = null; if (id === 'hut') walkIntoHut(); else { const T = DEST(id); const dir = T.pos.clone().sub(p); av.root.rotation.y = Math.atan2(dir.x, dir.z); } }
+        else if (!input.auto.length && app.hutArrive) { app.hutArrive = false; av.root.rotation.y = HUT.seat.rotY; cam.tYaw = lerpAngle(cam.yaw, HUT.seat.rotY + Math.PI, 1); toast('Inside the Dhyana Kutir. Sit on the centre cushion when you are ready', 3200); } }
       else { d.normalize(); const sl = Math.min(1, dist / 0.8 + 0.3); mx = d.x * sl; mz = d.z * sl; }
     }
   }
@@ -1027,6 +1046,7 @@ function updateWorld(dt, t, ctx) {
     if (input.auto.length && moved < 0.3) { input.stuck = (input.stuck || 0) + dt; if (input.stuck > 0.6) { input.auto.shift(); input.stuck = 0; } } else input.stuck = 0;
   } else if (av.state === 'walk') av.setState('idle');
   if (av.state === 'bow' && app.time > (app.pranamUntil || 0)) av.setState('namaste');
+  if (app.mode === 'world') p.y += (hutFloor(p.x, p.z) - p.y) * (1 - Math.exp(-dt * 14));   // up the hut's steps and onto its floor
   av.update(dt, t);
   footsteps(av);
   // gate bells chime as you pass beneath them
@@ -1039,9 +1059,11 @@ function updateWorld(dt, t, ctx) {
       $('promptTitle').textContent = T.name; $('promptSub').textContent = `${hallLabel(h)} places taken · ${T.blurb}`;
       $('enterBtn').textContent = directory.occupancy(h) >= HALL_CAPACITY ? 'Enter (full)' : 'Enter prayer hall';
       $('prompt').classList.add('on');
-    } else if (nearHut() && $('fullSheet').hidden) {
-      $('promptTitle').textContent = 'Meditation hut'; $('promptSub').textContent = 'Dhyana Kutir · breathwork and short guided meditations';
-      $('enterBtn').textContent = 'Enter hut'; $('prompt').classList.add('on');
+    } else if (nearHut() && $('fullSheet').hidden && !(input.auto.length && app.hutArrive)) {
+      const inside = inHut();
+      $('promptTitle').textContent = inside ? 'Dhyana Kutir' : 'Meditation hut';
+      $('promptSub').textContent = inside ? 'Sit on the centre cushion to breathe and meditate with the others' : 'Dhyana Kutir · breathwork and short guided meditations';
+      $('enterBtn').textContent = inside ? 'Sit and practise' : 'Go inside'; $('prompt').classList.add('on');
     } else if (nearPrasad() && !world.prasad.has(me.avatar) && $('fullSheet').hidden) {
       const q = world.prasad.length;
       $('promptTitle').textContent = 'Prasad centre'; $('promptSub').textContent = `A sevak shares prasad: a laddoo and sweet pongal in a leaf cup · ${q ? q + ' in line' : 'no one waiting'}`;
@@ -1079,7 +1101,9 @@ function updateWorld(dt, t, ctx) {
     cam.close = clamp01((10 - cam.dist) / 7);
     const right = new THREE.Vector3(Math.cos(cam.yaw), 0, -Math.sin(cam.yaw));
     // close up, the camera looks a little over your head, so your devotee sits low in the frame with the world ahead
-    const focus = p.clone().add(new THREE.Vector3(0, 1.05 + cam.close * 0.8, 0)).addScaledVector(right, cam.close * 0.55);
+    const hutCam = app.mode === 'world' && hutInside(p.x, p.z);   // under the thatch the camera comes down and in, with a wider view
+    cam.hutK = (cam.hutK || 0) + ((hutCam ? 1 : 0) - (cam.hutK || 0)) * (1 - Math.exp(-dt * 3));
+    const focus = p.clone().add(new THREE.Vector3(0, 1.05 + cam.close * 0.8 * (1 - cam.hutK * 0.55), 0)).addScaledVector(right, cam.close * 0.55 * (1 - cam.hutK * 0.6));
     cam.target.lerp(focus, 1 - Math.exp(-dt * 8));
     // portrait screens get a little more distance; temples and the gateway pull the camera in rather than hide you
     let want = cam.dist * (camera.aspect < 1 ? 1 + (1 - camera.aspect) * 0.6 * (1 - cam.close) : 1);
@@ -1087,8 +1111,14 @@ function updateWorld(dt, t, ctx) {
     const cz = Math.cos(cam.yaw) * Math.cos(cam.pitch);
     if (p.z < 39.5 && cz > 0.05) want = Math.max(Math.min(9, want), Math.min(want, (38.5 - cam.target.z) / cz));
     const dirAt = (pitch, out) => out.set(Math.sin(cam.yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(cam.yaw) * Math.cos(pitch));
+    // inside the meditation hut the camera stays under the beams, within the ring of posts
+    if (hutCam) {
+      const pc = Math.min(cam.pitch, 0.22), cx = cam.target.x - HUT.pos.x, czz = cam.target.z - HUT.pos.z, dx = Math.sin(cam.yaw) * Math.cos(pc), dz = Math.cos(cam.yaw) * Math.cos(pc);
+      const a2 = dx * dx + dz * dz, b = cx * dx + czz * dz, c2 = cx * cx + czz * czz - (HUT.radius - 0.3) ** 2, disc = b * b - a2 * c2;
+      want = Math.min(want, 2.8, disc > 0 ? Math.max(1.2, (-b + Math.sqrt(disc)) / a2) : 1.2);
+    }
     // first try lifting the camera over the obstacle, then pull it closer as a last resort
-    const basePitch = cam.pitch;   // your own tilt, close up or far away
+    const basePitch = hutCam ? Math.min(cam.pitch, 0.22) : cam.pitch;   // your own tilt, close up or far away
     let pitch = basePitch, allowed = want;
     for (let i = 0; i < 6; i++) {
       const pt = Math.min(1.3, basePitch + i * 0.12); occRay.set(cam.target, dirAt(pt, tmp)); occRay.far = want;
@@ -1103,9 +1133,9 @@ function updateWorld(dt, t, ctx) {
     // looking up, the camera sinks behind your devotee; it comes in closer rather than dip under the ground
     const above = cam.effPitch < 0 ? Math.max(0.6, (cam.target.y - 0.35) / -Math.sin(cam.effPitch)) : Infinity;
     camera.position.copy(cam.target).addScaledVector(dir, Math.min(cam.eff, above));
-    camera.lookAt(cam.target); camera.fov = 52 - cam.close * 8;
+    camera.lookAt(cam.target); camera.fov = 52 - cam.close * 8 + cam.hutK * (camera.aspect < 1 ? 26 : 16);
     world.update(dt, t, p, ctx);
-    if (playerRing) { playerRing.position.set(p.x, 0.06, p.z); const k = settings.reducedMotion ? 1 : 1 + Math.sin(t * 2.4) * 0.06; playerRing.scale.set(k, k, k); playerRing.material.opacity = 0.85 * Math.max(0, 1 - cam.close * 1.4); }   // the ring helps from afar; close up it would only clutter the scene
+    if (playerRing) { playerRing.position.set(p.x, p.y + 0.06, p.z); const k = settings.reducedMotion ? 1 : 1 + Math.sin(t * 2.4) * 0.06; playerRing.scale.set(k, k, k); playerRing.material.opacity = 0.85 * Math.max(0, 1 - cam.close * 1.4); }   // the ring helps from afar; close up it would only clutter the scene
   }
   camera.updateProjectionMatrix();
   post.tilt.amount = Q.tilt * (app.mode === 'welcome' ? 0.06 : 0.08 * (1 - (cam.close || 0))); post.tilt.focus = 0.4; post.tilt.band = 0.32; renderer.toneMappingExposure = world.tod.exposure;

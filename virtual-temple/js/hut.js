@@ -32,6 +32,18 @@ HUT.ring = [0, 35, -35, 65, -65, 95, -95, 125, -125, 147, -147].map((deg) => {
   return { deg, local: [x, z], pos: toWorld(x, FLOOR, z), rotY: HUT.rot + Math.atan2(0 - x, -2.1 - z) };
 });
 HUT.sitterSeats = [65, -65, 125, -147, -95];
+// a world point in the hut's own frame, and the height you stand at there: the floor and porch at plinth height, the
+// three glowing steps between, the garden all round
+export function hutLocal(x, z) { const dx = x - HUT.pos.x, dz = z - HUT.pos.z, c = Math.cos(HUT.rot), s = Math.sin(HUT.rot); return [dx * c - dz * s, dx * s + dz * c]; }
+export function hutFloor(x, z) {
+  const [lx, lz] = hutLocal(x, z);
+  if (Math.hypot(lx, lz) < R_PLINTH - 0.05 || (Math.abs(lx) < 1.8 && lz > 3 && lz < 5.27)) return FLOOR;
+  if (Math.abs(lx) < 1.45 && lz >= 5.27 && lz < 6.41) return FLOOR * Math.max(0, 2 - Math.floor((lz - 5.27) / 0.38)) / 3;
+  return 0;
+}
+export function hutInside(x, z) { const [lx, lz] = hutLocal(x, z); return Math.hypot(lx, lz) < R_POST - 0.1; }
+HUT.inside = toWorld(0, FLOOR, 1.2);   // where you stop on walking in: just behind the centre cushion, facing the altar
+HUT.radius = R_POST;
 // camera spots (local): behind you toward the altar, your face, a wide view of the room, and the altar lamps
 HUT.views = {
   altar: { pos: [0, 2.32, 3.5], look: [0, 1.92, -3.2], fov: 46 },
@@ -489,8 +501,16 @@ export function buildHut(world) {
     smoke.update(dt, t);
   });
 
-  world.colliders.circles.push({ x: HUT.pos.x, z: HUT.pos.z, r: R_PLINTH + 0.35 });
-  { const p = toWorld(0, 0, 4.9); world.colliders.circles.push({ x: p.x, z: p.z, r: 1.85 }); }
+  // the hut can be walked into: up the steps, across the porch and in between the two front posts. The edge of the plinth,
+  // the posts, the altar and the devotees already sitting keep you to the open floor.
+  const block = (x, z, r) => { const p = toWorld(x, 0, z); world.colliders.circles.push({ x: p.x, z: p.z, r }); };
+  for (let a = 0; a < Math.PI * 2; a += 0.17) if (Math.abs(Math.atan2(Math.sin(a), Math.cos(a))) > 0.5) block(Math.sin(a) * (R_PLINTH + 0.05), Math.cos(a) * (R_PLINTH + 0.05), 0.42);
+  for (const lz of [3.7, 4.2, 4.7, 5.2]) for (const sd of [-1, 1]) block(sd * 1.98, lz, 0.33);
+  for (const lz of [5.7, 6.2]) for (const sd of [-1, 1]) block(sd * 1.75, lz, 0.3);
+  for (const sd of [-1, 1]) block(sd * 1.5, 5.05, 0.2);
+  for (const a of postAngles) { const [x, z] = atAngle(R_POST, a); block(x, z, 0.17); }
+  block(0, ALTAR_Z - 0.05, 1.05); for (const sd of [-1, 1]) block(sd * 1.85, ALTAR_Z - 0.2, 0.35);
+  for (const deg of HUT.sitterSeats) { const seat = HUT.ring.find((r) => r.deg === deg); if (seat) block(seat.local[0], seat.local[1], 0.42); }
   world.pickables.push(g); g.traverse(o => { o.userData.hut = true; });
   HUT.group = g;
   return g;
