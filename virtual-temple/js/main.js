@@ -94,8 +94,9 @@ async function boot() {
   world.scene.add(me.avatar.root);
   playerRing = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.68, 48), new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffc861').multiplyScalar(2.2), transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending }));
   playerRing.rotation.x = -Math.PI / 2; world.scene.add(playerRing);
-  if (/[?&]debug\b/.test(location.search)) window.__vt = { app, me, world, hall, post, directory, cam, input, settings, audio, preview, refreshCreator, hut: { state: hutState, guide, model: HUT, enter: enterHut, leave: leaveHut, start: startSession, end: endSession }, net, get remotes() { return remotes; }, temples: TEMPLES, spots: SPOTS, seated, act, beginAarti, enterTemple }; // local testing hook
+  if (/[?&]debug\b/.test(location.search)) window.__vt = { app, me, world, hall, post, directory, cam, input, settings, audio, preview, refreshCreator, hut: { state: hutState, guide, model: HUT, enter: enterHut, leave: leaveHut, start: startSession, end: endSession }, net, profiles, get remotes() { return remotes; }, temples: TEMPLES, spots: SPOTS, seated, act, beginAarti, enterTemple }; // local testing hook
   setMode('welcome');
+  if (restored) profiles.refresh().then(onProfileRefresh);   // the copy kept here is shown at once; the server has the final word
   $('loading').style.opacity = '0'; setTimeout(() => $('loading').remove(), 900);
   last = performance.now(); requestAnimationFrame(loop);
 }
@@ -110,9 +111,19 @@ function setMode(m) {
   $('hutUI').classList.toggle('on', m === 'hut');
   $('labels').style.display = (m === 'world' || m === 'hall') ? '' : 'none';
   if (m !== 'world') { $('prompt').classList.remove('on'); $('map').classList.remove('on'); }
-  if (m === 'welcome') {
-    const u = profiles.user;
-    if (u && u.kind === 'registered') { $('guestBtn').textContent = 'Continue as ' + (u.avatar?.name || 'devotee'); $('signinBtn').textContent = 'Switch profile'; }
+  if (m === 'welcome') renderWelcome();
+}
+function renderWelcome() {
+  const u = profiles.user, reg = u && u.kind === 'registered';
+  $('guestBtn').textContent = reg ? 'Continue as ' + ((u.avatar && u.avatar.name) || 'devotee') : 'Enter as guest';
+  $('signinBtn').textContent = reg ? 'Switch profile' : 'Sign in or create profile';
+}
+// what the server said about the profile remembered on this device
+function onProfileRefresh(res) {
+  if (res === 'changed' && app.mode === 'welcome' && profiles.user && profiles.user.avatar) { me.config = { ...defaultConfig(), ...profiles.user.avatar }; me.avatar.setConfig(me.config); renderWelcome(); }
+  if (res === 'signedout') {
+    if (app.mode === 'welcome') { me.config = defaultConfig(); me.avatar.setConfig(me.config); renderWelcome(); }
+    toast('You were signed out. Sign in again to use your profile.', 3600);
   }
 }
 
@@ -166,13 +177,13 @@ function buildCreator() {
   $('creatorDone').addEventListener('click', () => {
     me.config.name = ($('cName').value.trim() || 'Devotee').slice(0, 20);
     me.avatar.setConfig(me.config);
-    if (profiles.user && profiles.user.kind === 'registered') { profiles.saveAvatar({ ...me.config }); toast('Avatar saved to your profile'); }
+    if (profiles.user && profiles.user.kind === 'registered') { profiles.saveAvatar({ ...me.config }).then((ok) => toast(ok ? 'Avatar saved to your profile' : 'Avatar saved here; it will reach your profile next time you are online', 2800)); }
     enterWorld();
   });
 }
 function openCreator(fromWorld = false) {
   const u = profiles.user;
-  $('creatorMode').textContent = u && u.kind === 'registered' ? `Saved to the profile for ${u.email} on this device.` : 'Guest avatar. It will not be saved after you leave.';
+  $('creatorMode').textContent = u && u.kind === 'registered' ? (u.cloud ? `Saved to your profile (${u.email}), on every device you sign in on.` : `Saved to the profile for ${u.email} on this device.`) : 'Guest avatar. It will not be saved after you leave.';
   $('creatorDone').textContent = fromWorld ? 'Save and return' : 'Enter the temple';
   $('cName').value = me.config.name || '';
   refreshCreator(); setMode('creator');
@@ -690,7 +701,7 @@ function bindUI() {
   document.addEventListener('pointerdown', startAudioOnce, { capture: true });
   document.addEventListener('keydown', startAudioOnce, { capture: true });
   $('guestBtn').addEventListener('click', () => {
-    if (profiles.user && profiles.user.kind === 'registered') { me.avatar.setConfig(me.config); enterWorld(); return; }
+    if (profiles.user && profiles.user.kind === 'registered') { if (!profiles.user.avatar) { openCreator(); return; } me.avatar.setConfig(me.config); enterWorld(); return; }
     profiles.guest(me.config); openCreator();
   });
   $('signinBtn').addEventListener('click', () => { setAuthMode('signin'); $('auth').hidden = false; if (!storageAvailable) $('authErr').textContent = 'This browser is blocking site storage, so profiles cannot be saved here. You can still continue as a guest.'; });
@@ -699,20 +710,23 @@ function bindUI() {
   $('authGuest').addEventListener('click', () => { $('auth').hidden = true; if (app.mode === 'world') return; profiles.guest(me.config); openCreator(); });
   $('authForm').addEventListener('submit', async (e) => {
     e.preventDefault(); $('authErr').textContent = '';
+    const btn = $('authSubmit'), label = btn.textContent; btn.disabled = true; btn.textContent = authMode === 'signin' ? 'Signing in…' : 'Creating…';
     try {
       if (authMode === 'signin') {
         const u = await profiles.signIn($('authEmail').value, $('authPass').value);
         $('auth').hidden = true;
-        if (u.avatar) { me.config = { ...u.avatar }; me.avatar.setConfig(me.config); toast(`Welcome back, ${me.config.name}`); enterWorld(); }
+        if (u.avatar) { me.config = { ...defaultConfig(), ...u.avatar }; me.avatar.setConfig(me.config); toast(`Welcome back, ${me.config.name}` + (u.cloud ? '' : ' (profile on this device only)'), 3000); if (app.mode === 'world') { updateProfileChip(); renderAccount(); startNet(); } else enterWorld(); }
         else openCreator();
       } else {
         const wasInWorld = app.mode === 'world';
         const u = await profiles.register($('authEmail').value, $('authPass').value, wasInWorld ? { ...me.config } : null);
         $('auth').hidden = true;
-        if (wasInWorld) { toast('Profile created. Your avatar is saved on this device.'); updateProfileChip(); renderAccount(); }
-        else { void u; openCreator(); }
+        const where = u.cloud ? 'Your avatar now follows you to any device.' : 'The temple server could not be reached, so it is saved on this device only.';
+        if (wasInWorld) { toast('Profile created. ' + where, 3600); updateProfileChip(); renderAccount(); }
+        else { if (!u.cloud) toast('Profile created on this device only: the temple server could not be reached.', 3600); openCreator(); }
       }
     } catch (err) { $('authErr').textContent = err.message; }
+    finally { btn.disabled = false; btn.textContent = label; }
   });
   document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => { $(b.dataset.close).hidden = true; }));
   $('presence').addEventListener('click', () => { closeAllPanels(); $('roomSheet').hidden = false; renderRoomSheet(); });
@@ -776,11 +790,25 @@ function applySettingsUI() {
 function renderAccount() {
   const u = profiles.user, box = $('accountBox');
   const reg = u && u.kind === 'registered';
-  box.innerHTML = `<div class="setrow"><span><b style="font-weight:600">${escapeHtml(me.config.name || 'Devotee')}</b><br><span class="note">${reg ? 'Profile saved on this device · ' + escapeHtml(u.email) : 'Guest · nothing is saved'}</span></span></div>
-    <div class="row"><button class="btn small" id="editAvatar">Edit avatar</button>${reg ? '<button class="btn small ghost" id="signOut">Sign out</button>' : '<button class="btn small" id="saveProfile">Create profile to save</button>'}</div>`;
+  const where = reg ? (u.cloud ? 'Signed in · follows you to any device · ' : 'Profile saved on this device only · ') + escapeHtml(u.email) : 'Guest · nothing is saved';
+  box.innerHTML = `<div class="setrow"><span><b style="font-weight:600">${escapeHtml(me.config.name || 'Devotee')}</b><br><span class="note">${where}</span></span></div>
+    <div class="row"><button class="btn small" id="editAvatar">Edit avatar</button>${reg ? '<button class="btn small ghost" id="signOut">Sign out</button><button class="btn small ghost" id="deleteProfile">Delete profile</button>' : '<button class="btn small" id="saveProfile">Create profile to save</button>'}</div>`;
   $('editAvatar').onclick = () => { $('settings').hidden = true; if (app.mode === 'hall') { toast('Leave the prayer hall to change your avatar'); return; } openCreator(true); };
-  if (reg) $('signOut').onclick = () => { profiles.signOut(); profiles.guest(me.config); updateProfileChip(); renderAccount(); toast('Signed out. You are continuing as a guest.'); };
+  if (reg) {
+    $('signOut').onclick = () => goHome(profiles.signOut(), 'Signed out');
+    $('deleteProfile').onclick = async () => {
+      if (!confirm(`Delete the profile for ${u.email}? Your saved avatar is removed${u.cloud ? ' from every device' : ''}. This cannot be undone.`)) return;
+      try { await profiles.deleteProfile(); goHome(null, 'Profile deleted'); } catch (e) { toast(e.message, 3600); }
+    };
+  }
   else $('saveProfile').onclick = () => { $('settings').hidden = true; setAuthMode('create'); $('auth').hidden = false; };
+}
+// back to the home screen (after signing out or deleting a profile): a fresh start, with nothing of the last devotee left
+async function goHome(pending, msg) {
+  if (hutState.session) endSession(true);
+  toast(msg, 1600); $('fade').classList.add('on');
+  try { await Promise.race([pending, new Promise((r) => setTimeout(r, 1500))]); } catch (e) { /* signed out locally either way */ }
+  setTimeout(() => location.reload(), settings.reducedMotion ? 0 : 450);
 }
 function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 let toastT;

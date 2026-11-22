@@ -21,13 +21,28 @@ It runs on Cloudflare's free plan. The room's whole state lives in its sockets' 
 
 Everything a client sends is checked and trimmed: known keys and modes only, numbers clamped, names stripped of markup, messages under 4 KB. A room holds at most 32 players. Anyone silent for a minute is dropped.
 
+## Profiles (HTTPS, JSON)
+
+Devotee profiles live in a second Durable Object, `Accounts`, so they follow players to any device. Only the temple's own site may call these (CORS): `https://hseju.github.io`, and localhost for testing.
+
+| Request | Body | Result |
+| --- | --- | --- |
+| `POST /auth/register` | `{email, key, look}` | a new profile and a session token |
+| `POST /auth/login` | `{email, key}` | a session token and the saved look |
+| `POST /auth/logout` | | ends this session only |
+| `GET /me` | | the profile |
+| `PUT /me` | `{look}` | saves the avatar |
+| `DELETE /me` | | deletes the profile and every session |
+
+`key` is the passphrase stretched in the browser (PBKDF2-SHA-256, 210,000 rounds, salted with the email); the passphrase itself is never sent. The server stores a salted SHA-256 of the key and only hashes of session tokens. After eight wrong passphrases an email waits fifteen minutes; each network address gets 40 attempts per fifteen minutes. Sessions last 180 days, at most 12 per profile.
+
 ## Run it locally
 
 ```sh
 cd server
 npm install
 npm run dev                 # wrangler dev on http://127.0.0.1:8787
-npm test                    # two simulated players run through join, move, pranam, places, leave
+npm test                    # two simulated players run through join, move, pranam, places, leave; then profiles
 ```
 
 Open the app with `?server=ws://127.0.0.1:8787` to use the local server. This only works when the app itself is served from localhost.

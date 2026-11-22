@@ -10,6 +10,7 @@
 //
 //   GET /                 a short status line
 //   GET /room/<code>      upgrade to a WebSocket in room <code> (letters, digits and dashes)
+//   /auth/*, /me          devotee profiles that follow you to any device (see the Accounts object below)
 
 import { DurableObject } from 'cloudflare:workers';
 
@@ -22,6 +23,8 @@ const EVENTS = new Set(['pranam', 'bell', 'flowers', 'diya', 'incense', 'abhishe
 const MODES = new Set(['w', 'h', 'u', 'x']);   // walking the grounds, in a prayer hall, practising in the hut, elsewhere (menus)
 
 const CORS = { 'access-control-allow-origin': '*' };
+// the sites allowed to use profiles from a browser: the public temple, and copies served on this machine for testing
+const PROFILE_ORIGINS = new Set(['https://hseju.github.io', 'http://localhost:8765', 'http://127.0.0.1:8765']);
 
 export default {
   async fetch(request, env) {
@@ -32,6 +35,7 @@ export default {
       const stub = env.ROOMS.get(env.ROOMS.idFromName(room[1].toLowerCase()));
       return stub.fetch(request);
     }
+    if (url.pathname.startsWith('/auth/') || url.pathname === '/me') return profiles(request, env, url);
     if (url.pathname === '/' || url.pathname === '/health') return new Response('Virtual Temple multiplayer server is running', { headers: { 'content-type': 'text/plain', ...CORS } });
     return new Response('Not found', { status: 404, headers: CORS });
   },
@@ -139,5 +143,100 @@ export class TempleRoom extends DurableObject {
     if (!id) return;
     p.id = null; ws.serializeAttachment(p);
     if (!this._players().some((x) => x.ws !== ws && x.p.id === id)) this._broadcast({ t: 'leave', id }, ws);
+  }
+}
+
+// ---------------------------------------------------------------- devotee profiles
+// A profile is an email, a passphrase and an avatar (look and name), kept in one Durable Object so it follows you to
+// any phone or browser. The passphrase never leaves your device: the app stretches it (PBKDF2, 210,000 rounds, salted
+// with your email) into a key, and the server keeps only a salted SHA-256 of that key, so even a copy of the store
+// would need the slow stretching for every guess. Signing in returns a random session token (the server keeps only
+// its hash) that lasts 180 days or until you sign out. Repeated wrong passphrases are slowed down per email and per
+// network address. Profiles are only reachable from the temple's own site.
+//
+//   POST   /auth/register {email, key, look}   create a profile           -> {token, profile}
+//   POST   /auth/login    {email, key}         sign in                    -> {token, profile}
+//   POST   /auth/logout                        end this session
+//   GET    /me                                 your profile               -> {profile}
+//   PUT    /me            {look}               save your avatar
+//   DELETE /me                                 delete your profile and every session
+async function profiles(request, env, url) {
+  const origin = request.headers.get('Origin') || '';
+  const allowed = PROFILE_ORIGINS.has(origin);
+  const cors = allowed ? { 'access-control-allow-origin': origin, 'access-control-allow-headers': 'content-type, authorization', 'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS', 'access-control-max-age': '86400', vary: 'Origin' } : { vary: 'Origin' };
+  if (request.method === 'OPTIONS') return new Response(null, { status: allowed ? 204 : 403, headers: cors });
+  if (!allowed) return json({ error: 'Profiles are only available on the temple’s own site.' }, 403, cors);
+  if ((request.headers.get('content-length') | 0) > 4096) return json({ error: 'Too large' }, 413, cors);
+  const stub = env.ACCOUNTS.get(env.ACCOUNTS.idFromName('all'));
+  const res = await stub.fetch(new Request('https://accounts' + url.pathname, { method: request.method, headers: { 'content-type': 'application/json', authorization: request.headers.get('authorization') || '', 'x-ip': request.headers.get('cf-connecting-ip') || '' }, body: ['POST', 'PUT'].includes(request.method) ? await request.text() : undefined }));
+  return new Response(res.body, { status: res.status, headers: { 'content-type': 'application/json', ...cors } });
+}
+const json = (body, status = 200, headers = {}) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', ...headers } });
+const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+const sha256 = async (bytes) => hex(await crypto.subtle.digest('SHA-256', bytes));
+const fromHex = (h) => new Uint8Array(h.match(/../g).map((x) => parseInt(x, 16)));
+const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/;
+const SESSION_DAYS = 180, WINDOW_MS = 15 * 60_000, MAX_FAILS_EMAIL = 8, MAX_TRIES_IP = 40, MAX_SESSIONS = 12;
+function same(a, b) { if (a.length !== b.length) return false; let d = 0; for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i); return d === 0; }
+
+export class Accounts extends DurableObject {
+  async fetch(request) {
+    const url = new URL(request.url), path = url.pathname, method = request.method, now = Date.now(), S = this.ctx.storage;
+    let body = {};
+    if (method === 'POST' || method === 'PUT') { try { body = JSON.parse((await request.text()) || '{}') || {}; } catch (e) { return json({ error: 'Bad request' }, 400); } }
+    const ip = request.headers.get('x-ip') || 'unknown';
+
+    if (path === '/auth/register' || path === '/auth/login') {
+      const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '', key = typeof body.key === 'string' ? body.key : '';
+      if (!EMAIL_RE.test(email) || email.length > 254) return json({ error: 'Enter a valid email address.' }, 400);
+      if (!/^[0-9a-f]{64}$/.test(key)) return json({ error: 'Bad request' }, 400);
+      if (!(await this._allow('r:i:' + ip, MAX_TRIES_IP, now, true))) return json({ error: 'Too many attempts from this network. Wait a few minutes and try again.' }, 429);
+      const acc = await S.get('a:' + email);
+      if (path === '/auth/register') {
+        if (acc) return json({ error: 'A profile with this email already exists. Sign in instead.' }, 409);
+        const salt = crypto.getRandomValues(new Uint8Array(16));
+        const rec = { email, salt: hex(salt), verifier: await sha256(new Uint8Array([...salt, ...fromHex(key)])), look: look(body.look), created: now, updated: now, sessions: [] };
+        return this._session(rec, now, 201);
+      }
+      if (!(await this._allow('r:e:' + email, MAX_FAILS_EMAIL, now, false))) return json({ error: 'Too many wrong passphrases for this email. Wait a few minutes and try again.' }, 429);
+      if (!acc || !same(await sha256(new Uint8Array([...fromHex(acc.salt), ...fromHex(key)])), acc.verifier)) {
+        await this._allow('r:e:' + email, MAX_FAILS_EMAIL, now, true);
+        return json({ error: acc ? 'That passphrase does not match. Try again.' : 'No profile with this email yet. Create one instead.', code: acc ? 'wrong' : 'none' }, 401);
+      }
+      await S.delete('r:e:' + email);
+      return this._session(acc, now, 200);
+    }
+
+    // everything else needs a session
+    const token = (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');
+    if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return json({ error: 'Please sign in again.' }, 401);
+    const th = await sha256(new TextEncoder().encode(token)), ses = await S.get('s:' + th);
+    if (!ses || ses.expires < now) { if (ses) await S.delete('s:' + th); return json({ error: 'Please sign in again.' }, 401); }
+    const acc = await S.get('a:' + ses.email);
+    if (!acc) { await S.delete('s:' + th); return json({ error: 'Please sign in again.' }, 401); }
+
+    if (path === '/auth/logout' && method === 'POST') { await S.delete('s:' + th); acc.sessions = acc.sessions.filter((h) => h !== th); await S.put('a:' + acc.email, acc); return json({ ok: true }); }
+    if (path === '/me' && method === 'GET') return json({ profile: { email: acc.email, look: acc.look } });
+    if (path === '/me' && method === 'PUT') { acc.look = look(body.look); acc.updated = now; await S.put('a:' + acc.email, acc); return json({ ok: true, profile: { email: acc.email, look: acc.look } }); }
+    if (path === '/me' && method === 'DELETE') { await S.delete(acc.sessions.map((h) => 's:' + h)); await S.delete('a:' + acc.email); return json({ ok: true }); }
+    return json({ error: 'Not found' }, 404);
+  }
+  async _session(acc, now, status) {
+    const raw = crypto.getRandomValues(new Uint8Array(32));
+    const token = btoa(String.fromCharCode(...raw)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const th = await sha256(new TextEncoder().encode(token));
+    acc.sessions = [...(acc.sessions || []), th];
+    const dropped = acc.sessions.length > MAX_SESSIONS ? acc.sessions.splice(0, acc.sessions.length - MAX_SESSIONS) : [];
+    if (dropped.length) await this.ctx.storage.delete(dropped.map((h) => 's:' + h));
+    await this.ctx.storage.put({ ['a:' + acc.email]: acc, ['s:' + th]: { email: acc.email, created: now, expires: now + SESSION_DAYS * 864e5 } });
+    return json({ token, profile: { email: acc.email, look: acc.look } }, status);
+  }
+  // a counter in a fifteen-minute window: false once it is full; count adds this attempt
+  async _allow(k, max, now, count) {
+    let r = await this.ctx.storage.get(k);
+    if (!r || r.until < now) r = { n: 0, until: now + WINDOW_MS };
+    if (r.n >= max) return false;
+    if (count) { r.n++; await this.ctx.storage.put(k, r); }
+    return true;
   }
 }
