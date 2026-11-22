@@ -432,6 +432,7 @@ function renderPresence() {
   let txt;
   if (!net.enabled) txt = `Multiplayer offline · ${sims} simulated devotees`;
   else if (net.online) { const n = net.count; txt = `${n} ${n === 1 ? 'devotee' : 'devotees'} online${priv ? ' · private' : ''} · ${sims} simulated`; }
+  else if (!net.ever && net.retry >= 3) txt = `Multiplayer offline · ${sims} simulated devotees`;   // this copy cannot reach the server (it keeps trying quietly)
   else txt = `${net.connecting ? 'Connecting' : 'Reconnecting'} · ${sims} simulated devotees`;
   $('presenceText').textContent = txt;
   $('presence').classList.toggle('live', net.online);

@@ -39,4 +39,4 @@ cd server
 CLOUDFLARE_API_TOKEN=<token with the "Edit Cloudflare Workers" template> npx wrangler deploy
 ```
 
-Then set `SERVER_URL` in `../js/net.js` to the `wss://` address wrangler prints, and publish the site.
+Then set `SERVER_URL` in `../js/net.js` to the `wss://` address wrangler prints, and publish the site. The live server is `https://virtual-temple.hseju.workers.dev` (account subdomain `hseju`). An account-owned token also needs `CLOUDFLARE_ACCOUNT_ID` set.
