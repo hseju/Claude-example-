@@ -18,7 +18,7 @@ import { checkMessage, cleanName, QUICK } from '../../js/chatfilter.js';   // th
 const MAX_PLAYERS = 32;          // per room
 const MAX_MESSAGE = 4096;        // bytes
 const SPOTS = 12;                // places in a prayer hall
-const SILENT_MS = 60_000;        // a player not heard from in this long is dropped
+const SILENT_MS = 150_000;       // a player not heard from in this long is dropped (background tabs ping slowly)
 const ANIMS = new Set(['idle', 'walk', 'namaste', 'bow', 'offer', 'ring', 'aarti', 'meditate']);
 const EVENTS = new Set(['pranam', 'bell', 'flowers', 'diya', 'incense', 'abhishek', 'pradakshina', 'aarti', 'chime']);
 const MODES = new Set(['w', 'h', 'u', 'x']);   // walking the grounds, in a prayer hall, practising in the hut, elsewhere (menus)

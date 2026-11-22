@@ -22,7 +22,7 @@ It runs on Cloudflare's free plan. The room's whole state lives in its sockets' 
 | server | `chat-ok {to, n}` / `chat-no {to, n, reason}` | your message was delivered, or not (`unkind`, `link`, `contact`, `long`, `slow`, `gone`) |
 | server | `pong {c, s}` | the server's clock |
 
-Everything a client sends is checked and trimmed: known keys and modes only, numbers clamped, names stripped of markup (and unkind names replaced with "Devotee"), messages under 4 KB. Chat goes only to the one player it is for and is never stored. A room holds at most 32 players. Anyone silent for a minute is dropped.
+Everything a client sends is checked and trimmed: known keys and modes only, numbers clamped, names stripped of markup (and unkind names replaced with "Devotee"), messages under 4 KB. Chat goes only to the one player it is for and is never stored. A room holds at most 32 players. Anyone silent for two and a half minutes is dropped (the app pings every 25 seconds, even from a background tab).
 
 ## Profiles (HTTPS, JSON)
 

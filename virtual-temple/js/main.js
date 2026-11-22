@@ -315,11 +315,10 @@ function updateHallUI() {
   const h = app.currentHall; if (!h) return;
   $('hallTitle').textContent = TEMPLES[h.templeId].name;
   $('hallSub').textContent = hallLabel(h);
-  const sims = directory.simulatedCount(h), friends = h.spots.filter((s) => s && s.remote).map((s) => (net.players.get(s.id) || s).name || 'a friend');
-  const parts = [];
-  if (friends.length) parts.push(friends.length <= 2 ? friends.join(' and ') + ' (here with you)' : `${friends.length} real devotees`);
-  if (sims) parts.push(`${sims} simulated devotee${sims === 1 ? '' : 's'}`);
-  $('hallNote').textContent = parts.length ? parts.join(' · ') + (net.online || friends.length ? '' : ' · multiplayer offline') : 'No one else is here';
+  // who is here, without counting: friends by name, otherwise just that others are praying
+  const others = h.spots.filter((s) => s && s.id !== me.id), friends = others.filter((s) => s.remote).map((s) => (net.players.get(s.id) || s).name || 'a friend');
+  $('hallNote').textContent = friends.length ? (friends.length <= 2 ? friends.join(' and ') : friends.slice(0, 2).join(', ') + ' and friends') + ' here with you'
+    : others.length ? 'Devotees are praying here' : 'No one else is here';
   $('occDots').innerHTML = h.spots.map(s => `<i class="${s ? (s.id === me.id ? 'me' : s.remote ? 'f' : 's') : ''}"></i>`).join('');
 }
 
@@ -448,12 +447,13 @@ function onNetEvent(p, m) {
 }
 // the presence pill, and the Play with friends sheet behind it
 function renderPresence() {
-  const sims = world.npcs.length + (world.hutSitters || []).length, priv = net.room !== 'public';
+  // no numbers for now: just whether you are online (and in a private temple)
+  const priv = net.room !== 'public';
   let txt;
-  if (!net.enabled) txt = `Multiplayer offline · ${sims} simulated devotees`;
-  else if (net.online) { const n = net.count; txt = `${n} ${n === 1 ? 'devotee' : 'devotees'} online${priv ? ' · private' : ''} · ${sims} simulated`; }
-  else if (!net.ever && net.retry >= 3) txt = `Multiplayer offline · ${sims} simulated devotees`;   // this copy cannot reach the server (it keeps trying quietly)
-  else txt = `${net.connecting ? 'Connecting' : 'Reconnecting'} · ${sims} simulated devotees`;
+  if (!net.enabled) txt = 'Offline';
+  else if (net.online) txt = priv ? 'Online · private' : 'Online';
+  else if (!net.ever && net.retry >= 3) txt = 'Offline';   // this copy cannot reach the server (it keeps trying quietly)
+  else txt = net.connecting ? 'Connecting…' : 'Reconnecting…';
   $('presenceText').textContent = txt;
   $('presence').classList.toggle('live', net.online);
   const unread = chat ? chat.unreadTotal : 0; $('presenceUnread').hidden = !unread; $('presenceUnread').textContent = unread > 9 ? '9+' : String(unread);
@@ -941,7 +941,7 @@ function renderHutPanel() {
   $('tTones').setAttribute('aria-checked', String(settings.breathTones));
   renderVoices();
   const taken = (world.hutSitters || []).length + 1;
-  $('hutSeats').textContent = `${taken} of ${HUT.capacity} seats taken; the others are simulated.`;
+  $('hutSeats').textContent = `${taken} of ${HUT.capacity} seats taken.`;
   const st = PracticeLog.summary();
   $('practiceStats').textContent = st.total ? `Today ${st.today} min · this week ${st.week} min in ${st.weekSessions} session${st.weekSessions === 1 ? '' : 's'}${st.streak > 1 ? ` · ${st.streak}-day streak` : ''}` : 'Your practice is kept on this device only.';
 }

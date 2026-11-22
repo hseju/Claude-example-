@@ -54,7 +54,7 @@ Opening `index.html` straight from disk (`file://`) does not work, because brows
 
 ## Honest limits
 
-* **Every other devotee is simulated.** The HUD says "Multiplayer offline · N simulated devotees", hall occupancy notes how many are simulated, and their name tags read "simulated" while you choose a spot.
+* **Simulated devotees fill the temple alongside real ones.** The presence pill shows only whether you are online ("Online", "Online · private", "Connecting…" or "Offline"), with no counts for now. Real devotees wear gold name tags, and simulated ones read "simulated" while you choose a place in a prayer hall.
 * **Audio: recorded and licensed.** Music, ambience and the aarti are real recordings under CC BY, CC BY-SA or public domain terms (see `audio/CREDITS.md`). Music streams from two `<audio>` elements that crossfade; ambience and aarti loops are decoded only while needed, so a phone never holds the whole library in memory. Bells you ring, the conch, footsteps, offerings and the hall chant are synthesised, as is the fallback for any empty manifest slot.
 
 ### Using recorded audio
