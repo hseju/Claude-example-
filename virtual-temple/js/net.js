@@ -9,7 +9,7 @@
 // private temple for you and your friends. When the server cannot be reached the app carries on as before, with
 // simulated devotees only, and keeps trying in the background.
 
-export const SERVER_URL = 'wss://virtual-temple.example.workers.dev';   // set when the server is deployed (see server/README.md)
+export const SERVER_URL = 'wss://virtual-temple.hseju.workers.dev';   // the deployed server (see server/README.md)
 
 const ROOM_RE = /^[a-z0-9-]{1,40}$/;
 export function roomFromUrl() {
@@ -80,7 +80,7 @@ export class Net {
 
   _msg(m) {
     switch (m.t) {
-      case 'welcome': this.online = true; this.connecting = false; this.offset = m.now - Date.now(); for (const p of m.players || []) this._join(p); this._emit('status'); this._emit('welcome'); break;
+      case 'welcome': this.online = true; this.ever = true; this.connecting = false; this.offset = m.now - Date.now(); for (const p of m.players || []) this._join(p); this._emit('status'); this._emit('welcome'); break;
       case 'pong': { const rtt = Date.now() - m.c; if (rtt >= 0 && rtt < 5000) this.offset = m.s + rtt / 2 - Date.now(); break; }
       case 'join': this._join(m.p); this._emit('status'); break;
       case 'leave': this._leave(m.id); this._emit('status'); break;
