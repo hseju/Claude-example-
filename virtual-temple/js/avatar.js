@@ -12,15 +12,20 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.m
 
 export const SKIN_TONES = ['#f1c9a5', '#e0ac7e', '#c68b5e', '#a8714a', '#8a5636', '#5f3a24'];
 export const HAIR_COLORS = ['#1b1512', '#3a271c', '#5b3a24', '#8a8580', '#e2ded6'];
+// Each option says who it is for ('masc', 'fem', or both when left out): the avatar maker offers only the ones that
+// suit the chosen gender, and optionsFor / fitToPresentation keep any saved or older avatar consistent with it.
 export const HAIR_STYLES = [
-  { id: 'short', label: 'Short' }, { id: 'wavy', label: 'Wavy' }, { id: 'bun', label: 'Bun' },
-  { id: 'braid', label: 'Long braid' }, { id: 'ponytail', label: 'Ponytail' }, { id: 'open', label: 'Long, open' },
-  { id: 'curly', label: 'Curly' }, { id: 'topknot', label: 'Top knot' }, { id: 'cropped', label: 'Shikha' }, { id: 'bald', label: 'Receding' },
+  { id: 'braid', label: 'Long braid', for: 'fem' }, { id: 'bun', label: 'Bun', for: 'fem' }, { id: 'ponytail', label: 'Ponytail', for: 'fem' }, { id: 'open', label: 'Long, open', for: 'fem' },
+  { id: 'short', label: 'Short' }, { id: 'wavy', label: 'Wavy' }, { id: 'curly', label: 'Curly' },
+  { id: 'topknot', label: 'Top knot', for: 'masc' }, { id: 'cropped', label: 'Shikha', for: 'masc' }, { id: 'bald', label: 'Receding', for: 'masc' },
 ];
-export const HEADWEAR = [{ id: 'none', label: 'Bare head' }, { id: 'turban', label: 'Safa turban' }, { id: 'topi', label: 'Gandhi topi' }];
+export const HEADWEAR = [
+  { id: 'none', label: 'Bare head' }, { id: 'turban', label: 'Safa turban', for: 'masc' }, { id: 'topi', label: 'Gandhi topi', for: 'masc' },
+  { id: 'gajra', label: 'Jasmine gajra', for: 'fem' }, { id: 'dupatta', label: 'Dupatta over the head', for: 'fem' },
+];
 export const OUTFITS = [
-  { id: 'kurta', label: 'Kurta & churidar' }, { id: 'dhoti', label: 'Dhoti & angavastram' },
-  { id: 'saree', label: 'Saree' }, { id: 'salwar', label: 'Salwar kameez' },
+  { id: 'kurta', label: 'Kurta & churidar', for: 'masc' }, { id: 'jacket', label: 'Kurta & Nehru jacket', for: 'masc' }, { id: 'dhoti', label: 'Dhoti & angavastram', for: 'masc' },
+  { id: 'saree', label: 'Saree', for: 'fem' }, { id: 'salwar', label: 'Salwar kameez', for: 'fem' }, { id: 'lehenga', label: 'Lehenga & dupatta', for: 'fem' },
 ];
 export const CLOTH_COLORS = [
   { id: 'ivory', base: '#efe6d2', accent: '#c9a24b' }, { id: 'saffron', base: '#e98a1f', accent: '#7d1f1a' },
@@ -30,12 +35,21 @@ export const CLOTH_COLORS = [
 ];
 export const PRESENTATIONS = [{ id: 'masc', label: 'Male' }, { id: 'fem', label: 'Female' }];
 // older saved profiles may say 'neutral'; read them by their attire
-const normalise = (c) => (c.presentation === 'fem' || c.presentation === 'masc' ? c : { ...c, presentation: c.outfit === 'saree' || c.outfit === 'salwar' ? 'fem' : 'masc' });
+const normalise = (c) => fitToPresentation(c.presentation === 'fem' || c.presentation === 'masc' ? { ...c } : { ...c, presentation: ['saree', 'salwar', 'lehenga'].includes(c.outfit) ? 'fem' : 'masc' });
 export const BUILDS = [{ id: 'slim', label: 'Slim' }, { id: 'average', label: 'Average' }, { id: 'broad', label: 'Broad' }];
 export const AGES = [{ id: 'adult', label: 'Adult' }, { id: 'elder', label: 'Elder' }];
-export const FACIAL = [{ id: 'none', label: 'Clean-shaven' }, { id: 'moustache', label: 'Moustache' }, { id: 'beard', label: 'Beard' }];
-export const MARKS = [{ id: 'bindi', label: 'Bindi' }, { id: 'tilak', label: 'Tilak' }, { id: 'tripundra', label: 'Tripundra' }, { id: 'none', label: 'None' }];
-export const JEWELLERY = [{ id: 'simple', label: 'Simple' }, { id: 'festive', label: 'Festive' }];
+export const FACIAL = [{ id: 'none', label: 'Clean-shaven', for: 'masc' }, { id: 'moustache', label: 'Moustache', for: 'masc' }, { id: 'beard', label: 'Beard', for: 'masc' }];
+export const MARKS = [{ id: 'bindi', label: 'Bindi', for: 'fem' }, { id: 'tilak', label: 'Tilak' }, { id: 'tripundra', label: 'Tripundra', for: 'masc' }, { id: 'none', label: 'None' }];
+export const JEWELLERY = [{ id: 'simple', label: 'Simple', fem: 'Studs & bangles', masc: 'Kada & sacred thread' }, { id: 'festive', label: 'Festive', fem: 'Festive, with nose ring', masc: 'Gold chain' }];
+export const optionsFor = (list, presentation) => list.filter((o) => !o.for || o.for === presentation);
+// what a gender starts with, for any choice that does not suit it
+const STARTS = { fem: { outfit: 'saree', hair: 'braid', headwear: 'none', mark: 'bindi', facial: 'none' }, masc: { outfit: 'kurta', hair: 'short', headwear: 'none', mark: 'tilak', facial: 'none' } };
+export function fitToPresentation(c) {
+  const g = c.presentation === 'masc' ? 'masc' : 'fem';
+  for (const [key, list] of [['outfit', OUTFITS], ['hair', HAIR_STYLES], ['headwear', HEADWEAR], ['mark', MARKS]]) if (!optionsFor(list, g).some((o) => o.id === c[key])) c[key] = STARTS[g][key];
+  if (g === 'fem') c.facial = 'none';
+  return c;
+}
 
 const DEFAULTS = { name: '', presentation: 'fem', build: 'average', age: 'adult', skin: SKIN_TONES[2], hair: 'braid', hairColor: HAIR_COLORS[0], outfit: 'saree', color: 'kumkum', facial: 'none', mark: 'bindi', jewellery: 'simple', glasses: false, carry: 'none', headwear: 'none' };
 export function defaultConfig() { return { ...DEFAULTS }; }
@@ -47,17 +61,17 @@ export function randomConfig(seed = Math.random(), opts = {}) {
   const presentation = opts.presentation || (r() < 0.48 ? 'fem' : 'masc');
   const age = opts.age || (r() < 0.2 ? 'elder' : 'adult');
   const fem = presentation === 'fem';
-  const outfit = fem ? pick(['saree', 'saree', 'salwar']) : pick(['kurta', 'kurta', 'dhoti']);
+  const outfit = fem ? pick(['saree', 'saree', 'salwar', 'lehenga']) : pick(['kurta', 'kurta', 'jacket', 'dhoti']);
   const hair = age === 'elder' && !fem ? pick(['bald', 'cropped', 'short']) : fem ? pick(['braid', 'bun', 'bun', 'wavy', 'ponytail', 'open']) : pick(['short', 'cropped', 'short', 'wavy', 'curly', 'topknot']);
   const hairColor = age === 'elder' ? pick(HAIR_COLORS.slice(3)) : pick(HAIR_COLORS.slice(0, 3));
   return {
     ...DEFAULTS, name: pick(NPC_NAMES), presentation, age, outfit, hair, hairColor, skin: pick(SKIN_TONES), color: pick(CLOTH_COLORS).id,
     build: pick(['slim', 'average', 'average', 'broad']),
     facial: fem ? 'none' : pick(['none', 'none', 'moustache', 'beard']),
-    mark: fem ? pick(['bindi', 'bindi', 'none']) : pick(['tilak', 'tripundra', 'none', 'none']),
+    mark: fem ? pick(['bindi', 'bindi', 'bindi', 'tilak', 'none']) : pick(['tilak', 'tripundra', 'none', 'none']),
     jewellery: r() < 0.35 ? 'festive' : 'simple', glasses: age === 'elder' ? r() < 0.6 : r() < 0.08,
     carry: age === 'elder' && r() < 0.35 ? 'cane' : r() < 0.22 ? 'thali' : 'none',
-    headwear: fem ? 'none' : r() < 0.14 ? 'turban' : r() < 0.1 ? 'topi' : 'none',
+    headwear: fem ? (age === 'elder' && r() < 0.5 ? 'dupatta' : r() < 0.25 ? 'gajra' : r() < 0.08 ? 'dupatta' : 'none') : r() < 0.14 ? 'turban' : r() < 0.1 ? 'topi' : 'none',
   };
 }
 
@@ -252,7 +266,7 @@ const mix = (a, b, k) => new THREE.Color(a).lerp(new THREE.Color(b), k);
 function buildFigure(cfg) {
   const fem = cfg.presentation === 'fem', masc = !fem, elder = cfg.age === 'elder';
   const bw = { slim: 0.92, average: 1, broad: 1.1 }[cfg.build] || 1, lb = (k) => k * bw;
-  const sw = 0.148 * (0.96 + (bw - 1) * 0.5);
+  const sw = 0.148 * (0.96 + (bw - 1) * 0.5) * (fem ? 0.95 : 1.05);   // women narrower at the shoulder, men broader
   const ey = 0.995, ex = 0.098, eyeZ = surfZ(ex, ey) - 0.004, mouthZ = surfZ(0, 0.92) - 0.002;
   const J = {
     root: [0, 0, 0], hips: [0, 0.42, 0], spine: [0, 0.5, 0], chest: [0, 0.6, 0], neck: [0, 0.73, 0], head: [0, 0.77, 0],
@@ -293,21 +307,25 @@ function buildFigure(cfg) {
   const head = new THREE.SphereGeometry(1, ...HSEG); head.scale(HR[0], HR[1], HR[2]); head.translate(0, HC, 0);
   P.add(head, BI.head, skin, MAT.body, (c, x, y) => c.multiplyScalar(0.97 + 0.05 * (y - HC) / HR[1]));
   for (const s of [1, -1]) P.add(ell(1, 0.04, 0.054, 0.03, s * 0.28, 0.995, -0.01), BI.head, darken(skin, 0.95));
-  P.add(onHead(disc(0.017, 0.013, 0.012), 0, 0.962, -0.002), BI.head, darken(skin, 0.9));
+  P.add(onHead(fem ? disc(0.015, 0.0115, 0.011) : disc(0.019, 0.014, 0.013), 0, 0.962, -0.002), BI.head, darken(skin, 0.9));   // a finer nose, or a fuller one
   // eyes: big and dark with catchlights; closed, they become gentle curves (the lid bones)
   for (const [s, side] of [[1, 'L'], [-1, 'R']]) {
     const x = s * ex;
-    P.add(ell(1, 0.036, 0.045, 0.018, x, ey, eyeZ), BI['eye' + side], ink);
+    P.add(ell(1, fem ? 0.037 : 0.035, fem ? 0.047 : 0.043, 0.018, x, ey, eyeZ), BI['eye' + side], ink);
+    // lashes: three soft strokes sweeping out from the upper outer corner
+    if (fem) for (let k = 0; k < 3; k++) { const a = 0.35 + k * 0.38, bx = x + s * 0.034 * Math.cos(a), by = ey + 0.04 * Math.sin(a);
+      P.add(tubeOf([new V(bx, by, eyeZ + 0.012), new V(bx + s * 0.011 * Math.cos(a + 0.3), by + 0.012 * Math.sin(a + 0.3) + 0.004, eyeZ + 0.014)], 0.0034, 6, 4), BI['eye' + side], ink); }
     P.add(ell(1, 0.012, 0.012, 0.008, x + 0.012, ey + 0.017, eyeZ + 0.013), BI['eye' + side], '#ffffff');
     P.add(ell(1, 0.006, 0.006, 0.005, x - 0.012, ey - 0.015, eyeZ + 0.012), BI['eye' + side], '#ffffff');
     P.add(tubeOf([new V(x - 0.034, ey + 0.004, eyeZ + 0.012), new V(x, ey - 0.012, eyeZ + 0.019), new V(x + 0.034, ey + 0.004, eyeZ + 0.012)], 0.0062, 12, 5), BI['lid' + side], ink);
     const browC = hairC === HAIR_COLORS[4] || hairC === HAIR_COLORS[3] ? darken(hairC, 0.7) : darken(hairC, 0.95);
-    P.add(tubeOnFace([[x - 0.03, 1.07], [x, 1.079], [x + 0.03, 1.07]], 0.0058), BI['brow' + side], browC);
-    P.add(onHead(disc(0.042, 0.025, 0.005), s * 0.163, 0.94, -0.001), BI.head, mix(skin, '#ff8a80', 0.5));
+    if (fem) P.add(tubeOnFace([[x - 0.031, 1.07], [x - s * 0.004, 1.084], [x + 0.031, 1.072]], 0.0047), BI['brow' + side], browC);   // fine and arched
+    else P.add(tubeOnFace([[x - 0.033, 1.066], [x, 1.071], [x + 0.033, 1.068]], 0.0074), BI['brow' + side], browC);                 // heavier and straighter
+    P.add(onHead(disc(0.042, 0.025, 0.005), s * 0.163, 0.94, -0.001), BI.head, mix(skin, '#ff8a80', fem ? 0.6 : 0.32));
   }
   // a small smile (the corners lift with the mouth bones) and an open mouth that appears when chanting
   const smile = tubeOnFace([[-0.034, 0.936], [-0.017, 0.926], [0, 0.923], [0.017, 0.926], [0.034, 0.936]], 0.0054, 0.0025);
-  P.add(smile, BI.head, '#7a2c22', MAT.body, null, (x) => x > 0.01 ? [[BI.mouthL, sstep(0.01, 0.034, x)], [BI.head, 1 - sstep(0.01, 0.034, x)]] : x < -0.01 ? [[BI.mouthR, sstep(0.01, 0.034, -x)], [BI.head, 1 - sstep(0.01, 0.034, -x)]] : [[BI.head, 1]]);
+  P.add(smile, BI.head, fem ? '#a8323c' : '#7a2c22', MAT.body, null, (x) => x > 0.01 ? [[BI.mouthL, sstep(0.01, 0.034, x)], [BI.head, 1 - sstep(0.01, 0.034, x)]] : x < -0.01 ? [[BI.mouthR, sstep(0.01, 0.034, -x)], [BI.head, 1 - sstep(0.01, 0.034, -x)]] : [[BI.head, 1]]);
   P.add(ell(1, 0.022, 0.027, 0.008, 0, 0.92, mouthZ), BI.jaw, '#5a1e16');
   P.add(ell(1, 0.012, 0.008, 0.005, 0, 0.911, mouthZ + 0.004), BI.jaw, '#e8796b');
   // forehead marks
@@ -324,10 +342,11 @@ function buildFigure(cfg) {
     P.add(ell(1, 0.014, 0.014, 0.014, s * 0.288, 0.935, 0.0), BI.head, gold, MAT.metal);
     if (cfg.jewellery === 'festive') { const c = new THREE.ConeGeometry(0.022, 0.034, 10); c.translate(s * 0.288, 0.905, 0); P.add(c, BI.head, gold, MAT.metal); }
   }
+  if (fem && cfg.jewellery === 'festive') P.add(onHead(new THREE.TorusGeometry(0.0115, 0.0022, 6, 16), 0.019, 0.953, 0.004), BI.head, gold, MAT.metal);   // a small nath
 
   // ---- hair: a cap that follows a hairline; extra pieces for each style
   const hairShade = (c, x, y, z) => c.multiplyScalar(0.86 + 0.14 * Math.sin(x * 70 + z * 40 + y * 9));
-  const covered = cfg.headwear === 'turban' || cfg.headwear === 'topi';
+  const covered = cfg.headwear === 'turban' || cfg.headwear === 'topi' || cfg.headwear === 'dupatta';
   // region(nx, ny, nz) > 0 inside the hair. Outside, the cap sinks just under the skin, and the thickness tapers across the
   // edge, so the hairline is where two smooth surfaces cross: a clean curve rather than the steps of the mesh grid
   const cap = (scale, region0, bump = 0) => {
@@ -382,6 +401,22 @@ function buildFigure(cfg) {
     for (let i = 0; i < p.count; i++) { const y = p.getY(i); p.setXYZ(i, p.getX(i) * 0.27, Math.max(0, y) * 0.11, p.getZ(i) * 0.2 * (1 - 0.55 * Math.max(0, y))); }
     g.computeVertexNormals(); g.rotateX(-0.12); g.translate(0, HC + 0.19, -0.01); P.add(g, BI.head, '#f6f3ea');
   }
+  // a dupatta drawn over the head, framing the face and falling behind the shoulders; or a string of jasmine round the hair
+  else if (cfg.headwear === 'dupatta') {
+    const vc = cfg.outfit === 'saree' || cfg.outfit === 'lehenga' ? base : mix(base, '#ffffff', 0.3);
+    const g = new THREE.SphereGeometry(1, ...HSEG), p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+      const nx = p.getX(i), ny = p.getY(i), nz = p.getZ(i), open = sstep(0.0, 0.38, nz) * sstep(0.5, 0.18, ny);   // the face stays open
+      const k = 1.12 - open * 0.17 + 0.04 * Math.max(0, -ny) * Math.max(0, -nz);
+      p.setXYZ(i, nx * HR[0] * k, HC + ny * HR[1] * k, nz * HR[2] * k);
+    }
+    g.computeVertexNormals(); P.add(g, BI.head, vc, MAT.body, (c, x, y, z) => c.multiplyScalar(0.92 + 0.08 * Math.sin(x * 40 + y * 12)));
+    P.add(ell(1, 0.2, 0.18, 0.07, 0, 0.82, -0.19), BI.chest, darken(vc, 0.93));
+  } else if (cfg.headwear === 'gajra') {
+    for (let i = 0; i <= 22; i++) { const a = -1.35 + i / 22 * 2.7, row = i % 2;
+      P.add(ell(1, 0.017, 0.017, 0.015, Math.sin(a) * HR[0] * 1.07, HC + 0.035 + row * 0.022 - 0.03 * Math.cos(a * 1.3), -Math.cos(a) * HR[2] * 1.07), BI.head, row ? '#fffaf0' : '#f6efd8'); }
+    for (const a of [-1.2, 0, 1.2]) P.add(ell(1, 0.022, 0.009, 0.012, Math.sin(a) * HR[0] * 1.08, HC + 0.02, -Math.cos(a) * HR[2] * 1.08), BI.head, '#3f7a3a');
+  }
   // facial hair
   if (masc && cfg.facial === 'moustache') for (const s of [1, -1]) { const m = onHead(disc(0.032, 0.012, 0.012), s * 0.022, 0.948, 0.002); P.add(m, BI.head, hairC); }
   if (masc && cfg.facial === 'beard') {
@@ -395,10 +430,12 @@ function buildFigure(cfg) {
   }
 
   // ---- the body: a rounded torso, short arms with mitten hands, short legs with bare feet
-  const tp = [[0.001, 0.38], [0.11, 0.385], [0.145, 0.42], [0.152, 0.5], [0.15, 0.58], [0.155, 0.65], [0.13, 0.715], [0.07, 0.745], [0.001, 0.75]].map(([r, y]) => [lb(r), y]);
+  // women: a defined waist and fuller hips; men: a broader chest and shoulders
+  const tp = (fem ? [[0.001, 0.38], [0.115, 0.385], [0.152, 0.42], [0.141, 0.5], [0.139, 0.56], [0.151, 0.63], [0.124, 0.712], [0.068, 0.745], [0.001, 0.75]]
+    : [[0.001, 0.38], [0.108, 0.385], [0.14, 0.42], [0.15, 0.5], [0.153, 0.58], [0.162, 0.65], [0.142, 0.715], [0.074, 0.745], [0.001, 0.75]]).map(([r, y]) => [lb(r), y]);
   P.add(lathe(tp, 28).scale(1, 1, 0.82), BI.chest, skin, MAT.body, null, W.torso);
   P.add(new THREE.CylinderGeometry(0.05, 0.056, 0.1, 14).translate(0, 0.77, 0), BI.neck, darken(skin, 0.94), MAT.body, null, W.neck);
-  const ARM = [[0.001, 0.045], [0.036, 0.036], [0.05, 0.0], [0.049, -0.06], [0.046, -0.125], [0.044, -0.19], [0.04, -0.245], [0.001, -0.258]];
+  const ARM = [[0.001, 0.045], [0.036, 0.036], [0.05, 0.0], [0.049, -0.06], [0.046, -0.125], [0.044, -0.19], [0.04, -0.245], [0.001, -0.258]].map(([r, y]) => [r * (fem ? 0.94 : 1.05), y]);
   const LEGP = [[0.001, 0.04], [0.05, 0.026], [0.062, 0.0], [0.06, -0.08], [0.054, -0.165], [0.05, -0.25], [0.046, -0.315], [0.001, -0.33]];
   for (const [s, side] of [[1, 'L'], [-1, 'R']]) {
     P.add(at(lathe(ARM, 16), 'sh' + side), BI['sh' + side], skin, MAT.body, null, W.arm(side));
@@ -424,16 +461,37 @@ function buildFigure(cfg) {
     P.add(shell(dense(prof, 0.02), { sz: 0.86, seg: 40, hemWave: 0.003 }), BI.chest, '#ffffff', MAT.skirt, null, W.torso, lapDrape(0.45, hem, (th) => lobes(th, 0.18, sal ? 0.15 : 0.12), 0.018, 0.17, sal ? 0.025 : 0.006));
     P.add(new THREE.CylinderGeometry(0.06, 0.064, 0.032, 18, 1, true).translate(0, 0.772, 0.002), BI.chest, accent);
   };
-  if (cfg.outfit === 'kurta') {
+  if (cfg.outfit === 'kurta' || cfg.outfit === 'jacket') {
     tunic(0.2, false); sleeve(0.235, base); trousers('#f4eee2', 0);
     const fz = (y) => radAt([[0.176, 0.6], [0.178, 0.66], [0.152, 0.72], [0.076, 0.762]].map(([r, yy]) => [lb(r), yy]), y) * 0.86 + 0.003;
     P.add(tubeOf([0.755, 0.72, 0.68, 0.64, 0.61].map(y => new V(0, y, fz(y))), 0.005, 10, 4), BI.chest, gold, MAT.metal);
     for (const y of [0.735, 0.7, 0.665]) P.add(ell(1, 0.007, 0.007, 0.004, 0, y, fz(y) + 0.004), BI.chest, accent, MAT.metal);
   }
+  if (cfg.outfit === 'jacket') {
+    // a sleeveless Nehru jacket over the kurta, in the accent colour, with a band collar and a row of gold buttons
+    const jc = darken(accent, 0.92);
+    P.add(shell(dense([[lb(0.212), 0.33], [lb(0.205), 0.42], [lb(0.194), 0.52], [lb(0.192), 0.6], [lb(0.192), 0.66], [lb(0.166), 0.72], [0.086, 0.762]], 0.02), { sz: 0.88, seg: 40 }), BI.chest, jc, MAT.body, (c, x, y, z) => c.multiplyScalar(z > 0 && Math.abs(x) < 0.008 ? 0.7 : 1), W.torso);
+    P.add(new THREE.CylinderGeometry(0.066, 0.07, 0.04, 18, 1, true).translate(0, 0.775, 0.002), BI.chest, jc);
+    const jz = (y) => radAt([[0.205, 0.42], [0.194, 0.52], [0.192, 0.6], [0.192, 0.66], [0.166, 0.72]].map(([r, yy]) => [lb(r), yy]), y) * 0.88 + 0.004;
+    for (const y of [0.7, 0.64, 0.58, 0.52, 0.46, 0.4]) P.add(ell(1, 0.008, 0.008, 0.005, 0, y, jz(y)), BI.chest, gold, MAT.metal);
+    for (const s2 of [1, -1]) P.add(ell(1, 0.016, 0.0035, 0.004, s2 * 0.075, 0.6, jz(0.6) - 0.004), BI.chest, gold, MAT.metal);   // pocket welts
+  }
+  if (cfg.outfit === 'lehenga') {
+    // a fitted choli, a full flared skirt pleated all round, and a dupatta over one shoulder
+    P.add(shell(dense([[lb(0.158), 0.5], [lb(0.16), 0.58], [lb(0.168), 0.65], [lb(0.142), 0.715], [0.075, 0.752]], 0.02), { sz: 0.86, seg: 36 }), BI.chest, accent, MAT.body, null, W.torso);
+    sleeve(0.11, accent);
+    const skirt = shell(dense([[lb(0.3), 0.02], [lb(0.275), 0.12], [lb(0.235), 0.28], [lb(0.19), 0.42], [lb(0.166), 0.5], [lb(0.158), 0.53]], 0.025), { sz: 0.88, pleats: 34, pleatFront: Math.PI, hemWave: 0.007, seg: 56 });
+    P.add(skirt, BI.hips, '#ffffff', MAT.skirt, null, null, lapDrape(0.5, 0.02, (th) => lobes(th, 0.22, 0.18)));
+    P.add(torus(lb(0.167), 0.013, 0, 0.515, 0), BI.hips, gold, MAT.metal);
+    // the dupatta: the same patterned cloth as the skirt, with its zari borders, drawn on both sides like a saree's pallu
+    P.add(ribbon([new V(0.14, 0.4, -0.18), new V(0.155, 0.6, -0.13), new V(0.162, 0.758, 0.0), new V(0.11, 0.67, 0.172), new V(0.03, 0.58, 0.185), new V(-0.07, 0.5, 0.188), new V(-0.15, 0.42, 0.15)],
+      (u) => 0.095 + 0.03 * Math.sin(u * Math.PI), { segs: 56, fold: 0.006, folds: 4, lift: 0.016 }), BI.chest, '#ffffff', MAT.ribbon);
+  }
   if (cfg.outfit === 'salwar') {
     tunic(0.22, true); sleeve(0.17, base); trousers(mix(base, '#ffffff', 0.55), 0.028);
-    P.add(ribbon([new V(0.13, 0.42, -0.17), new V(0.15, 0.62, -0.13), new V(0.158, 0.755, 0.0), new V(0.09, 0.66, 0.168), new V(0, 0.62, 0.188), new V(-0.09, 0.66, 0.168), new V(-0.158, 0.755, 0.0), new V(-0.15, 0.62, -0.13), new V(-0.13, 0.42, -0.17)],
-      () => 0.085, { segs: 60, fold: 0.005, folds: 3, lift: 0.01 }), BI.chest, accent, MAT.body);
+    // the dupatta, drawn from both sides so it shows from every angle
+    { const d = ribbon([new V(0.13, 0.42, -0.17), new V(0.15, 0.62, -0.13), new V(0.158, 0.755, 0.0), new V(0.09, 0.66, 0.168), new V(0, 0.62, 0.188), new V(-0.09, 0.66, 0.168), new V(-0.158, 0.755, 0.0), new V(-0.15, 0.62, -0.13), new V(-0.13, 0.42, -0.17)],
+      () => 0.085, { segs: 60, fold: 0.005, folds: 3, lift: 0.01 }); P.add(d, BI.chest, accent, MAT.body); const back = d.clone(); const ix = back.index.array; for (let t = 0; t < ix.length; t += 3) { const a = ix[t + 1]; ix[t + 1] = ix[t + 2]; ix[t + 2] = a; } back.computeVertexNormals(); P.add(back, BI.chest, accent, MAT.body); }
   }
   if (cfg.outfit === 'saree') {
     P.add(shell(dense([[lb(0.158), 0.5], [lb(0.16), 0.58], [lb(0.168), 0.65], [lb(0.142), 0.715], [0.075, 0.752]], 0.02), { sz: 0.86, seg: 36 }), BI.chest, accent, MAT.body, null, W.torso);

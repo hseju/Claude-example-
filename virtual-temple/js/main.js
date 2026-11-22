@@ -1,7 +1,7 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 import { World, TEMPLES, lerpAngle } from './world.js';
 import { PrayerHall, SPOTS, ENTRANCE, hallRoute, hallFloor } from './dome.js';
-import { Avatar, defaultConfig, randomConfig, SKIN_TONES, HAIR_COLORS, HAIR_STYLES, OUTFITS, CLOTH_COLORS, PRESENTATIONS, BUILDS, AGES, FACIAL, MARKS, JEWELLERY, HEADWEAR } from './avatar.js';
+import { Avatar, defaultConfig, randomConfig, SKIN_TONES, HAIR_COLORS, HAIR_STYLES, OUTFITS, CLOTH_COLORS, PRESENTATIONS, BUILDS, AGES, FACIAL, MARKS, JEWELLERY, HEADWEAR, optionsFor, fitToPresentation } from './avatar.js';
 import { TempleAudio } from './audio.js';
 import { HallDirectory, LocalSimulation, HALL_CAPACITY } from './presence.js';
 import { ProfileStore, storageAvailable } from './profile.js';
@@ -146,27 +146,31 @@ function chipGroup(el, items, key, render) {
     const b = document.createElement('button'); b.type = 'button';
     if (render) render(b, it); else { b.className = 'chip'; b.textContent = it.label; }
     b.setAttribute('aria-pressed', String(me.config[key] === (it.id ?? it)));
-    b.addEventListener('click', () => { me.config[key] = it.id ?? it; if (key === 'presentation') presetsFor(me.config); refreshCreator(); audio.uiTap(); });
+    b.addEventListener('click', () => { const prev = me.config[key]; me.config[key] = it.id ?? it; if (key === 'presentation') presetsFor(me.config, prev); refreshCreator(); audio.uiTap(); });
     el.appendChild(b);
   }
 }
-function presetsFor(c) {
-  if (c.presentation === 'fem' && (c.outfit === 'dhoti' || c.outfit === 'kurta')) c.outfit = 'saree';
-  if (c.presentation === 'masc' && (c.outfit === 'saree' || c.outfit === 'salwar')) c.outfit = 'kurta';
-  if (c.presentation === 'masc' && (c.hair === 'braid' || c.hair === 'bun')) c.hair = 'short';
-  if (c.presentation === 'fem') { c.facial = 'none'; if (c.mark === 'tripundra') c.mark = 'bindi'; }
+// switching gender: what you chose for the other one is remembered, so switching back brings it back; anything that does
+// not suit the new one starts from a sensible choice (saree, braid and bindi; kurta, short hair and tilak)
+const lookMemo = {};
+function presetsFor(c, from) {
+  const keys = ['outfit', 'hair', 'headwear', 'mark', 'facial'];
+  if (from && from !== c.presentation) lookMemo[from] = Object.fromEntries(keys.map((k) => [k, c[k]]));
+  if (lookMemo[c.presentation]) Object.assign(c, lookMemo[c.presentation]);
+  fitToPresentation(c);
 }
 function refreshCreator() {
   chipGroup($('cPres'), PRESENTATIONS, 'presentation');
-  chipGroup($('cOutfit'), OUTFITS, 'outfit');
+  const g = me.config.presentation === 'masc' ? 'masc' : 'fem';   // only the choices that suit the chosen gender
+  chipGroup($('cOutfit'), optionsFor(OUTFITS, g), 'outfit');
   chipGroup($('cColor'), CLOTH_COLORS, 'color', (b, it) => { b.className = 'swatch'; b.style.background = `linear-gradient(135deg, ${it.base} 60%, ${it.accent} 60%)`; b.setAttribute('aria-label', it.id); });
   chipGroup($('cSkin'), SKIN_TONES, 'skin', (b, it) => { b.className = 'swatch'; b.style.background = it; b.setAttribute('aria-label', 'Skin tone'); });
-  chipGroup($('cHair'), HAIR_STYLES, 'hair');
+  chipGroup($('cHair'), optionsFor(HAIR_STYLES, g), 'hair');
   chipGroup($('cHairColor'), HAIR_COLORS, 'hairColor', (b, it) => { b.className = 'swatch'; b.style.background = it; b.setAttribute('aria-label', 'Hair colour'); });
-  chipGroup($('cHeadwear'), HEADWEAR, 'headwear');
+  chipGroup($('cHeadwear'), optionsFor(HEADWEAR, g), 'headwear'); $('cHeadTitle').textContent = g === 'fem' ? 'Head covering & flowers' : 'Head covering';
   chipGroup($('cBuild'), BUILDS, 'build'); chipGroup($('cAge'), AGES, 'age');
-  chipGroup($('cFacial'), FACIAL, 'facial'); $('cFacial').hidden = me.config.presentation === 'fem';
-  chipGroup($('cMark'), MARKS, 'mark'); chipGroup($('cJewel'), JEWELLERY, 'jewellery');
+  chipGroup($('cFacial'), optionsFor(FACIAL, g), 'facial'); $('cFacial').hidden = g === 'fem';
+  chipGroup($('cMark'), optionsFor(MARKS, g), 'mark'); chipGroup($('cJewel'), JEWELLERY.map((j) => ({ id: j.id, label: j[g] || j.label })), 'jewellery');
   chipGroup($('cGlasses'), [{ id: false, label: 'No glasses' }, { id: true, label: 'Glasses' }], 'glasses');
   if (preview.avatar) preview.avatar.setConfig(me.config);
 }
