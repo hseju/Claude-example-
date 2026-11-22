@@ -4,6 +4,8 @@ A browser-based, mobile-first 3D prototype of a living temple campus. You create
 
 It is plain HTML, CSS and ES modules on top of [three.js](https://threejs.org) 0.160 (loaded from jsDelivr). There is no build step and no image asset: architecture and textures are generated in the browser. Music and ambience are licensed recordings in `audio/` (see `audio/CREDITS.md`); effects are synthesised.
 
+**Play it online:** https://hseju.github.io/Claude-example-/ (GitHub Pages). The site is published from the `gh-pages` branch, which `.github/workflows/temple-pages.yml` refreshes from this folder every time `virtual-temple/` changes on the `claude/virtual-temple` branch.
+
 ## Run it
 
 Any static file server works:
