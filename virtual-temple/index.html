@@ -78,7 +78,7 @@
 <section id="hud" class="layer">
   <div class="chipbar tl">
     <button class="pill" id="profileChip" aria-label="Profile and settings"><span class="dot" id="pDot">A</span><span><span id="pName">Guest</span> <span class="tag" id="pKind">guest</span></span></button>
-    <span class="pill" id="presence" title="Other devotees here are simulated in this prototype"><span>Multiplayer offline · <span id="simCount">0</span> simulated devotees</span></span>
+    <button class="pill" id="presence" aria-label="Who is here, and play with friends"><span class="live" aria-hidden="true"></span><span id="presenceText">Multiplayer offline</span></button>
   </div>
   <div class="chipbar tr">
     <button class="pill" id="todChip" aria-haspopup="true" aria-expanded="false">Morning</button>
@@ -204,6 +204,16 @@
     <p class="sub" id="fullSub">All 12 places are taken.</p>
     <div class="row"><button class="btn primary" id="joinOther">Join hall 2</button><button class="btn" id="waitSpot">Wait for a place</button><button class="btn ghost" id="cancelFull">Back to courtyard</button></div>
   </div>
+
+<!-- Play with friends -->
+<section id="roomSheet" class="sheet" hidden aria-labelledby="roomTitle">
+  <button class="close" data-close="roomSheet" aria-label="Close">✕</button>
+  <h2 id="roomTitle">Play with friends</h2>
+  <p class="sub" id="roomSub"></p>
+  <div class="roomlist" id="roomList"></div>
+  <div class="row"><button class="btn primary" id="roomInvite">Invite friends to a private temple</button><button class="btn" id="roomPublic" hidden>Go to the public temple</button></div>
+  <p class="note" style="margin-top:10px">Simulated devotees keep the temple lively. Real people wear a name tag with a saffron initial.</p>
+</section>
 
 <!-- Aarti schedule -->
 <section id="schedule" class="sheet" hidden aria-labelledby="schedTitle">

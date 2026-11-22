@@ -9,6 +9,8 @@ import { PostFX } from './postfx.js';
 import { setAnisotropy } from './textures.js';
 import { setPBRAnisotropy } from './pbr.js';
 import { HUT, hutFloor, hutInside } from './hut.js';
+import { Net, newRoomCode, inviteLink, netId } from './net.js';
+import { RemotePlayers } from './remote.js';
 import { PRASAD } from './prasad.js';
 import { BREATHWORK, MEDITATIONS, TIMER, Guide, Session, PracticeLog, EXTRA_LINES } from './practice.js';
 import { meditatorSVG, MeditatorVisual } from './meditator.js';
@@ -82,7 +84,7 @@ async function boot() {
   sim.start();
   directory.on(onHallChange);
   for (const b of world.bells) b.onStrike = (bell, e = 1) => audio.bell(bell.worldPos, { size: bell.soundSize || 1, gain: 0.42 * (0.25 + 0.75 * e * e), hall: 0.05, stone: 0.35 });
-  $('simCount').textContent = world.npcs.length + (world.hutSitters || []).length;
+  renderPresence();
   buildLabels(); buildCreator(); bindUI(); applySettingsUI();
   onResize();
   const restored = storageAvailable ? profiles.restore() : null;
@@ -92,7 +94,7 @@ async function boot() {
   world.scene.add(me.avatar.root);
   playerRing = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.68, 48), new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffc861').multiplyScalar(2.2), transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending }));
   playerRing.rotation.x = -Math.PI / 2; world.scene.add(playerRing);
-  if (/[?&]debug\b/.test(location.search)) window.__vt = { app, me, world, hall, post, directory, cam, input, settings, audio, preview, refreshCreator, hut: { state: hutState, guide, model: HUT, enter: enterHut, leave: leaveHut, start: startSession, end: endSession } }; // local testing hook
+  if (/[?&]debug\b/.test(location.search)) window.__vt = { app, me, world, hall, post, directory, cam, input, settings, audio, preview, refreshCreator, hut: { state: hutState, guide, model: HUT, enter: enterHut, leave: leaveHut, start: startSession, end: endSession }, net, get remotes() { return remotes; }, temples: TEMPLES, spots: SPOTS, seated, act, beginAarti, enterTemple }; // local testing hook
   setMode('welcome');
   $('loading').style.opacity = '0'; setTimeout(() => $('loading').remove(), 900);
   last = performance.now(); requestAnimationFrame(loop);
@@ -180,7 +182,7 @@ function openCreator(fromWorld = false) {
 // ---------------------------------------------------------------- world entry
 let entered = false;
 function enterWorld() {
-  updateProfileChip();
+  updateProfileChip(); startNet();
   fadeThrough(() => {
     setMode('world'); app.camMode = 'world';
     if (!entered) { me.avatar.root.position.set(0, 0, 46.5); me.avatar.root.rotation.y = Math.PI; cam.yaw = cam.tYaw = 0; entered = true; toast('Walk through the gate. Tap a shrine or open the map to choose where to go.', 5200); }
@@ -200,6 +202,9 @@ function freeText(h) { const n = HALL_CAPACITY - directory.occupancy(h); return 
 function hallLabel(h) { return `Prayer hall ${h.index} · ${directory.occupancy(h)} / ${HALL_CAPACITY}`; }
 function enterTemple(id) {
   if (app.mode !== 'world') return;
+  // friends from your room in one of this temple's halls: join them there (a simulated devotee makes room if it is full)
+  const withFriends = directory.instances(id).find((h) => h.spots.some((o) => o && o.remote));
+  if (withFriends) { if (directory.occupancy(withFriends) >= HALL_CAPACITY) makeRoom(withFriends); if (directory.occupancy(withFriends) < HALL_CAPACITY) return goHall(withFriends); }
   const first = directory.instances(id)[0];
   if (directory.occupancy(first) < HALL_CAPACITY) return goHall(first);
   const alt = directory.findOrCreateAvailable(id);
@@ -240,6 +245,7 @@ function goHall(h, spot = -1) {
 function chooseSpot(i) {
   const h = app.currentHall;
   if (!directory.claim(h.id, i, { id: me.id, name: me.config.name, simulated: false, config: me.config })) { toast('That place was just taken. Choose another lotus.'); return; }
+  net.send({ t: 'claim', hall: h.id, spot: i });
   audio.uiTap();
   hall.mySpot = i; hall.selecting = false; hall.refreshMarkers();
   $('spotSheet').hidden = true;
@@ -257,7 +263,9 @@ function seated() {
   app.hallState = 'seated'; app.camMode = 'prayer';
   me.avatar.root.rotation.y = Math.PI; me.avatar.setState('namaste');
   $('actions').hidden = false;
-  if (app.pendingAarti) { app.pendingAarti = false; setTimeout(beginAarti, 800); }
+  const ra = app.remoteAarti; const raAt = ra && app.currentHall && ra.hall === app.currentHall.id ? (net.now - ra.at) / 1000 : -1;
+  if (raAt >= 0 && raAt < ra.dur - 8) { app.remoteAarti = null; setTimeout(() => beginAarti((net.now - ra.at) / 1000, ra.by), 600); }
+  else if (app.pendingAarti) { app.pendingAarti = false; setTimeout(() => beginAarti(), 800); }
   else toast('You are in your place. Choose a prayer below.', 3200);
 }
 function leaveHall() {
@@ -265,7 +273,7 @@ function leaveHall() {
   directory.leaveQueue(me.id);
   const back = () => fadeThrough(() => {
     if (app.leftSpot >= 0) hall._extinguish(app.leftSpot); app.leftSpot = -1;
-    directory.release(me.id); hall.mySpot = -1; hall.clearOccupants();
+    releaseMe(); hall.mySpot = -1; hall.clearOccupants();
     const T = TEMPLES[app.templeId];
     world.scene.add(me.avatar.root);
     const out = T.entrance.clone().add(T.entrance.clone().setY(0).normalize().multiplyScalar(-1.5));
@@ -275,10 +283,10 @@ function leaveHall() {
     $('spotSheet').hidden = true; $('actions').hidden = true; $('fullSheet').hidden = true;
     setMode('world'); app.camMode = 'world'; snapCamera();
   });
-  if (app.errand) { app.errand = null; hall.playerErrand = null; hall.errandFocus = null; app.onArrive = null; input.auto = []; $('actions').classList.remove('busy'); app.leftSpot = hall.mySpot; directory.release(me.id); hall.mySpot = -1; back(); return; }
+  if (app.errand) { app.errand = null; hall.playerErrand = null; hall.errandFocus = null; app.onArrive = null; input.auto = []; $('actions').classList.remove('busy'); app.leftSpot = hall.mySpot; releaseMe(); hall.mySpot = -1; back(); return; }
   if (app.hallState === 'seated') {
     const s = SPOTS[hall.mySpot], aisle = s.x > 0 ? s.x - 1.5 : s.x + 1.5;
-    app.leftSpot = hall.mySpot; directory.release(me.id); hall.mySpot = -1; hall.refreshMarkers();
+    app.leftSpot = hall.mySpot; releaseMe(); hall.mySpot = -1; hall.refreshMarkers();
     input.auto = [new THREE.Vector3(aisle, 0, s.z), new THREE.Vector3(aisle, 0, 7.2), ENTRANCE.clone()];
     app.hallState = 'leaving'; app.camMode = 'walk'; $('actions').hidden = true; app.onArrive = back;
   } else back();
@@ -291,9 +299,12 @@ function updateHallUI() {
   const h = app.currentHall; if (!h) return;
   $('hallTitle').textContent = TEMPLES[h.templeId].name;
   $('hallSub').textContent = hallLabel(h);
-  const sims = directory.simulatedCount(h);
-  $('hallNote').textContent = sims ? `${sims} simulated devotee${sims === 1 ? '' : 's'} · multiplayer offline` : 'No one else is here';
-  $('occDots').innerHTML = h.spots.map(s => `<i class="${s ? (s.id === me.id ? 'me' : 's') : ''}"></i>`).join('');
+  const sims = directory.simulatedCount(h), friends = h.spots.filter((s) => s && s.remote).map((s) => (net.players.get(s.id) || s).name || 'a friend');
+  const parts = [];
+  if (friends.length) parts.push(friends.length <= 2 ? friends.join(' and ') + ' (here with you)' : `${friends.length} real devotees`);
+  if (sims) parts.push(`${sims} simulated devotee${sims === 1 ? '' : 's'}`);
+  $('hallNote').textContent = parts.length ? parts.join(' · ') + (net.online || friends.length ? '' : ' · multiplayer offline') : 'No one else is here';
+  $('occDots').innerHTML = h.spots.map(s => `<i class="${s ? (s.id === me.id ? 'me' : s.remote ? 'f' : 's') : ''}"></i>`).join('');
 }
 
 // ---------------------------------------------------------------- prayer actions
@@ -302,6 +313,8 @@ function act(name) {
   if (app.mode !== 'hall' || app.hallState !== 'seated' || app.aarti) return;
   const now = performance.now(); if (now - lastAct < 350) return; lastAct = now;
   const av = me.avatar, i = hall.mySpot;
+  const SHARED = { namaste: 'pranam', bell: 'bell', flowers: 'flowers', pradakshina: 'pradakshina', diya: 'diya', incense: 'incense', abhishek: 'abhishek' };
+  if (SHARED[name] && !(name === 'diya' && hall.spotState[i].lit)) net.send({ t: 'e', k: SHARED[name], hall: app.currentHall.id, spot: i });   // the others in this hall see it
   if (name === 'namaste') { av.setState('bow'); setTimeout(() => av.state === 'bow' && av.setState('namaste'), 2500); const who = hall.greetFrom(av); if (who) toast(`${who.config.name || 'The devotee beside you'} returns your namaste`, 2400); }
   if (name === 'bell' || name === 'flowers' || name === 'pradakshina') { startErrand(name); return; }
   if (name === 'diya') {
@@ -343,6 +356,107 @@ function errandDone() {
   app.hallState = 'seated'; app.camMode = 'prayer'; me.avatar.setState('namaste'); $('actions').classList.remove('busy');
 }
 
+// ---------------------------------------------------------------- multiplayer
+// Real devotees from your room (see net.js and server/): they walk the grounds, sit in the hut, take places in the prayer
+// halls and make offerings beside you. The simulated devotees stay, so the temple is never empty, and step aside for them.
+const net = new Net();
+let remotes = null, netReady = false;
+const myNetId = () => netId(me.id || 'guest');
+function myNetState() {
+  const av = me.avatar, p = av.root.position, m = app.mode === 'world' ? 'w' : app.mode === 'hall' ? 'h' : app.mode === 'hut' ? 'u' : 'x';
+  return { m, x: p.x, y: p.y, z: p.z, r: av.root.rotation.y, a: av.state, sp: av.speed || 0, h: m === 'h' && app.currentHall ? app.currentHall.id : null };
+}
+function startNet() {
+  if (remotes) { if (netReady) net.send({ t: 'cfg', name: me.config.name || 'Devotee', look: me.config }); return; }
+  remotes = new RemotePlayers(world.scene, $('labels'), { shadows: Q.level !== 'low' });
+  net.on('join', (p) => { remotes.add(p); if (netReady) toast(`${p.name} has come to the temple`, 2800); });
+  net.on('leave', (p) => { remotes.remove(p); if (netReady && net.online) toast(`${p.name} has left`, 2200); });
+  net.on('state', (p) => remotes.state(p));
+  net.on('look', (p) => { remotes.look(p); if (p.spot) { directory.release(p.id); applyRemoteSpot(p); } });
+  net.on('spot', applyRemoteSpot);
+  net.on('claim', (m) => { if (!m.ok && app.mode === 'hall' && app.currentHall && m.hall === app.currentHall.id && hall.mySpot === m.spot) lostSpot(); });
+  net.on('event', onNetEvent);
+  net.on('welcome', () => { netReady = true; if (app.mode === 'hall' && app.currentHall && hall.mySpot >= 0) net.send({ t: 'claim', hall: app.currentHall.id, spot: hall.mySpot }); renderPresence(); });
+  net.on('status', () => { if (!net.online) netReady = false; renderPresence(); });
+  net.start(() => ({ id: myNetId(), name: me.config.name || 'Devotee', look: me.config, s: myNetState() }));
+  renderPresence();
+}
+function releaseMe() { directory.release(me.id); net.send({ t: 'release' }); }
+function makeRoom(h) { const o = h.spots.find((x) => x && x.simulated); if (o) directory.release(o.id); }
+// the server says where a friend sits: mirror it in this browser's halls, where a simulated devotee steps aside for them
+function applyRemoteSpot(p) {
+  const cur = directory.spotOf(p.id);
+  if (cur && p.spot && cur.hall.id === p.spot.hall && cur.spot === p.spot.spot) return;
+  if (cur) directory.release(p.id);
+  if (!p.spot) return;
+  const [templeId, idx] = p.spot.hall.split('-'); if (!TEMPLES[templeId]) return;
+  let h = null; for (let i = 1; i <= Math.min(+idx, 20); i++) h = directory.ensureInstance(templeId, i);
+  if (!h) return;
+  const o = h.spots[p.spot.spot];
+  if (o && o.id === me.id) lostSpot();
+  else if (o) directory.release(o.id);
+  directory.claim(h.id, p.spot.spot, { id: p.id, name: p.name, simulated: false, remote: true, config: p.look });
+}
+// someone reached your place at the server first: back to choosing, with a word of explanation
+function lostSpot() {
+  if (app.mode !== 'hall' || hall.mySpot < 0) return;
+  if (app.aarti) endAarti(true);
+  directory.release(me.id);
+  app.errand = null; hall.playerErrand = null; hall.errandFocus = null; app.onArrive = null; input.auto = []; $('actions').classList.remove('busy');
+  hall.mySpot = -1; hall.selecting = true; hall.refreshMarkers();
+  me.avatar.root.position.copy(ENTRANCE); me.avatar.root.rotation.y = Math.PI; me.avatar.setState('idle');
+  app.hallState = 'select'; app.camMode = 'select'; $('actions').hidden = true; $('spotSheet').hidden = false; $('spotSub').textContent = freeText(app.currentHall);
+  toast('Another devotee reached that place a moment before you. Choose another lotus.', 3600);
+}
+function onNetEvent(p, m) {
+  const name = p.name || 'A devotee';
+  if (m.k === 'aarti' && m.hall) {
+    const offset = (net.now - m.at) / 1000, dur = m.dur || 60;
+    if (offset < 0 || offset > dur - 8) return;
+    const T = TEMPLES[m.hall.split('-')[0]];
+    if (app.mode === 'hall' && app.currentHall && app.currentHall.id === m.hall) {
+      if (app.hallState === 'seated' && !app.aarti) { beginAarti(offset, p); toast(`${name} has begun the aarti`, 2600); }
+      else if (!app.aarti) { app.remoteAarti = { hall: m.hall, at: m.at, dur, by: p }; toast(`${name} has begun the aarti here. Take a place to join in.`, 3800); }
+    } else toast(`${name} has begun the aarti in the ${T ? T.name : 'temple'}`, 3200);
+    return;
+  }
+  if (m.hall) {   // an offering in a prayer hall: seen by those in the same hall
+    if (app.mode === 'hall' && app.currentHall && app.currentHall.id === m.hall) { hall.remoteAct(p.id, m.k); if (m.k === 'pranam') toast(`${name} offers namaste`, 2000); }
+    return;
+  }
+  if (m.k === 'pranam') { remotes.bow(p); if (m.to === myNetId()) toast(`${name} offers you pranam`, 3000); }
+}
+// the presence pill, and the Play with friends sheet behind it
+function renderPresence() {
+  const sims = world.npcs.length + (world.hutSitters || []).length, priv = net.room !== 'public';
+  let txt;
+  if (!net.enabled) txt = `Multiplayer offline · ${sims} simulated devotees`;
+  else if (net.online) { const n = net.count; txt = `${n} ${n === 1 ? 'devotee' : 'devotees'} online${priv ? ' · private' : ''} · ${sims} simulated`; }
+  else txt = `${net.connecting ? 'Connecting' : 'Reconnecting'} · ${sims} simulated devotees`;
+  $('presenceText').textContent = txt;
+  $('presence').classList.toggle('live', net.online);
+  if (!$('roomSheet').hidden) renderRoomSheet();
+}
+function renderRoomSheet() {
+  const priv = net.room !== 'public';
+  $('roomSub').textContent = !net.enabled ? 'Multiplayer is not set up in this copy of the temple, so everyone here is simulated.'
+    : !net.online ? 'Connecting to the temple server… Simulated devotees keep you company meanwhile.'
+    : priv ? `You are in a private temple (${net.room}). Only people with your invite link can join.` : 'You are in the public temple: anyone who opens the site walks here with you.';
+  const people = net.online ? [{ name: (me.config.name || 'You') + ' (you)' }, ...net.players.values()] : [];
+  $('roomList').innerHTML = people.length ? people.map((p) => `<div class="who"><i>${escapeHtml((p.name || 'D')[0].toUpperCase())}</i><span>${escapeHtml(p.name || 'Devotee')}</span><em>${p.spot ? `in ${escapeHtml(TEMPLES[p.spot.hall.split('-')[0]] ? TEMPLES[p.spot.hall.split('-')[0]].short : 'a')} temple` : p.s && p.s.m === 'u' ? 'meditating' : p.s && p.s.m === 'h' ? 'in a prayer hall' : ''}</em></div>`).join('') : '';
+  $('roomInvite').textContent = priv ? 'Share invite link' : 'Invite friends to a private temple';
+  $('roomInvite').disabled = !net.enabled;
+  $('roomPublic').hidden = !priv;
+}
+async function inviteFriends() {
+  if (!net.enabled) return;
+  if (net.room === 'public') { net.switchRoom(newRoomCode()); history.replaceState(null, '', inviteLink(net.room)); }
+  const url = inviteLink(net.room);
+  try { if (navigator.share) { await navigator.share({ title: 'Virtual Temple', text: 'Come to the temple with me', url }); renderRoomSheet(); return; } } catch (e) { if (e && e.name === 'AbortError') { renderRoomSheet(); return; } }
+  try { await navigator.clipboard.writeText(url); toast('Invite link copied. Send it to your friends.', 3200); } catch (e) { prompt('Copy this invite link and send it to your friends:', url); }
+  renderRoomSheet();
+}
+
 // ---------------------------------------------------------------- aarti
 const SCHEDULE = [['Mangala aarti', 5, 30], ['Shringar aarti', 7, 45], ['Rajbhog aarti', 12, 0], ['Sandhya aarti', 18, 30], ['Shayan aarti', 21, 0]];
 function nextAarti(now = new Date()) {
@@ -364,19 +478,19 @@ function requestAarti(templeId) {
   if (app.mode === 'hall') { if (app.hallState === 'select') autoSpot(); else if (app.hallState === 'seated') { app.pendingAarti = false; beginAarti(); } }
 }
 const MANTRA = { ganesha: 'ॐ गं गणपतये नमः', shiva: 'ॐ नमः शिवाय', krishna: 'ॐ नमो भगवते वासुदेवाय' };
-function beginAarti() {
+function beginAarti(offset = 0, by = null) {
   if (app.aarti || app.hallState !== 'seated') return;
   const dur = 60;
-  app.aarti = { t: 0, dur };
+  app.aarti = { t: offset, dur };
   document.body.classList.add('ceremony');
   sim.gather(app.currentHall.id, 11);
-  hall.startAarti(dur); audio.startAarti(dur);
+  hall.startAarti(dur); hall.aarti.t = offset; audio.startAarti(dur, offset);
+  if (!by) net.send({ t: 'e', k: 'aarti', hall: app.currentHall.id, at: net.now, dur });   // friends in this hall join the same ceremony, in step
   hall.onAartiEnd = () => endAarti(false);
   app.camMode = settings.reducedMotion ? 'prayer' : 'aarti';
   $('aartiDeva').textContent = MANTRA[app.templeId];
   $('aartiLine').textContent = `${nextAarti().name.replace(' aarti', '')} aarti preview · ${TEMPLES[app.templeId].name}, hall ${app.currentHall.index}`;
-  setTimeout(() => app.aarti && $('aartiCaption').classList.add('on'), 9000);
-  setTimeout(() => $('aartiCaption').classList.remove('on'), 22000);
+  if (offset < 18) { setTimeout(() => app.aarti && $('aartiCaption').classList.add('on'), Math.max(0, 9 - offset) * 1000); setTimeout(() => $('aartiCaption').classList.remove('on'), (22 - offset) * 1000); }
 }
 function endAarti(abort) {
   if (!app.aarti) return;
@@ -435,7 +549,14 @@ function positionLabels() {
     // show a quiet "simulated" tag over other devotees while choosing a place
     const occ = [...hall.occupants.values()];
     while (labelEls.sims.length < occ.length) { const e = document.createElement('div'); e.className = 'nlabel sim'; e.textContent = 'simulated'; $('labels').appendChild(e); labelEls.sims.push(e); }
-    labelEls.sims.forEach((e, i) => { if (i < occ.length && app.hallState === 'select') { e.textContent = `${occ[i].config.name} · simulated`; project(occ[i].root.position, e, 1.45); } else e.style.display = 'none'; });
+    labelEls.sims.forEach((e, i) => {
+      const a = occ[i];
+      if (a && (app.hallState === 'select' || (a.remote && app.camMode !== 'aarti'))) {
+        const nm = a.remote ? ((net.players.get(a.occId) || {}).name || a.config.name || 'Devotee') : a.config.name, key = (a.remote ? 'f:' : 's:') + nm;
+        if (e.dataset.k !== key) { e.dataset.k = key; e.className = a.remote ? 'nlabel friend' : 'nlabel sim'; e.innerHTML = a.remote ? `<i>${escapeHtml(nm[0].toUpperCase())}</i>${escapeHtml(nm)}` : `${escapeHtml(nm)} · simulated`; }
+        project(a.root.position, e, 1.45);
+      } else e.style.display = 'none';
+    });
   }
 }
 
@@ -472,10 +593,15 @@ function worldPranam() {
   // to the nearest devotee who is facing you (within a few steps, or close beside you at a shrine): they bow back.
   // Anyone turned away does not see it. With no one facing you, your pranam goes to the shrine before you, or the nearest temple
   const T = nearShrine(), who = world.nearestDevotee(av.root.position, 4.5, true), dWho = who ? who.avatar.root.position.distanceTo(av.root.position) : 99;
-  const toWho = who && (!T || dWho < 2.6);
-  const at = toWho ? who.avatar.root.position : T ? T.pos : Object.values(TEMPLES).sort((a, b) => a.pos.distanceTo(av.root.position) - b.pos.distanceTo(av.root.position))[0].pos;
+  // a friend from your room counts too: they see you bow to them, and decide for themselves whether to bow back
+  const friend = remotes ? remotes.nearest(av.root.position, 4.5) : null, dF = friend ? friend.avatar.root.position.distanceTo(av.root.position) : 99;
+  const toFriend = friend && dF <= dWho && (!T || dF < 2.6);
+  const toWho = !toFriend && who && (!T || dWho < 2.6);
+  const at = toFriend ? friend.avatar.root.position : toWho ? who.avatar.root.position : T ? T.pos : Object.values(TEMPLES).sort((a, b) => a.pos.distanceTo(av.root.position) - b.pos.distanceTo(av.root.position))[0].pos;
   const d = at.clone().sub(av.root.position); av.root.rotation.y = Math.atan2(d.x, d.z);
-  if (toWho) { world.greet(who, av); toast(`${who.avatar.config.name || 'A devotee'} returns your pranam`, 2400); }
+  net.send({ t: 'e', k: 'pranam', ...(toFriend ? { to: friend.p.id } : {}) });
+  if (toFriend) toast(`You offer pranam to ${friend.p.name}`, 2400);
+  else if (toWho) { world.greet(who, av); toast(`${who.avatar.config.name || 'A devotee'} returns your pranam`, 2400); }
 }
 function nearShrine() {
   for (const T of Object.values(TEMPLES)) if (T.entrance.distanceTo(me.avatar.root.position) < 3.4) return T;
@@ -552,7 +678,7 @@ function showTapMarker(p) {
 }
 
 // ---------------------------------------------------------------- UI wiring
-function closeAllPanels() { for (const id of ['auth', 'schedule', 'settings', 'todPop', 'soundPop']) $(id).hidden = true; $('map').classList.remove('on'); $('mapBtn').setAttribute('aria-pressed', 'false'); }
+function closeAllPanels() { for (const id of ['auth', 'schedule', 'settings', 'todPop', 'soundPop', 'roomSheet']) $(id).hidden = true; $('map').classList.remove('on'); $('mapBtn').setAttribute('aria-pressed', 'false'); }
 function toggleMap() { const on = !$('map').classList.contains('on'); $('map').classList.toggle('on', on); $('mapBtn').setAttribute('aria-pressed', String(on)); }
 let authMode = 'signin';
 function setAuthMode(m) { authMode = m; $('tabSignin').setAttribute('aria-selected', String(m === 'signin')); $('tabCreate').setAttribute('aria-selected', String(m === 'create')); $('authSubmit').textContent = m === 'signin' ? 'Sign in' : 'Create profile'; $('authPass').autocomplete = m === 'signin' ? 'current-password' : 'new-password'; $('authErr').textContent = ''; }
@@ -588,6 +714,9 @@ function bindUI() {
     } catch (err) { $('authErr').textContent = err.message; }
   });
   document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => { $(b.dataset.close).hidden = true; }));
+  $('presence').addEventListener('click', () => { closeAllPanels(); $('roomSheet').hidden = false; renderRoomSheet(); });
+  $('roomInvite').addEventListener('click', inviteFriends);
+  $('roomPublic').addEventListener('click', () => { net.switchRoom('public'); history.replaceState(null, '', inviteLink('public')); renderRoomSheet(); toast('Back in the public temple', 2000); });
   // HUD
   $('mapBtn').addEventListener('click', toggleMap);
   $('settingsBtn').addEventListener('click', () => { renderAccount(); $('settings').hidden = false; });
@@ -1010,10 +1139,12 @@ function loop(now) {
     if (narrow) { camera.position.set(0, 1.0 + zk * 0.1, 7.4 * D / 4.4); camera.lookAt(0, -0.12 + zk * 0.67, 0); } else { camera.position.set(0.216 * D, 0.95 + zk * 0.15, D); camera.lookAt(0.216 * D, 0.68 + zk * 0.34, 0); }
     camera.updateProjectionMatrix(); post.tilt.amount = 0; post.bloom.strength = 0; post.shafts.strength = 0; post.finalMat.uniforms.uVignette.value = 0.5; post.render(preview.scene, camera); return;
   }
-  if (app.mode === 'hall') { updateHall(dt, t, ctx); positionLabels(); return; }
-  if (app.mode === 'hut') { updateHut(dt, t, ctx); return; }
+  if (me.avatar) net.tick(myNetState());
+  if (app.mode === 'hall') { updateHall(dt, t, ctx); positionLabels(); remotes && remotes.hideLabels(); return; }
+  if (app.mode === 'hut') { updateHut(dt, t, ctx); remotes && remotes.update(dt, t, { project, showLabels: !hutState.session }); return; }
   updateWorld(dt, t, ctx);
   positionLabels();
+  remotes && remotes.update(dt, t, { project, showLabels: app.mode === 'world' });
 }
 
 function updateWorld(dt, t, ctx) {
