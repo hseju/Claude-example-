@@ -1,0 +1,43 @@
+# Keeps the public Virtual Temple site up to date: whenever virtual-temple/ changes on the claude/virtual-temple
+# branch, its files are copied to the root of the gh-pages branch, which GitHub Pages serves at
+# https://hseju.github.io/Claude-example-/
+name: Publish Virtual Temple to GitHub Pages
+
+on:
+  push:
+    branches: [claude/virtual-temple]
+    paths: ['virtual-temple/**', '.github/workflows/temple-pages.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: temple-pages
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Copy the site to the gh-pages branch
+        run: |
+          set -euo pipefail
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          site="$RUNNER_TEMP/pages"
+          if git ls-remote --exit-code --heads origin gh-pages >/dev/null; then
+            git fetch --depth 1 origin gh-pages
+            git worktree add -B gh-pages "$site" origin/gh-pages
+          else
+            git worktree add --orphan -b gh-pages "$site"
+          fi
+          cd "$site"
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -r "$GITHUB_WORKSPACE/virtual-temple/." .
+          touch .nojekyll   # serve the files exactly as they are
+          git add -A
+          if git diff --cached --quiet; then echo "The site is already up to date."; exit 0; fi
+          git commit -m "Publish Virtual Temple from ${GITHUB_SHA::7}"
+          git push origin gh-pages
