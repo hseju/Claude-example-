@@ -13,13 +13,16 @@ It runs on Cloudflare's free plan. The room's whole state lives in its sockets' 
 | client | `e {k, to?, hall?, spot?, at?, dur?}` | an event: `pranam`, `bell`, `flowers`, `diya`, `incense`, `abhishek`, `pradakshina`, `aarti` |
 | client | `cfg {name, look}` | your name or look changed |
 | client | `claim {hall, spot}` / `release` | take or leave a place in a prayer hall |
+| client | `chat {to, q \| text, n}` | a private message: ready-made phrase number `q`, or typed `text` (checked by `js/chatfilter.js`; at most 5 per 10 seconds) |
 | client | `ping {c}` | clock sync and keep-alive |
 | server | `welcome {you, now, players}` | everyone already here, with their state and places |
 | server | `join`, `leave`, `s`, `e`, `cfg`, `spot` | the same, relayed from other players |
 | server | `claim {ok, hall, spot}` | whether your place was yours to take |
+| server | `chat {from, text, q}` | a private message for you |
+| server | `chat-ok {to, n}` / `chat-no {to, n, reason}` | your message was delivered, or not (`unkind`, `link`, `contact`, `long`, `slow`, `gone`) |
 | server | `pong {c, s}` | the server's clock |
 
-Everything a client sends is checked and trimmed: known keys and modes only, numbers clamped, names stripped of markup, messages under 4 KB. A room holds at most 32 players. Anyone silent for a minute is dropped.
+Everything a client sends is checked and trimmed: known keys and modes only, numbers clamped, names stripped of markup (and unkind names replaced with "Devotee"), messages under 4 KB. Chat goes only to the one player it is for and is never stored. A room holds at most 32 players. Anyone silent for a minute is dropped.
 
 ## Profiles (HTTPS, JSON)
 
