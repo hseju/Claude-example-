@@ -340,8 +340,8 @@ export class PrayerHall {
       const cur = this.occupants.get(i);
       if (cur && cur.occId === o.id) return;
       if (cur) this.scene.remove(cur.root);
-      const a = new Avatar(o.config, { simulated: true, shadows: this.quality.level !== 'low' }); a.occId = o.id; a.root.position.copy(SPOTS[i]); a.root.rotation.y = Math.PI;
-      a.nextAct = 3 + Math.random() * 10; a.setState(Math.random() < 0.6 ? 'namaste' : 'idle');
+      const a = new Avatar(o.config, { simulated: !o.remote, shadows: this.quality.level !== 'low' }); a.occId = o.id; a.remote = !!o.remote; a.root.position.copy(SPOTS[i]); a.root.rotation.y = Math.PI;
+      a.nextAct = 3 + Math.random() * 10; a.setState(a.remote || Math.random() < 0.6 ? 'namaste' : 'idle');
       this.scene.add(a.root); this.occupants.set(i, a);
     });
     for (const [i, a] of this.occupants) if (!keep.has(i)) {
@@ -388,6 +388,17 @@ export class PrayerHall {
     };
   }
 
+  // a real devotee in this hall made an offering on their own screen: play it out here, from their place
+  remoteAct(occId, kind) {
+    let at = -1, a = null; for (const [i, x] of this.occupants) if (x.occId === occId) { at = i; a = x; }
+    if (!a) return null;
+    if (kind === 'pranam') { a.setState('bow'); setTimeout(() => a.state === 'bow' && a.setState('namaste'), 2500); }
+    else if (kind === 'bell' || kind === 'flowers' || kind === 'pradakshina') { if (!a.walkPts) this._simErrand(at, a, kind); }
+    else if (kind === 'diya') { a.setState('offer'); setTimeout(() => this.lightDiya(at), 1000); setTimeout(() => a.state === 'offer' && a.setState('namaste'), 2200); }
+    else if (kind === 'incense') { a.setState('offer'); setTimeout(() => this.offerIncense(at), 900); setTimeout(() => a.state === 'offer' && a.setState('namaste'), 2100); }
+    else if (kind === 'abhishek') { a.setState('offer'); this.abhishek(); setTimeout(() => a.state === 'offer' && a.setState('namaste'), 1800); }
+    return a;
+  }
   ringBell(avatar) {
     if (avatar) { avatar.setState('ring'); setTimeout(() => avatar.state === 'ring' && avatar.setState('namaste'), 1600); }
     const p = avatar ? avatar.root.position : null; (p && p.x > 0 ? this.bells[1] : this.bells[0]).strike(1.1);
@@ -481,7 +492,7 @@ export class PrayerHall {
     // simulated occupants: quiet, occasional devotion
     for (const [i, a] of this.occupants) {
       a.nextAct -= dt;
-      if (!this.aarti && a.nextAct <= 0) {
+      if (!this.aarti && a.nextAct <= 0 && !a.remote) {   // real devotees from your room act only when their owners do
         a.nextAct = 9 + Math.random() * 16; const r = Math.random();
         if (r < 0.35) a.setState('bow'); else if (r < 0.55 && !this.spotState[i].lit) { a.setState('offer'); setTimeout(() => this.lightDiya(i, { sound: false }), 900); }
         else if (r < 0.62 && ctx.incense) { a.setState('offer'); this.offerIncense(i); }

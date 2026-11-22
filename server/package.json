@@ -1,0 +1,13 @@
+{
+  "name": "virtual-temple-server",
+  "private": true,
+  "description": "Multiplayer server for the Virtual Temple: one Durable Object per room",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "node test/smoke.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "4.158.0"
+  }
+}

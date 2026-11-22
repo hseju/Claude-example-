@@ -1,0 +1,42 @@
+# Virtual Temple multiplayer server
+
+A Cloudflare Worker with one Durable Object per room. Each player keeps one WebSocket to their room. The room relays where everyone is and what they do: walking, sitting in the hut, offerings in the prayer halls, pranam, the shared aarti. It is also the single authority on the twelve places in each prayer hall, so two people can never take the same lotus. Simulated devotees never touch the server; every browser keeps its own, and they step aside for real people.
+
+It runs on Cloudflare's free plan. The room's whole state lives in its sockets' attachments, so the room can sleep between messages.
+
+## Protocol (JSON over WebSocket, `wss://<worker>/room/<code>`)
+
+| From | Message | Meaning |
+| --- | --- | --- |
+| client | `hello {id, name, look, s}` | join the room: a hashed player id, display name, avatar look and first state |
+| client | `s {m, x, y, z, r, a, sp, h}` | your state: mode (`w` grounds, `h` prayer hall, `u` meditation hut, `x` menus), position, facing, animation, speed, hall id |
+| client | `e {k, to?, hall?, spot?, at?, dur?}` | an event: `pranam`, `bell`, `flowers`, `diya`, `incense`, `abhishek`, `pradakshina`, `aarti` |
+| client | `cfg {name, look}` | your name or look changed |
+| client | `claim {hall, spot}` / `release` | take or leave a place in a prayer hall |
+| client | `ping {c}` | clock sync and keep-alive |
+| server | `welcome {you, now, players}` | everyone already here, with their state and places |
+| server | `join`, `leave`, `s`, `e`, `cfg`, `spot` | the same, relayed from other players |
+| server | `claim {ok, hall, spot}` | whether your place was yours to take |
+| server | `pong {c, s}` | the server's clock |
+
+Everything a client sends is checked and trimmed: known keys and modes only, numbers clamped, names stripped of markup, messages under 4 KB. A room holds at most 32 players. Anyone silent for a minute is dropped.
+
+## Run it locally
+
+```sh
+cd server
+npm install
+npm run dev                 # wrangler dev on http://127.0.0.1:8787
+npm test                    # two simulated players run through join, move, pranam, places, leave
+```
+
+Open the app with `?server=ws://127.0.0.1:8787` to use the local server. This only works when the app itself is served from localhost.
+
+## Deploy
+
+```sh
+cd server
+CLOUDFLARE_API_TOKEN=<token with the "Edit Cloudflare Workers" template> npx wrangler deploy
+```
+
+Then set `SERVER_URL` in `../js/net.js` to the `wss://` address wrangler prints, and publish the site.
