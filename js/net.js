@@ -53,7 +53,12 @@ export class Net {
   get now() { return Date.now() + this.offset; }                     // the server's clock
 
   // hello() returns { id, name, look, s }: who you are, sent on every (re)connect
-  start(hello) { this.hello = hello; if (this.enabled) this._open(); }
+  start(hello) {
+    this.hello = hello; if (!this.enabled) return;
+    this._open();
+    // a heartbeat on a timer rather than the drawing loop, so a tab in the background (which stops drawing) stays in the room
+    this._beat = setInterval(() => { if (this.online && performance.now() - this._pingAt > 20000) this.ping(); }, 25000);
+  }
   switchRoom(room) {
     if (!ROOM_RE.test(room) || room === this.room) return;
     this.room = room; this._close(); this._open();
@@ -116,7 +121,6 @@ export class Net {
   tick(s) {
     if (!this.online) return;
     const now = performance.now();
-    if (now - this._pingAt > 20000) this.ping();
     const st = { t: 's', m: s.m, x: r2(s.x), y: r2(s.y), z: r2(s.z), r: r2(s.r), a: s.a, sp: r2(s.sp || 0), h: s.h || null };
     const L = this._last;
     const changed = !L || L.m !== st.m || L.a !== st.a || L.h !== st.h || Math.abs(L.x - st.x) > 0.02 || Math.abs(L.z - st.z) > 0.02 || Math.abs(L.y - st.y) > 0.02 || Math.abs(L.r - st.r) > 0.03;
