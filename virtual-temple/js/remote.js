@@ -14,18 +14,28 @@ const FREE_SEATS = HUT.ring.filter((s) => !HUT.sitterSeats.includes(s.deg));
 export class RemotePlayers {
   constructor(scene, labelRoot, { shadows = true } = {}) {
     this.scene = scene; this.labelRoot = labelRoot; this.shadows = shadows;
-    this.list = new Map();   // id -> { p, avatar, label, seat, pos, rot, bowUntil }
+    this.list = new Map();   // id -> { p, avatar, label, bubble, pick, seat, pos, rot, bowUntil }
+    this.onTap = null;       // tapping a friend (their avatar or name tag): open a chat with them
+    this._pickMat = new THREE.MeshBasicMaterial({ visible: false });
+    this._pickGeo = new THREE.BoxGeometry(0.75, 1.45, 0.75).translate(0, 0.72, 0);
   }
   add(p) {
     if (this.list.has(p.id)) return this.list.get(p.id);
     const avatar = new Avatar(p.look, { simulated: false, shadows: this.shadows });
     avatar.root.visible = false; this.scene.add(avatar.root);
-    const label = document.createElement('div'); label.className = 'nlabel friend'; this.labelRoot.appendChild(label);
-    const R = { p, avatar, label, seat: -1, pos: new THREE.Vector3(), rot: 0, fresh: true, bowUntil: 0 };
+    const label = document.createElement('div'); label.className = 'nlabel friend'; label.title = 'Chat'; this.labelRoot.appendChild(label);
+    label.addEventListener('click', () => this.onTap && this.onTap(p.id));
+    const bubble = document.createElement('div'); bubble.className = 'bubble'; bubble.style.display = 'none'; this.labelRoot.appendChild(bubble);
+    const pick = new THREE.Mesh(this._pickGeo, this._pickMat); pick.userData.remoteId = p.id; avatar.root.add(pick);   // an easy target for a tap
+    const R = { p, avatar, label, bubble, pick, bubbleUntil: 0, seat: -1, pos: new THREE.Vector3(), rot: 0, fresh: true, bowUntil: 0 };
     this.list.set(p.id, R); this.setLabel(R); this.state(p);
     return R;
   }
-  remove(p) { const R = this.list.get(p.id); if (!R) return; this.scene.remove(R.avatar.root); R.label.remove(); this.list.delete(p.id); }
+  remove(p) { const R = this.list.get(p.id); if (!R) return; this.scene.remove(R.avatar.root); R.label.remove(); R.bubble.remove(); this.list.delete(p.id); }
+  // a message they sent you, shown for a few seconds over their head
+  say(p, text) { const R = this.list.get(p.id); if (!R) return; R.bubble.textContent = text; R.bubbleUntil = performance.now() + 8000; }
+  // the friends you could tap right now
+  picks() { const out = []; for (const R of this.list.values()) if (R.avatar.root.visible) out.push(R.pick); return out; }
   look(p) { const R = this.list.get(p.id); if (!R) return; R.avatar.setConfig(p.look); this.setLabel(R); }
   setLabel(R) { const n = R.p.name || 'Devotee'; R.label.innerHTML = `<i>${esc(n[0].toUpperCase())}</i>${esc(n)}`; }
   state(p) {
@@ -56,7 +66,7 @@ export class RemotePlayers {
       const s = R.p.s, A = R.avatar, root = A.root;
       const inWorld = s && s.m === 'w', inHut = s && s.m === 'u' && R.seat >= 0;
       root.visible = !!(inWorld || inHut);
-      if (!root.visible) { R.label.style.display = 'none'; R.fresh = true; continue; }
+      if (!root.visible) { R.label.style.display = 'none'; R.bubble.style.display = 'none'; R.fresh = true; continue; }
       if (inHut) {
         const seat = FREE_SEATS[R.seat]; root.position.copy(seat.pos); root.rotation.y = seat.rotY; A.speed = 0; A.setState('meditate');
       } else {
@@ -71,9 +81,10 @@ export class RemotePlayers {
       }
       A.update(dt, t);
       if (showLabels && project) project(root.position, R.label, inHut ? 1.15 : 1.55); else R.label.style.display = 'none';
+      if (now < R.bubbleUntil && project) project(root.position, R.bubble, inHut ? 1.6 : 2.0); else R.bubble.style.display = 'none';
     }
   }
-  hideLabels() { for (const R of this.list.values()) R.label.style.display = 'none'; }
+  hideLabels() { for (const R of this.list.values()) { R.label.style.display = 'none'; R.bubble.style.display = 'none'; } }
   clear() { for (const R of [...this.list.values()]) this.remove(R.p); }
 }
 

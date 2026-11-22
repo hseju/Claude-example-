@@ -11,6 +11,7 @@ import { setPBRAnisotropy } from './pbr.js';
 import { HUT, hutFloor, hutInside } from './hut.js';
 import { Net, newRoomCode, inviteLink, netId } from './net.js';
 import { RemotePlayers } from './remote.js';
+import { Chat } from './chat.js';
 import { PRASAD } from './prasad.js';
 import { BREATHWORK, MEDITATIONS, TIMER, Guide, Session, PracticeLog, EXTRA_LINES } from './practice.js';
 import { meditatorSVG, MeditatorVisual } from './meditator.js';
@@ -371,7 +372,7 @@ function errandDone() {
 // Real devotees from your room (see net.js and server/): they walk the grounds, sit in the hut, take places in the prayer
 // halls and make offerings beside you. The simulated devotees stay, so the temple is never empty, and step aside for them.
 const net = new Net();
-let remotes = null, netReady = false;
+let remotes = null, netReady = false, chat = null;
 const myNetId = () => netId(me.id || 'guest');
 function myNetState() {
   const av = me.avatar, p = av.root.position, m = app.mode === 'world' ? 'w' : app.mode === 'hall' ? 'h' : app.mode === 'hut' ? 'u' : 'x';
@@ -380,6 +381,8 @@ function myNetState() {
 function startNet() {
   if (remotes) { if (netReady) net.send({ t: 'cfg', name: me.config.name || 'Devotee', look: me.config }); return; }
   remotes = new RemotePlayers(world.scene, $('labels'), { shadows: Q.level !== 'low' });
+  chat = new Chat(net, { toast, onIncoming: (p, m) => { if (p && m) remotes.say(p, m.text); renderPresence(); } });
+  remotes.onTap = (id) => openChat(id);
   net.on('join', (p) => { remotes.add(p); if (netReady) toast(`${p.name} has come to the temple`, 2800); });
   net.on('leave', (p) => { remotes.remove(p); if (netReady && net.online) toast(`${p.name} has left`, 2200); });
   net.on('state', (p) => remotes.state(p));
@@ -392,6 +395,8 @@ function startNet() {
   net.start(() => ({ id: myNetId(), name: me.config.name || 'Devotee', look: me.config, s: myNetState() }));
   renderPresence();
 }
+// a chat with a real devotee: from their avatar, their name tag, or their row in Play with friends
+function openChat(id) { if (!chat) return; closeAllPanels(); chat.openWith(id); }
 function releaseMe() { directory.release(me.id); net.send({ t: 'release' }); }
 function makeRoom(h) { const o = h.spots.find((x) => x && x.simulated); if (o) directory.release(o.id); }
 // the server says where a friend sits: mirror it in this browser's halls, where a simulated devotee steps aside for them
@@ -447,6 +452,7 @@ function renderPresence() {
   else txt = `${net.connecting ? 'Connecting' : 'Reconnecting'} · ${sims} simulated devotees`;
   $('presenceText').textContent = txt;
   $('presence').classList.toggle('live', net.online);
+  const unread = chat ? chat.unreadTotal : 0; $('presenceUnread').hidden = !unread; $('presenceUnread').textContent = unread > 9 ? '9+' : String(unread);
   if (!$('roomSheet').hidden) renderRoomSheet();
 }
 function renderRoomSheet() {
@@ -455,7 +461,7 @@ function renderRoomSheet() {
     : !net.online ? 'Connecting to the temple server… Simulated devotees keep you company meanwhile.'
     : priv ? `You are in a private temple (${net.room}). Only people with your invite link can join.` : 'You are in the public temple: anyone who opens the site walks here with you.';
   const people = net.online ? [{ name: (me.config.name || 'You') + ' (you)' }, ...net.players.values()] : [];
-  $('roomList').innerHTML = people.length ? people.map((p) => `<div class="who"><i>${escapeHtml((p.name || 'D')[0].toUpperCase())}</i><span>${escapeHtml(p.name || 'Devotee')}</span><em>${p.spot ? `in ${escapeHtml(TEMPLES[p.spot.hall.split('-')[0]] ? TEMPLES[p.spot.hall.split('-')[0]].short : 'a')} temple` : p.s && p.s.m === 'u' ? 'meditating' : p.s && p.s.m === 'h' ? 'in a prayer hall' : ''}</em></div>`).join('') : '';
+  $('roomList').innerHTML = people.length ? people.map((p) => `<div class="who"><i>${escapeHtml((p.name || 'D')[0].toUpperCase())}</i><span>${escapeHtml(p.name || 'Devotee')}</span>${p.id ? `<button class="btn small" data-chat="${escapeHtml(p.id)}">Chat${chat && chat.unread.get(p.id) ? ` (${chat.unread.get(p.id)})` : ''}</button>` : ''}<em>${p.spot ? `in ${escapeHtml(TEMPLES[p.spot.hall.split('-')[0]] ? TEMPLES[p.spot.hall.split('-')[0]].short : 'a')} temple` : p.s && p.s.m === 'u' ? 'meditating' : p.s && p.s.m === 'h' ? 'in a prayer hall' : ''}</em></div>`).join('') : '';
   $('roomInvite').textContent = priv ? 'Share invite link' : 'Invite friends to a private temple';
   $('roomInvite').disabled = !net.enabled;
   $('roomPublic').hidden = !priv;
@@ -565,7 +571,7 @@ function positionLabels() {
       const a = occ[i];
       if (a && (app.hallState === 'select' || (a.remote && app.camMode !== 'aarti'))) {
         const nm = a.remote ? ((net.players.get(a.occId) || {}).name || a.config.name || 'Devotee') : a.config.name, key = (a.remote ? 'f:' : 's:') + nm;
-        if (e.dataset.k !== key) { e.dataset.k = key; e.className = a.remote ? 'nlabel friend' : 'nlabel sim'; e.innerHTML = a.remote ? `<i>${escapeHtml(nm[0].toUpperCase())}</i>${escapeHtml(nm)}` : `${escapeHtml(nm)} · simulated`; }
+        if (e.dataset.k !== key) { e.dataset.k = key; e.className = a.remote ? 'nlabel friend' : 'nlabel sim'; e.onclick = a.remote ? () => openChat(a.occId) : null; e.innerHTML = a.remote ? `<i>${escapeHtml(nm[0].toUpperCase())}</i>${escapeHtml(nm)}` : `${escapeHtml(nm)} · simulated`; }
         project(a.root.position, e, 1.45);
       } else e.style.display = 'none';
     });
@@ -670,6 +676,7 @@ const ray = new THREE.Raycaster(), occRay = new THREE.Raycaster();
 function tap(x, y) {
   ray.setFromCamera(new THREE.Vector2(x / innerWidth * 2 - 1, -(y / innerHeight) * 2 + 1), camera);
   if (app.mode === 'world') {
+    if (remotes) { const f = ray.intersectObjects(remotes.picks(), false)[0]; if (f) { openChat(f.object.userData.remoteId); return; } }
     const hits = ray.intersectObjects(world.pickables, true);
     for (const h of hits) {
       const o = h.object;
@@ -690,7 +697,7 @@ function showTapMarker(p) {
 }
 
 // ---------------------------------------------------------------- UI wiring
-function closeAllPanels() { for (const id of ['auth', 'schedule', 'settings', 'todPop', 'soundPop', 'roomSheet']) $(id).hidden = true; $('map').classList.remove('on'); $('mapBtn').setAttribute('aria-pressed', 'false'); }
+function closeAllPanels() { for (const id of ['auth', 'schedule', 'settings', 'todPop', 'soundPop', 'roomSheet', 'chatSheet']) $(id).hidden = true; if (chat) chat.open = null; $('map').classList.remove('on'); $('mapBtn').setAttribute('aria-pressed', 'false'); }
 function toggleMap() { const on = !$('map').classList.contains('on'); $('map').classList.toggle('on', on); $('mapBtn').setAttribute('aria-pressed', String(on)); }
 let authMode = 'signin';
 function setAuthMode(m) { authMode = m; $('tabSignin').setAttribute('aria-selected', String(m === 'signin')); $('tabCreate').setAttribute('aria-selected', String(m === 'create')); $('authSubmit').textContent = m === 'signin' ? 'Sign in' : 'Create profile'; $('authPass').autocomplete = m === 'signin' ? 'current-password' : 'new-password'; $('authErr').textContent = ''; }
@@ -731,6 +738,7 @@ function bindUI() {
   document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => { $(b.dataset.close).hidden = true; }));
   $('presence').addEventListener('click', () => { closeAllPanels(); $('roomSheet').hidden = false; renderRoomSheet(); });
   $('roomInvite').addEventListener('click', inviteFriends);
+  $('roomList').addEventListener('click', (e) => { const b = e.target.closest('[data-chat]'); if (b) openChat(b.dataset.chat); });
   $('roomPublic').addEventListener('click', () => { net.switchRoom('public'); history.replaceState(null, '', inviteLink('public')); renderRoomSheet(); toast('Back in the public temple', 2000); });
   // HUD
   $('mapBtn').addEventListener('click', toggleMap);

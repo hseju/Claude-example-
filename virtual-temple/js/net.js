@@ -89,6 +89,9 @@ export class Net {
       case 'e': { const p = this.players.get(m.id); if (p) this._emit('event', p, m); break; }
       case 'spot': { const p = this.players.get(m.id); if (p) { p.spot = m.hall ? { hall: m.hall, spot: m.spot } : null; this._emit('spot', p); } break; }
       case 'claim': this._emit('claim', m); break;
+      case 'chat': { const p = this.players.get(m.from); if (p) this._emit('chat', p, m); break; }
+      case 'chat-ok': this._emit('chat-ok', m); break;
+      case 'chat-no': this._emit('chat-no', m); break;
       default: break;
     }
   }
@@ -106,6 +109,9 @@ export class Net {
   }
   _dropAll() { for (const id of [...this.players.keys()]) this._leave(id); }
 
+  // a private message to one player: { q } for a ready-made phrase, or { text } (checked again by the server).
+  // Returns a number that comes back with the server's answer, or 0 if offline.
+  chat(to, body) { this._n = (this._n || 0) + 1; return this.send({ t: 'chat', to, n: this._n, ...body }) ? this._n : 0; }
   // your own state: sent when it changes (up to eight times a second while you move) and every few seconds when still
   tick(s) {
     if (!this.online) return;

@@ -13,6 +13,7 @@
 //   /auth/*, /me          devotee profiles that follow you to any device (see the Accounts object below)
 
 import { DurableObject } from 'cloudflare:workers';
+import { checkMessage, cleanName, QUICK } from '../../js/chatfilter.js';   // the same kindness check the app runs
 
 const MAX_PLAYERS = 32;          // per room
 const MAX_MESSAGE = 4096;        // bytes
@@ -110,7 +111,8 @@ export class TempleRoom extends DurableObject {
       const id = pid(m.id); if (!id) { ws.close(4002, 'bad id'); return; }
       // the same player opening a second tab, or coming back after a dropped connection, takes over from the old socket
       for (const x of this._players()) if (x.p.id === id && x.ws !== ws) { x.p.id = null; x.ws.serializeAttachment(x.p); try { x.ws.close(4000, 'replaced'); } catch (e) { /* gone */ } }
-      const q = { id, name: str(m.name, 24) || 'Devotee', look: look(m.look), s: m.s ? state(m.s) : null, spot: null, seen: now };
+      const q = { id, name: cleanName(str(m.name, 24)), look: look(m.look), s: m.s ? state(m.s) : null, spot: null, seen: now };
+      if (q.look.name) q.look.name = q.name;
       ws.serializeAttachment(q);
       this._send(ws, { t: 'welcome', you: id, now, players: this._players().filter((x) => x.ws !== ws).map((x) => pub(x.p)) });
       this._broadcast({ t: 'join', p: pub(q) }, ws);
@@ -122,13 +124,31 @@ export class TempleRoom extends DurableObject {
     switch (m.t) {
       case 's': p.s = state(m); this._save(ws, p); this._broadcast({ t: 's', id: p.id, ...p.s }, ws); break;
       case 'e': if (EVENTS.has(m.k)) { this._save(ws, p); this._broadcast({ t: 'e', id: p.id, ...event(m) }, ws); } break;
-      case 'cfg': p.name = str(m.name, 24) || p.name; p.look = look(m.look); this._save(ws, p); this._broadcast({ t: 'cfg', id: p.id, name: p.name, look: p.look }, ws); break;
+      case 'cfg': p.name = cleanName(str(m.name, 24), p.name); p.look = look(m.look); if (p.look.name) p.look.name = p.name; this._save(ws, p); this._broadcast({ t: 'cfg', id: p.id, name: p.name, look: p.look }, ws); break;
       case 'claim': {
         const hall = hallId(m.hall), spot = m.spot;
         const ok = !!hall && Number.isInteger(spot) && spot >= 0 && spot < SPOTS
           && !this._players().some((x) => x.ws !== ws && x.p.spot && x.p.spot.hall === hall && x.p.spot.spot === spot);
         if (ok) { p.spot = { hall, spot }; this._save(ws, p); this._broadcast({ t: 'spot', id: p.id, hall, spot }, ws); }
         this._send(ws, { t: 'claim', ok, hall, spot });
+        break;
+      }
+      // a private message to one player: a ready-made phrase, or typed text that passes the kindness check
+      case 'chat': {
+        const to = pid(m.to), n = Number.isInteger(m.n) ? m.n : 0; if (!to) break;
+        p.chat = (p.chat || []).filter((t) => now - t < 10_000);
+        if (p.chat.length >= 5 || (p.chat.length && now - p.chat[p.chat.length - 1] < 700)) { this._send(ws, { t: 'chat-no', to, reason: 'slow', n }); break; }
+        let text, q = null;
+        if (Number.isInteger(m.q) && m.q >= 0 && m.q < QUICK.length) { q = m.q; text = QUICK[q]; }
+        else {
+          text = typeof m.text === 'string' ? m.text.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim() : '';
+          const c = checkMessage(text); if (!c.ok) { this._send(ws, { t: 'chat-no', to, reason: c.reason, n }); break; }
+        }
+        const target = this._players().find((x) => x.p.id === to && x.ws !== ws);
+        if (!target) { this._send(ws, { t: 'chat-no', to, reason: 'gone', n }); break; }
+        p.chat.push(now); this._save(ws, p);
+        this._send(target.ws, { t: 'chat', from: p.id, text, q, at: now });
+        this._send(ws, { t: 'chat-ok', to, text, q, at: now, n });
         break;
       }
       case 'release': if (p.spot) { p.spot = null; this._save(ws, p); this._broadcast({ t: 'spot', id: p.id, hall: null }, ws); } break;

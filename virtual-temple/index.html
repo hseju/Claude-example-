@@ -78,7 +78,7 @@
 <section id="hud" class="layer">
   <div class="chipbar tl">
     <button class="pill" id="profileChip" aria-label="Profile and settings"><span class="dot" id="pDot">A</span><span><span id="pName">Guest</span> <span class="tag" id="pKind">guest</span></span></button>
-    <button class="pill" id="presence" aria-label="Who is here, and play with friends"><span class="live" aria-hidden="true"></span><span id="presenceText">Multiplayer offline</span></button>
+    <button class="pill" id="presence" aria-label="Who is here, and play with friends"><span class="live" aria-hidden="true"></span><span id="presenceText">Multiplayer offline</span><span class="unread" id="presenceUnread" hidden></span></button>
   </div>
   <div class="chipbar tr">
     <button class="pill" id="todChip" aria-haspopup="true" aria-expanded="false">Morning</button>
@@ -214,6 +214,18 @@
   <div class="row"><button class="btn primary" id="roomInvite">Invite friends to a private temple</button><button class="btn" id="roomPublic" hidden>Go to the public temple</button></div>
   <p class="note" style="margin-top:10px">Simulated devotees keep the temple lively. Real people wear a name tag with a saffron initial.</p>
 </section>
+
+<!-- Private chat with a real devotee -->
+<section id="chatSheet" class="sheet" hidden aria-labelledby="chatName">
+  <div class="chat-head"><span class="ci" id="chatInitial" aria-hidden="true">D</span><div><h2 id="chatName">Devotee</h2><p class="sub" id="chatStatus">online now</p></div>
+    <button class="btn small ghost" id="chatMute" type="button">Mute</button><button class="close" id="chatClose" type="button" aria-label="Close chat">✕</button></div>
+  <div class="chat-log" id="chatLog" aria-live="polite"></div>
+  <div class="chat-quick" id="chatQuick" aria-label="Quick messages"></div>
+  <form id="chatForm" class="chat-form" autocomplete="off"><input id="chatText" type="text" enterkeyhint="send" placeholder="Write a kind message…" aria-label="Message"><button class="btn primary small" id="chatSend" type="submit">Send</button></form>
+  <p class="chat-err" id="chatErr" role="alert"></p>
+  <p class="note">Messages are just between you two and are not saved. Unkind words, links and contact details are never sent.</p>
+</section>
+<button id="chatNote" class="chat-note" type="button" aria-live="polite"></button>
 
 <!-- Aarti schedule -->
 <section id="schedule" class="sheet" hidden aria-labelledby="schedTitle">
