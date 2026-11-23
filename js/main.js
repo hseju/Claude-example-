@@ -95,7 +95,7 @@ async function boot() {
   world.scene.add(me.avatar.root);
   playerRing = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.68, 48), new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffc861').multiplyScalar(2.2), transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending }));
   playerRing.rotation.x = -Math.PI / 2; world.scene.add(playerRing);
-  if (/[?&]debug\b/.test(location.search)) window.__vt = { app, me, world, hall, post, directory, cam, input, settings, audio, preview, refreshCreator, hut: { state: hutState, guide, model: HUT, enter: enterHut, leave: leaveHut, start: startSession, end: endSession }, net, profiles, get remotes() { return remotes; }, temples: TEMPLES, spots: SPOTS, seated, act, beginAarti, enterTemple }; // local testing hook
+  if (/[?&]debug\b/.test(location.search)) window.__vt = { app, me, world, hall, post, directory, cam, input, settings, audio, preview, refreshCreator, hut: { state: hutState, guide, model: HUT, enter: enterHut, leave: leaveHut, start: startSession, end: endSession }, net, profiles, get remotes() { return remotes; }, temples: TEMPLES, spots: SPOTS, seated, act, beginAarti, enterTemple, goHall, autoSpot, walkIntoHut, receivePrasad, setMode, applyTOD, get chat() { return chat; } }; // local testing hook
   setMode('welcome');
   if (restored) profiles.refresh().then(onProfileRefresh);   // the copy kept here is shown at once; the server has the final word
   $('loading').style.opacity = '0'; setTimeout(() => $('loading').remove(), 900);
