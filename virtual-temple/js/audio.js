@@ -455,8 +455,8 @@ export class TempleAudio {
     set(L.melody, still * music * (0.3 + near * 0.3 + z.krishna * 0.25) * (this.ceremony ? 0 : 1));
     set(L.tabla, still * music * m.tabla * (0.25 + near * 0.3));
     set(L.chant, recMusic || this.sanctum ? 0 : m.chant * 0.3 * z.dome);
-    set(L.shivaDrone, this.sanctum ? 0.55 * (this.ceremony ? 0.4 : 1) : (recMusic ? 0.15 : 0.5) * z.shiva * (0.2 + z.dome));
-    set(L.om, this.sanctum ? (this.ceremony ? 0.3 : 1) : 0);
+    set(L.shivaDrone, this.sanctum ? (this._hasRec('om') ? 0.16 : 0.55) * (this.ceremony ? 0.4 : 1) : (recMusic ? 0.15 : 0.5) * z.shiva * (0.2 + z.dome));   // under the recorded chant, only a faint bed
+    set(L.om, this.sanctum ? (this.ceremony ? 0.3 : 1) * (this._hasRec('om') ? 0.85 : 1) : 0);
     this._ramp(this.hallReturn.gain, 0.12 + z.dome * 0.7, tc);
     this._ramp(this.stoneReturn.gain, 0.15 + z.corridor * 0.55, tc);
   }
@@ -478,6 +478,8 @@ export class TempleAudio {
     this.applyZone(this.zone, 1);
     setTimeout(() => this._loadBuffer('aarti'), 20000);   // ready well before the first aarti
     this._loadBuffer('bell');   // a recorded brass temple bell, small, so it is ready for the first strike
+    this._loadBuffer('om.single');   // one chanted Aum for the Om meditation, small
+    if (this.sanctum) this._omLoop();   // already in the Shiva hall when the recordings became known
   }
   _hasRec(key) { return !!(this.manifest && this.manifest[key]); }
   _loadBuffer(key) {
@@ -757,6 +759,14 @@ export class TempleAudio {
   // a chanted "Aum": the vowel opens, rounds and closes into a long hum
   om(dur = 7, when = 0) {
     if (!this.ctx) return;
+    const one = this.library['om.single'];
+    if (one) {   // a recorded Aum (audio/om-single.mp3), the same voice as the Shiva hall
+      const ctx = this.ctx, t = ctx.currentTime + when, src = ctx.createBufferSource(), g = ctx.createGain(), end = Math.min(dur, one.duration);
+      src.buffer = one; g.gain.setValueAtTime(0.75, t); g.gain.setValueAtTime(0.75, t + end - 0.4); g.gain.linearRampToValueAtTime(0, t + end);
+      src.connect(g).connect(this._guideOut()); this._send(g, { hall: 0.45 }); src.start(t); src.stop(t + end + 0.05);
+      return;
+    }
+    if (this._hasRec('om.single')) this._loadBuffer('om.single');
     const ctx = this.ctx, t = ctx.currentTime + when, out = this._guideOut(), f0 = 110;
     const g = ctx.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.1, t + 0.5); g.gain.setValueAtTime(0.1, t + dur * 0.75); g.gain.linearRampToValueAtTime(0, t + dur);
     const f1 = ctx.createBiquadFilter(); f1.type = 'bandpass'; f1.Q.value = 5; f1.frequency.setValueAtTime(700, t); f1.frequency.linearRampToValueAtTime(450, t + dur * 0.3); f1.frequency.linearRampToValueAtTime(260, t + dur * 0.55);
@@ -777,11 +787,13 @@ export class TempleAudio {
     this.sanctum = s;
     if (!this.ctx) return;
     clearTimeout(this._omTimer); this._omTimer = null;
-    if (s) { this.playStation(); this._omLoop(); } else this._resumeMusic();
+    if (s) { this.playStation(); this._omLoop(); } else { this._stopOmChant(); this._resumeMusic(); }
     this.applyZone(this.zone, s ? 1.2 : 2);
   }
   _omLoop() {
-    if (!this.ctx || !this.sanctum || this._omTimer) return;
+    if (!this.ctx || !this.sanctum) return;
+    if (this._hasRec('om')) { clearTimeout(this._omTimer); this._omTimer = null; this._omChant(); return; }   // the recorded chant; the voices below are only for when it cannot load
+    if (this._omTimer) return;
     const tick = () => {
       if (!this.sanctum) { this._omTimer = null; return; }
       const dur = 9.5 + Math.random() * 2.5, t = this.ctx.currentTime + 0.08;
@@ -791,6 +803,23 @@ export class TempleAudio {
       this._omTimer = setTimeout(tick, (dur + 1.3 + Math.random() * 0.6) * 1000);   // a breath between each Om, the cave ringing on through it
     };
     this._omTimer = setTimeout(tick, 400);
+  }
+  // the recorded chant (audio/om-chant.mp3, see audio/CREDITS.md): a male voice chanting Aum on the Om pitch over a
+  // second, very deep voice an octave below, looped seamlessly; the cave's own reverb rings on it
+  async _omChant() {
+    if (this._omRec) return;
+    const buf = await this._loadBuffer('om');
+    if (!buf || !this.sanctum || this._omRec || !this.ctx) { if (!buf && this.sanctum && !this._omRec) { this.manifest.om = null; this._omLoop(); } return; }
+    const ctx = this.ctx, now = ctx.currentTime, [a, b] = (this.manifest && this.manifest['om.loop']) || [0.1, buf.duration - 0.1];
+    const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true; src.loopStart = a; src.loopEnd = Math.min(b, buf.duration);
+    const g = ctx.createGain(); g.gain.setValueAtTime(0, now); g.gain.linearRampToValueAtTime(1, now + 2.5);
+    src.connect(g).connect(this.layers.om); src.start(now, a);
+    this._omRec = { src, g };
+  }
+  _stopOmChant() {
+    const r = this._omRec; if (!r || !this.ctx) return; this._omRec = null;
+    const now = this.ctx.currentTime; r.g.gain.cancelScheduledValues(now); r.g.gain.setValueAtTime(r.g.gain.value, now); r.g.gain.linearRampToValueAtTime(0, now + 2.5);
+    try { r.src.stop(now + 2.6); } catch (e) { /* already stopped */ }
   }
   // one voice's "Aum": an open "aa" that rounds through "oo" into a long hummed "mm", from a deep, breathy chest voice
   _omVoice(t, dur, f0, cents, level) {
