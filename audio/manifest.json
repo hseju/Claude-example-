@@ -6,6 +6,9 @@
   "ambience.night": "audio/ambience-night.mp3",
   "aarti": "audio/aarti.mp3",
   "bell": "audio/bell-ghanta.mp3",
+  "om": "audio/om-chant.mp3",
+  "om.loop": [0.1, 34.8835],
+  "om.single": "audio/om-single.mp3",
   "playlists": {
     "uplifting": [
       { "file": "audio/music/dhaka.mp3", "title": "Dhaka", "artist": "Kevin MacLeod" },
